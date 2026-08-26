@@ -1,26 +1,98 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ---------------------------------------------------------------------------
+   Xsta360 design tokens — ported from the mockups.
+   Paper/ledger aesthetic: warm paper background, ink-green text, stamp-red
+   accents, register-green for "won", warm-amber for "today".
+   ------------------------------------------------------------------------- */
+@theme {
+  --color-paper: #f3f0e6;
+  --color-paper-2: #eae6d8;
+  --color-panel: #fbf9f2;
+  --color-rule: #d8d2bc;
+  --color-ink: #1e2a22;
+  --color-ink-soft: #4a5750;
+  --color-stamp: #b23a2e;
+  --color-stamp-deep: #8c2c22;
+  --color-register: #2f6b4f;
+  --color-amber: #d98a2b;
+  --color-cold: #9aa39a;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-stamp);
+  color: var(--color-paper);
+}
+
+/* Ledger ruled background — the signature hero texture. */
+.ledger-lines {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 39px,
+    var(--color-rule) 39px,
+    var(--color-rule) 40px
+  );
+}
+
+/* Receipt perforated edge. */
+.receipt-edge-top,
+.receipt-edge-bottom {
+  position: relative;
+}
+.receipt-edge-top::before,
+.receipt-edge-bottom::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 14px;
+  background-image: radial-gradient(
+    circle,
+    var(--color-paper) 6px,
+    transparent 7px
+  );
+  background-size: 22px 22px;
+  background-position: -4px center;
+  background-repeat: repeat-x;
+}
+.receipt-edge-top::before {
+  top: -7px;
+}
+.receipt-edge-bottom::after {
+  bottom: -7px;
+}
+
+/* "FOLLOWED UP" stamp animation. */
+@keyframes stamp-in {
+  to {
+    transform: rotate(-9deg) scale(1);
+    opacity: 0.92;
+  }
+}
+.stamp {
+  transform: rotate(-9deg) scale(0);
+  opacity: 0;
+  animation: stamp-in 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) 1.1s forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .stamp {
+    animation: none;
+    transform: rotate(-9deg) scale(1);
+    opacity: 0.92;
+  }
 }
