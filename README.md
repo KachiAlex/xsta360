@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Xsta360
 
-## Getting Started
+A sales management app for Sales & Marketing teams — manage leads, follow up on time, and close deals without anything going cold.
 
-First, run the development server:
+Built with Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, Postgres, and Drizzle ORM.
+
+## Features
+
+- **Today's Follow-Ups** — a dashboard that surfaces overdue and due-today reminders with heat dots and a stat strip (leads today, overdue, due today, 7-day win rate).
+- **Pipeline board** — drag-and-drop Kanban with custom stages per organization.
+- **Leads** — searchable/filterable list, detail view with a full history timeline (remarks, stage changes, reminders, assignments).
+- **Remarks & reminders** — log a remark and set a follow-up in one tap; snooze or complete reminders.
+- **Win/Loss tracking** — moving to Won/Lost is an explicit action; Lost requires a reason code.
+- **Team management** — invite by email, change roles, remove members (admin only).
+- **Source attribution** — lead count and conversion rate by source; per-rep performance report.
+- **CSV import** — upload a CSV, map columns, bulk insert with per-row error reporting.
+- **Embeddable lead capture form** — public endpoint that drops leads into your pipeline tagged `embedded_form`.
+- **Email reminders** — cron-driven transactional emails via Resend (console fallback in dev).
+- **Marketing homepage** — public landing page matching the design mockup.
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+cp .env.example .env.local   # fill in DATABASE_URL, SESSION_SECRET, etc.
+pnpm db:push                 # create tables
+pnpm db:seed                 # optional: demo data (login: tunde@kreatix.com / password123)
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Commands
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | Description |
+| --- | --- |
+| `pnpm dev` | Dev server |
+| `pnpm build` | Production build |
+| `pnpm start` | Serve production build |
+| `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm lint` | ESLint |
+| `pnpm db:push` | Push schema to Postgres |
+| `pnpm db:studio` | Drizzle Studio (DB GUI) |
+| `pnpm db:seed` | Seed demo data |
 
-## Learn More
+## Environment variables
 
-To learn more about Next.js, take a look at the following resources:
+See [`.env.example`](./.env.example). Required: `DATABASE_URL`, `SESSION_SECRET`. Optional: `RESEND_API_KEY`, `EMAIL_FROM`, `APP_URL`, `CRON_SECRET`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Architecture
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Multi-tenant: every table is scoped by `orgId`. Auth uses email/password with a JWT in an httpOnly cookie. Roles are `admin | manager | rep` on the membership row. All mutations go through server actions that re-verify the session and org scope, and emit audit events. See [AGENTS.md](./AGENTS.md) for full details.
 
-## Deploy on Vercel
+## Deployment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Provision Postgres (Neon, Supabase, or self-hosted).
+2. Set all environment variables.
+3. `pnpm db:push` to create tables.
+4. Deploy (Vercel or any Node host).
+5. Set up a cron job hitting `/api/cron/reminders` every 5-10 minutes with `Authorization: Bearer $CRON_SECRET`.
