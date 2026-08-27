@@ -477,3 +477,77 @@ export async function getDashboardStats(orgId: string, userId: string): Promise<
     winRate7d: winRate,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Upcoming reminders list (for the reminders panel on the dashboard)
+// ---------------------------------------------------------------------------
+
+export interface ReminderRow {
+  id: string;
+  leadId: string;
+  leadName: string;
+  leadCompany: string | null;
+  leadPhone: string | null;
+  dueAt: Date;
+  note: string | null;
+  status: string;
+  bucket: "overdue" | "today" | "upcoming";
+}
+
+export async function getUpcomingReminders(orgId: string, userId: string): Promise<{
+  overdue: ReminderRow[];
+  today: ReminderRow[];
+  upcoming: ReminderRow[];
+}> {
+  const now = new Date();
+  const sod = startOfDay(now);
+  const eod = endOfDay(now);
+  const fourteenDaysAhead = new Date(now.getTime() + 14 * 86_400_000);
+
+  const reminders = await db
+    .select({
+      id: schema.reminders.id,
+      leadId: schema.reminders.leadId,
+      leadName: schema.leads.name,
+      leadCompany: schema.leads.company,
+      leadPhone: schema.leads.phone,
+      dueAt: schema.reminders.dueAt,
+      note: schema.reminders.note,
+      status: schema.reminders.status,
+    })
+    .from(schema.reminders)
+    .innerJoin(schema.leads, eq(schema.reminders.leadId, schema.leads.id))
+    .where(
+      and(
+        eq(schema.reminders.orgId, orgId),
+        eq(schema.reminders.assigneeId, userId),
+        eq(schema.reminders.status, "pending"),
+        lte(schema.reminders.dueAt, fourteenDaysAhead),
+      ),
+    )
+    .orderBy(asc(schema.reminders.dueAt));
+
+  const result: { overdue: ReminderRow[]; today: ReminderRow[]; upcoming: ReminderRow[] } = {
+    overdue: [],
+    today: [],
+    upcoming: [],
+  };
+
+  for (const r of reminders) {
+    const bucket: "overdue" | "today" | "upcoming" =
+      r.dueAt < sod ? "overdue" : r.dueAt <= eod ? "today" : "upcoming";
+    result[bucket].push({
+      id: r.id,
+      leadId: r.leadId,
+      leadName: r.leadName,
+      leadCompany: r.leadCompany,
+      leadPhone: r.leadPhone,
+      dueAt: r.dueAt,
+      note: r.note,
+      status: r.status,
+      bucket,
+    });
+  }
+
+  return result;
+}

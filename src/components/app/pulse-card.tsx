@@ -6,6 +6,7 @@ import { HeatDot } from "@/components/ui/heat-dot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ActivityForm } from "@/components/app/activity-form";
+import { QuickReminderForm } from "@/components/app/quick-reminder-form";
 import type { PulseLead, TimelineEntry } from "@/lib/dashboard";
 import { completeReminderFromDashboard, snoozeReminderFromDashboard } from "@/app/actions/activities";
 import { whatsappClickToChat } from "@/lib/whatsapp";
@@ -261,6 +262,9 @@ export function PulseCard({ lead }: { lead: PulseLead }) {
               <div className="text-xs text-ink-soft py-2">No activities logged yet.</div>
             )}
           </div>
+
+          {/* Inline quick reminder form */}
+          <QuickReminderForm leadId={lead.leadId} />
 
           {/* Inline activity form */}
           <ActivityForm leadId={lead.leadId} />

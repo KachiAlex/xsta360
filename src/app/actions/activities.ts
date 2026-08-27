@@ -205,3 +205,95 @@ export async function snoozeReminderFromDashboard(
   revalidatePath("/dashboard");
   return { ok: true };
 }
+
+// ---------------------------------------------------------------------------
+// Set a standalone reminder (no activity required)
+// ---------------------------------------------------------------------------
+
+const SetReminderSchema = z.object({
+  leadId: z.string().uuid(),
+  dueAt: z.string().min(1, "Pick a date"),
+  note: z.string().trim().optional().or(z.literal("")),
+});
+
+export async function setReminder(
+  _prev: ActivityFormState,
+  formData: FormData,
+): Promise<ActivityFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+
+  const parsed = SetReminderSchema.safeParse({
+    leadId: formData.get("leadId"),
+    dueAt: formData.get("dueAt"),
+    note: formData.get("note"),
+  });
+  if (!parsed.success) {
+    return {
+      errors: parsed.error.issues.reduce<Record<string, string[]>>((acc, i) => {
+        const key = i.path[0]?.toString() ?? "_";
+        (acc[key] ??= []).push(i.message);
+        return acc;
+      }, {}),
+    };
+  }
+
+  const { leadId, dueAt, note } = parsed.data;
+  const lead = await loadOrgLead(ctx, leadId);
+  if (!lead) return { message: "Lead not found" };
+
+  const due = new Date(dueAt);
+  if (isNaN(due.getTime())) {
+    return { errors: { dueAt: ["Invalid date"] } };
+  }
+
+  const [reminder] = await db
+    .insert(schema.reminders)
+    .values({
+      leadId,
+      orgId: ctx.orgId,
+      assigneeId: lead.assigneeId ?? ctx.userId,
+      dueAt: due,
+      note: note || "Follow-up reminder",
+    })
+    .returning();
+
+  await logEvent(ctx.orgId, "reminder_set", {
+    leadId,
+    actorId: ctx.userId,
+    meta: { reminderId: reminder.id, dueAt: due.toISOString(), note: note || null },
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath(`/leads/${leadId}`);
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Delete a reminder
+// ---------------------------------------------------------------------------
+
+export async function deleteReminder(
+  _prev: ActivityFormState,
+  formData: FormData,
+): Promise<ActivityFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+
+  const reminderId = String(formData.get("reminderId"));
+  const [reminder] = await db
+    .delete(schema.reminders)
+    .where(
+      and(
+        eq(schema.reminders.id, reminderId),
+        eq(schema.reminders.orgId, ctx.orgId),
+      ),
+    )
+    .returning();
+
+  if (!reminder) return { message: "Reminder not found" };
+
+  revalidatePath("/dashboard");
+  revalidatePath(`/leads/${reminder.leadId}`);
+  return { ok: true };
+}

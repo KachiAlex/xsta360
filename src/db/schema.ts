@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -65,6 +66,10 @@ export const auditEventTypeEnum = pgEnum("audit_event_type", [
   "sequence_step_sent",
   "sequence_completed",
   "duplicate_detected",
+  "member_invited",
+  "member_joined",
+  "role_changed",
+  "member_removed",
 ]);
 export type AuditEventType = (typeof auditEventTypeEnum.enumValues)[number];
 
@@ -144,6 +149,10 @@ export const invitations = pgTable("invitations", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  // Default 7-day expiry; used as the TTL for the copyable invite link.
+  expiresAt: timestamp("expires_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now() + interval '7 days'`),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

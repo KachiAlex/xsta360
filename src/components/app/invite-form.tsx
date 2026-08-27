@@ -1,19 +1,29 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { inviteMember, type TeamFormState } from "@/app/actions/team";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/field";
 
 export function InviteForm() {
   const [state, action, pending] = useActionState<TeamFormState, FormData>(inviteMember, {});
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    if (!state.inviteUrl) return;
+    await navigator.clipboard.writeText(state.inviteUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <form action={action} className="flex gap-2 items-end flex-wrap">
       <div>
         <Label>Email</Label>
         <Input name="email" type="email" placeholder="teammate@company.com" className="w-auto" />
-        {state.errors?.email && <p className="text-xs text-stamp mt-1">{state.errors.email[0]}</p>}
+        {state.errors?.email && (
+          <p className="text-xs text-stamp mt-1">{state.errors.email[0]}</p>
+        )}
       </div>
       <div>
         <Label>Role</Label>
@@ -24,10 +34,27 @@ export function InviteForm() {
         </Select>
       </div>
       <Button type="submit" size="sm" disabled={pending}>
-        {pending ? "Sending…" : "Invite"}
+        {pending ? "Creating…" : "Invite"}
       </Button>
+
       {state.message && (
-        <p className={`text-xs ${state.ok ? "text-register" : "text-stamp"} w-full`}>{state.message}</p>
+        <p className={`text-xs ${state.ok ? "text-register" : "text-stamp"} w-full`}>
+          {state.message}
+        </p>
+      )}
+
+      {state.inviteUrl && (
+        <div className="w-full flex items-center gap-2 mt-2">
+          <Input
+            value={state.inviteUrl}
+            readOnly
+            className="text-sm bg-paper-2 font-mono"
+            onClick={(e) => e.currentTarget.select()}
+          />
+          <Button type="button" size="sm" onClick={copy}>
+            {copied ? "Copied" : "Copy link"}
+          </Button>
+        </div>
       )}
     </form>
   );

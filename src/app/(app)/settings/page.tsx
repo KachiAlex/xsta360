@@ -8,7 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { InviteForm } from "@/components/app/invite-form";
 import { StageManager } from "@/components/app/stage-manager";
 import { MemberRow } from "@/components/app/member-row";
+import { InvitationRow } from "@/components/app/invitation-row";
 import { OrgSettingsForm } from "@/components/app/org-settings-form";
+
+const appUrl = (process.env.APP_URL || "").replace(/\/$/, "");
 
 export default async function SettingsPage() {
   const ctx = await requireAuth();
@@ -27,11 +30,11 @@ export default async function SettingsPage() {
     <>
       <Topbar />
       <div className="content flex-1 px-8 py-7 max-w-[1240px] w-full mx-auto space-y-6">
-        <h1 className="font-mono text-xl">Settings</h1>
+        <h1 className="font-mono text-xl">Workspace settings</h1>
 
         {/* Team management */}
         <Panel>
-          <PanelHead title="Team" sub={`${members.length} member${members.length === 1 ? "" : "s"}`}>
+          <PanelHead title="Members" sub={`${members.length} member${members.length === 1 ? "" : "s"}`}>
             {isAdmin && <span className="text-xs text-ink-soft font-mono">Admin only</span>}
           </PanelHead>
           <table className="w-full border-collapse">
@@ -45,13 +48,13 @@ export default async function SettingsPage() {
             </thead>
             <tbody>
               {members.map((m) => (
-                <tr key={m.userId} className="hover:bg-paper-2">
+                <tr key={m.membershipId} className="hover:bg-paper-2">
                   <td className="px-5 py-3.5 border-b border-dashed border-rule font-semibold">{m.name}</td>
                   <td className="px-5 py-3.5 border-b border-dashed border-rule text-sm">{m.email}</td>
                   <td className="px-5 py-3.5 border-b border-dashed border-rule">
                     {isAdmin ? (
                       <MemberRow
-                        membershipId={m.userId}
+                        membershipId={m.membershipId}
                         currentRole={m.role}
                         isSelf={m.userId === ctx.userId}
                       />
@@ -74,12 +77,16 @@ export default async function SettingsPage() {
           {isAdmin && invitations.length > 0 && (
             <div className="px-5 py-4 border-t border-rule">
               <div className="font-mono text-[11px] uppercase tracking-wider text-ink-soft mb-2">Pending invitations</div>
-              <ul className="space-y-1 text-sm">
+              <ul className="space-y-2 text-sm">
                 {invitations.map((inv) => (
-                  <li key={inv.id} className="flex justify-between">
-                    <span>{inv.email}</span>
-                    <span className="text-ink-soft font-mono text-xs">{inv.role}</span>
-                  </li>
+                  <InvitationRow
+                    key={inv.id}
+                    id={inv.id}
+                    email={inv.email}
+                    role={inv.role}
+                    inviteUrl={`${appUrl}/join/${inv.token}`}
+                    expiresAt={inv.expiresAt}
+                  />
                 ))}
               </ul>
             </div>

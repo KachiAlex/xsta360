@@ -24,6 +24,7 @@ export async function getOrgLostReasons(orgId: string) {
 export async function getOrgMembers(orgId: string) {
   return db
     .select({
+      membershipId: schema.memberships.id,
       userId: schema.users.id,
       name: schema.users.name,
       email: schema.users.email,

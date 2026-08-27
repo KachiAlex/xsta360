@@ -1,11 +1,12 @@
 import { requireAuth } from "@/lib/dal";
 import { getOrgStages, getOrgMembers } from "@/lib/queries";
-import { getPulseLeads, getDashboardStats } from "@/lib/dashboard";
+import { getPulseLeads, getDashboardStats, getUpcomingReminders } from "@/lib/dashboard";
 import { getTaskSummary } from "@/lib/tasks";
 import { Topbar, ViewTab } from "@/components/app/topbar";
 import { AddLeadModal } from "@/components/app/add-lead-modal";
 import { PulseCard } from "@/components/app/pulse-card";
 import { TaskWidget } from "@/components/app/task-widget";
+import { ReminderPanel } from "@/components/app/reminder-panel";
 import { EmptyState } from "@/components/app/empty-state";
 
 function formatDay(d: Date): string {
@@ -21,12 +22,13 @@ const BUCKET_META = [
 
 export default async function DashboardPage() {
   const ctx = await requireAuth();
-  const [stages, members, pulse, stats, taskSummary] = await Promise.all([
+  const [stages, members, pulse, stats, taskSummary, upcomingReminders] = await Promise.all([
     getOrgStages(ctx.orgId),
     getOrgMembers(ctx.orgId),
     getPulseLeads(ctx.orgId, ctx.userId),
     getDashboardStats(ctx.orgId, ctx.userId),
     getTaskSummary(ctx.orgId, ctx.userId),
+    getUpcomingReminders(ctx.orgId, ctx.userId),
   ]);
 
   const totalCount =
@@ -82,7 +84,7 @@ export default async function DashboardPage() {
         {/* To-Dos & Notes widget */}
         <TaskWidget summary={taskSummary} />
 
-        {/* Pulse cards */}
+        {/* Two-column: pulse cards + reminders panel */}
         {totalCount === 0 ? (
           <EmptyState
             title="No leads yet"
@@ -90,34 +92,41 @@ export default async function DashboardPage() {
             action={addLead}
           />
         ) : (
-          <div className="space-y-6">
-            {/* Summary line */}
-            <div className="text-sm text-ink-soft font-mono">
-              {formatDay(new Date())} · {totalCount} lead{totalCount === 1 ? "" : "s"} assigned to you
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+            {/* Left: pulse cards */}
+            <div className="space-y-6 min-w-0">
+              <div className="text-sm text-ink-soft font-mono">
+                {formatDay(new Date())} · {totalCount} lead{totalCount === 1 ? "" : "s"} assigned to you
+              </div>
+
+              {BUCKET_META.map(({ key, label, color }) => {
+                const leads = pulse[key];
+                if (leads.length === 0) return null;
+                return (
+                  <div key={key}>
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <span className={`font-mono text-[11px] uppercase tracking-wider font-bold ${color}`}>
+                        {label}
+                      </span>
+                      <span className="font-mono text-[11px] text-ink-soft">
+                        ({leads.length})
+                      </span>
+                      <span className="flex-1 h-px bg-rule" />
+                    </div>
+                    <div className="space-y-2">
+                      {leads.map((lead) => (
+                        <PulseCard key={lead.leadId} lead={lead} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            {BUCKET_META.map(({ key, label, color }) => {
-              const leads = pulse[key];
-              if (leads.length === 0) return null;
-              return (
-                <div key={key}>
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <span className={`font-mono text-[11px] uppercase tracking-wider font-bold ${color}`}>
-                      {label}
-                    </span>
-                    <span className="font-mono text-[11px] text-ink-soft">
-                      ({leads.length})
-                    </span>
-                    <span className="flex-1 h-px bg-rule" />
-                  </div>
-                  <div className="space-y-2">
-                    {leads.map((lead) => (
-                      <PulseCard key={lead.leadId} lead={lead} />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+            {/* Right: reminders panel (sticky) */}
+            <div className="lg:sticky lg:top-[88px] lg:self-start">
+              <ReminderPanel reminders={upcomingReminders} />
+            </div>
           </div>
         )}
       </div>
