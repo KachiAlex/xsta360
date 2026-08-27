@@ -13,7 +13,8 @@ export interface SidebarProps {
 }
 
 const NAV = [
-  { href: "/dashboard", label: "Today's Follow-Ups", icon: "▤", key: "today" },
+  { href: "/dashboard", label: "Follow-Ups", icon: "▤", key: "today" },
+  { href: "/tasks", label: "To-Dos & Notes", icon: "✓", key: "tasks" },
   { href: "/pipeline", label: "Pipeline", icon: "▦", key: "pipeline" },
   { href: "/leads", label: "Leads", icon: "▥", key: "leads" },
   { href: "/reports", label: "Reports", icon: "▧", key: "reports" },

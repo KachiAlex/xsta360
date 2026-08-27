@@ -1,9 +1,11 @@
 import { requireAuth } from "@/lib/dal";
 import { getOrgStages, getOrgMembers } from "@/lib/queries";
 import { getPulseLeads, getDashboardStats } from "@/lib/dashboard";
+import { getTaskSummary } from "@/lib/tasks";
 import { Topbar, ViewTab } from "@/components/app/topbar";
 import { AddLeadModal } from "@/components/app/add-lead-modal";
 import { PulseCard } from "@/components/app/pulse-card";
+import { TaskWidget } from "@/components/app/task-widget";
 import { EmptyState } from "@/components/app/empty-state";
 
 function formatDay(d: Date): string {
@@ -19,11 +21,12 @@ const BUCKET_META = [
 
 export default async function DashboardPage() {
   const ctx = await requireAuth();
-  const [stages, members, pulse, stats] = await Promise.all([
+  const [stages, members, pulse, stats, taskSummary] = await Promise.all([
     getOrgStages(ctx.orgId),
     getOrgMembers(ctx.orgId),
     getPulseLeads(ctx.orgId, ctx.userId),
     getDashboardStats(ctx.orgId, ctx.userId),
+    getTaskSummary(ctx.orgId, ctx.userId),
   ]);
 
   const totalCount =
@@ -75,6 +78,9 @@ export default async function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* To-Dos & Notes widget */}
+        <TaskWidget summary={taskSummary} />
 
         {/* Pulse cards */}
         {totalCount === 0 ? (

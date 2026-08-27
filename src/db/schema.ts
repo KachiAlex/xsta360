@@ -56,6 +56,9 @@ export const auditEventTypeEnum = pgEnum("audit_event_type", [
   "lead_assigned",
   "lead_lost",
   "lead_won",
+  "todo_created",
+  "todo_completed",
+  "note_created",
 ]);
 export type AuditEventType = (typeof auditEventTypeEnum.enumValues)[number];
 
@@ -67,6 +70,12 @@ export const activityTypeEnum = pgEnum("activity_type", [
   "visit",
 ]);
 export type ActivityType = (typeof activityTypeEnum.enumValues)[number];
+
+export const todoStatusEnum = pgEnum("todo_status", ["pending", "completed"]);
+export type TodoStatus = (typeof todoStatusEnum.enumValues)[number];
+
+export const todoPriorityEnum = pgEnum("todo_priority", ["low", "medium", "high"]);
+export type TodoPriority = (typeof todoPriorityEnum.enumValues)[number];
 
 // ---------------------------------------------------------------------------
 // Organizations & users
@@ -282,6 +291,67 @@ export const reminders = pgTable(
   (t) => ({
     assigneeDueIdx: index("reminders_assignee_due_idx").on(t.assigneeId, t.dueAt),
     statusDueIdx: index("reminders_status_due_idx").on(t.status, t.dueAt),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// To-dos (standalone or linked to a lead, with optional reminder)
+// ---------------------------------------------------------------------------
+
+export const todos = pgTable(
+  "todos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // Optional link to a lead.
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    status: todoStatusEnum("status").notNull().default("pending"),
+    priority: todoPriorityEnum("priority").notNull().default("medium"),
+    // Optional due date — acts as a reminder trigger.
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    userStatusIdx: index("todos_user_status_idx").on(t.userId, t.status),
+    orgUserIdx: index("todos_org_user_idx").on(t.orgId, t.userId),
+    leadIdx: index("todos_lead_idx").on(t.leadId),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Notes (standalone or linked to a lead)
+// ---------------------------------------------------------------------------
+
+export const notes = pgTable(
+  "notes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // Optional link to a lead.
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    body: text("body").notNull().default(""),
+    pinned: boolean("pinned").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgUserIdx: index("notes_org_user_idx").on(t.orgId, t.userId),
+    leadIdx: index("notes_lead_idx").on(t.leadId),
   }),
 );
 
