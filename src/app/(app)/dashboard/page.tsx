@@ -1,47 +1,42 @@
 import { requireAuth } from "@/lib/dal";
 import { getOrgStages, getOrgMembers } from "@/lib/queries";
-import { getTodayFollowUps, getDashboardStats } from "@/lib/dashboard";
+import { getPulseLeads, getDashboardStats } from "@/lib/dashboard";
 import { Topbar, ViewTab } from "@/components/app/topbar";
 import { AddLeadModal } from "@/components/app/add-lead-modal";
-import { LogRemarkModal } from "@/components/app/log-remark-modal";
-import { Panel, PanelHead } from "@/components/ui/panel";
-import { Badge } from "@/components/ui/badge";
-import { HeatDot } from "@/components/ui/heat-dot";
+import { PulseCard } from "@/components/app/pulse-card";
 import { EmptyState } from "@/components/app/empty-state";
-
-const SOURCE_LABELS: Record<string, string> = {
-  referral: "Referral",
-  social: "Social",
-  ad: "Ad campaign",
-  walk_in: "Walk-in",
-  embedded_form: "Website form",
-  other: "Other",
-};
-
-function formatTime(d: Date): string {
-  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-}
 
 function formatDay(d: Date): string {
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
+const BUCKET_META = [
+  { key: "overdue" as const, label: "Overdue", color: "text-stamp" },
+  { key: "today" as const, label: "Due today", color: "text-[#9c6014]" },
+  { key: "upcoming" as const, label: "Upcoming", color: "text-ink" },
+  { key: "quiet" as const, label: "Quiet", color: "text-ink-soft" },
+];
+
 export default async function DashboardPage() {
   const ctx = await requireAuth();
-  const [stages, members, followUps, stats] = await Promise.all([
+  const [stages, members, pulse, stats] = await Promise.all([
     getOrgStages(ctx.orgId),
     getOrgMembers(ctx.orgId),
-    getTodayFollowUps(ctx.orgId, ctx.userId),
+    getPulseLeads(ctx.orgId, ctx.userId),
     getDashboardStats(ctx.orgId, ctx.userId),
   ]);
 
+  const totalCount =
+    pulse.overdue.length + pulse.today.length + pulse.upcoming.length + pulse.quiet.length;
+  const addLead = (
+    <AddLeadModal stages={stages} members={members} currentUserId={ctx.userId} />
+  );
+
   return (
     <>
-      <Topbar
-        actions={<AddLeadModal stages={stages} members={members} currentUserId={ctx.userId} />}
-      >
+      <Topbar actions={addLead}>
         <ViewTab active href="/dashboard">
-          Today&apos;s Follow-Ups
+          Follow-Ups
         </ViewTab>
         <ViewTab active={false} href="/pipeline">
           Pipeline
@@ -59,7 +54,7 @@ export default async function DashboardPage() {
           </div>
           <div className="stat bg-panel px-[22px] py-[18px]">
             <div className="label font-mono text-[11px] uppercase tracking-wider text-ink-soft mb-2">
-              Overdue follow-ups
+              Overdue
             </div>
             <div className="value font-mono text-[26px] font-bold text-stamp">
               {stats.overdue}
@@ -81,83 +76,43 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Today's Follow-Ups table */}
-        {followUps.length === 0 ? (
+        {/* Pulse cards */}
+        {totalCount === 0 ? (
           <EmptyState
-            title="No follow-ups today"
-            description="You're all caught up. Add a lead or set a reminder to see it here tomorrow."
-            action={<AddLeadModal stages={stages} members={members} currentUserId={ctx.userId} />}
+            title="No leads yet"
+            description="Add your first lead to start tracking follow-ups and activities."
+            action={addLead}
           />
         ) : (
-          <Panel>
-            <PanelHead
-              title="Today's Follow-Ups"
-              sub={`${formatDay(new Date())} · ${followUps.length} lead${followUps.length === 1 ? "" : "s"}`}
-            />
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">
-                    Lead
-                  </th>
-                  <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">
-                    Last remark
-                  </th>
-                  <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">
-                    Days since contact
-                  </th>
-                  <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">
-                    Reminder
-                  </th>
-                  <th className="px-5 py-3 border-b border-rule" />
-                </tr>
-              </thead>
-              <tbody>
-                {followUps.map((row) => (
-                  <tr key={row.leadId} className="hover:bg-paper-2">
-                    <td className="px-5 py-3.5 border-b border-dashed border-rule">
-                      <div className="flex items-center gap-0">
-                        <HeatDot heat={row.heat} className="mr-2.5" />
-                        <div>
-                          <div className="font-semibold">{row.leadName}</div>
-                          <div className="text-xs text-ink-soft">
-                            {row.company ? `${row.company} · ` : ""}
-                            {SOURCE_LABELS[row.source] ?? row.source}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3.5 border-b border-dashed border-rule text-sm">
-                      {row.lastRemarkBody ?? <span className="text-ink-soft">No remarks yet</span>}
-                    </td>
-                    <td className="px-5 py-3.5 border-b border-dashed border-rule text-sm">
-                      {row.daysSinceContact !== null
-                        ? `${row.daysSinceContact} day${row.daysSinceContact === 1 ? "" : "s"}`
-                        : "—"}
-                    </td>
-                    <td className="px-5 py-3.5 border-b border-dashed border-rule">
-                      {row.bucket === "overdue" ? (
-                        <Badge tone="overdue">Overdue</Badge>
-                      ) : row.bucket === "today" && row.reminderDueAt ? (
-                        <Badge tone="today">{formatTime(row.reminderDueAt)}</Badge>
-                      ) : (
-                        <Badge tone="later">Later</Badge>
-                      )}
-                    </td>
-                    <td className="px-5 py-3.5 border-b border-dashed border-rule">
-                      <div className="flex gap-2">
-                        <LogRemarkModal
-                          leadId={row.leadId}
-                          leadName={row.leadName}
-                          leadCompany={row.company}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Panel>
+          <div className="space-y-6">
+            {/* Summary line */}
+            <div className="text-sm text-ink-soft font-mono">
+              {formatDay(new Date())} · {totalCount} lead{totalCount === 1 ? "" : "s"} assigned to you
+            </div>
+
+            {BUCKET_META.map(({ key, label, color }) => {
+              const leads = pulse[key];
+              if (leads.length === 0) return null;
+              return (
+                <div key={key}>
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <span className={`font-mono text-[11px] uppercase tracking-wider font-bold ${color}`}>
+                      {label}
+                    </span>
+                    <span className="font-mono text-[11px] text-ink-soft">
+                      ({leads.length})
+                    </span>
+                    <span className="flex-1 h-px bg-rule" />
+                  </div>
+                  <div className="space-y-2">
+                    {leads.map((lead) => (
+                      <PulseCard key={lead.leadId} lead={lead} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </>

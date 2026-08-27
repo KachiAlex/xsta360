@@ -48,6 +48,7 @@ export const auditEventTypeEnum = pgEnum("audit_event_type", [
   "lead_created",
   "lead_updated",
   "remark_added",
+  "activity_logged",
   "reminder_set",
   "reminder_completed",
   "reminder_snoozed",
@@ -57,6 +58,15 @@ export const auditEventTypeEnum = pgEnum("audit_event_type", [
   "lead_won",
 ]);
 export type AuditEventType = (typeof auditEventTypeEnum.enumValues)[number];
+
+export const activityTypeEnum = pgEnum("activity_type", [
+  "call",
+  "email",
+  "meeting",
+  "note",
+  "visit",
+]);
+export type ActivityType = (typeof activityTypeEnum.enumValues)[number];
 
 // ---------------------------------------------------------------------------
 // Organizations & users
@@ -215,6 +225,36 @@ export const remarks = pgTable(
   },
   (t) => ({
     leadCreatedIdx: index("remarks_lead_created_idx").on(t.leadId, t.createdAt),
+  }),
+);
+
+// Structured activities: dated/timed touchpoints per lead (call, email, meeting, etc.)
+export const activities = pgTable(
+  "activities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    type: activityTypeEnum("type").notNull().default("note"),
+    body: text("body").notNull(),
+    // When the activity actually happened (editable — can log past activities).
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    // Optional link to a reminder spawned from this activity.
+    reminderId: uuid("reminder_id").references(() => reminders.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    leadOccurredIdx: index("activities_lead_occurred_idx").on(t.leadId, t.occurredAt),
+    orgOccurredIdx: index("activities_org_occurred_idx").on(t.orgId, t.occurredAt),
   }),
 );
 
