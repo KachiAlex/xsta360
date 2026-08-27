@@ -89,17 +89,61 @@ src/
 ## Reminder cron
 The `/api/cron/reminders` route scans due reminders and sends emails. Hit it with:
 ```bash
-curl -H "Authorization: Bearer $CRON_SECRET" https://your-app/api/cron/reminders
+curl -H "Authorization: Bearer $CRON_SECRET" http://xsta360.67-211-210-8.sslip.io/api/cron/reminders
 ```
-On Vercel, add a cron job in `vercel.json`. On other platforms, use an external scheduler (e.g. cron-job.org) every 5-10 minutes.
+Set up an external scheduler (e.g. cron-job.org) to hit this every 5-10 minutes.
 
-## Deployment
-1. Provision Postgres (Neon, Supabase, or self-hosted).
-2. Set all env vars (see above).
-3. `pnpm db:push` to create tables.
-4. `pnpm build && pnpm start` (or deploy to Vercel).
-5. Set up the reminder cron (see above).
-6. Optionally `pnpm db:seed` for demo data.
+## Server deployment (Docker)
+
+The app runs in Docker on `67.211.210.8` with Postgres + Next.js containers.
+
+**Architecture:**
+- `xsta360-db-1` — Postgres 16 (internal Docker network only)
+- `xsta360-app-1` — Next.js app (exposed on `127.0.0.1:3009`)
+- Host nginx reverse proxy → `http://xsta360.67-211-210-8.sslip.io`
+
+**URL:** http://xsta360.67-211-210-8.sslip.io
+**Login:** tunde@kreatix.com / password123
+
+**Server files:**
+- `/opt/xsta360/` — project repo (cloned from GitHub)
+- `/opt/xsta360/.env` — environment variables (secrets, not in git)
+- `/etc/nginx/sites-available/xsta360` — nginx config
+
+**Deploy/update workflow:**
+```bash
+ssh root@67.211.210.8
+cd /opt/xsta360
+git pull
+docker compose build
+docker compose up -d
+# Check logs:
+docker logs xsta360-app-1 -f
+```
+
+**Run seed (if needed):**
+```bash
+docker exec -e SKIP_SERVER_ONLY=1 xsta360-app-1 npx tsx src/db/seed.ts
+```
+
+## Vercel frontend setup
+
+To deploy the frontend on Vercel (connecting to the server's Postgres):
+
+1. Import the repo from https://github.com/KachiAlex/xsta360 in Vercel
+2. Set environment variables in Vercel:
+   - `DATABASE_URL` = `postgresql://xsta360:281a0e36d2886003bf8b46f22ed1cea0527a1cfd5f2ffd21@67.211.210.8:5432/xsta360`
+   - `SESSION_SECRET` = (same as server)
+   - `APP_URL` = your Vercel URL
+   - `CRON_SECRET` = (same as server)
+3. Deploy
+
+**Note:** For Vercel to reach the server's Postgres, port 5432 must be exposed externally. Currently it's bound to `127.0.0.1` only. To expose it:
+- Change the docker-compose `db` service ports to `"0.0.0.0:5432:5432"` (or a custom port)
+- Or use a tool like `socat` / SSH tunnel
+- Or use a managed Postgres (Neon/Supabase) and point both the server and Vercel to it
+
+**Alternative (recommended):** Run the full app on the server (current setup) and use Vercel only for the marketing homepage. The app at `http://xsta360.67-211-210-8.sslip.io` is already fully functional.
 
 ## Next.js 16 notes
 - Middleware is now **Proxy** (`proxy.ts`, not `middleware.ts`).

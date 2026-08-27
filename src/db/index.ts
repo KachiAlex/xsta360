@@ -9,14 +9,35 @@ if (!process.env.SKIP_SERVER_ONLY) {
   require("server-only");
 }
 
-const url = process.env.DATABASE_URL;
-if (!url) {
-  throw new Error("DATABASE_URL is not set. Copy .env.example to .env.local.");
+type DB = ReturnType<typeof drizzle<typeof schema>>;
+
+let client: ReturnType<typeof postgres> | null = null;
+let dbInstance: DB | null = null;
+
+function getDb(): DB {
+  if (dbInstance) return dbInstance;
+
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error("DATABASE_URL is not set. Copy .env.example to .env.local.");
+  }
+
+  // Single connection is fine for dev; postgres.js pools under the hood.
+  client = postgres(url, { max: 10, prepare: false });
+  dbInstance = drizzle(client, { schema });
+  return dbInstance;
 }
 
-// Single connection is fine for dev; postgres.js pools under the hood.
-const client = postgres(url, { max: 10, prepare: false });
+export const db = new Proxy<DB>({} as DB, {
+  get(_target, prop) {
+    const realDb = getDb();
+    const value = (realDb as unknown as Record<string, unknown>)[prop as string];
+    if (typeof value === "function") {
+      return value.bind(realDb);
+    }
+    return value;
+  },
+}) as DB;
 
-export const db = drizzle(client, { schema });
-export type DB = typeof db;
+export type { DB };
 export { schema };
