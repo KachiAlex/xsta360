@@ -9,6 +9,7 @@ import {
   index,
   uniqueIndex,
   jsonb,
+  numeric,
 } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
@@ -59,6 +60,11 @@ export const auditEventTypeEnum = pgEnum("audit_event_type", [
   "todo_created",
   "todo_completed",
   "note_created",
+  "document_uploaded",
+  "sequence_enrolled",
+  "sequence_step_sent",
+  "sequence_completed",
+  "duplicate_detected",
 ]);
 export type AuditEventType = (typeof auditEventTypeEnum.enumValues)[number];
 
@@ -86,6 +92,12 @@ export const organizations = pgTable("organizations", {
   name: text("name").notNull(),
   // Embeddable form token — public, used to route embedded submissions.
   formToken: text("form_token").notNull().unique(),
+  // Custom field definitions: [{ key, label, type: "text"|"number"|"select"|"date", options?: string[] }]
+  customFieldDefs: jsonb("custom_field_defs").notNull().default([]),
+  // WhatsApp Business config: { enabled, phoneNumberId, apiKey }
+  whatsappConfig: jsonb("whatsapp_config"),
+  // Currency symbol for deal values (e.g. "₦", "$", "€")
+  currency: text("currency").notNull().default("₦"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -150,6 +162,8 @@ export const pipelineStages = pgTable(
     // open | won | lost — drives board rendering and win/loss logic.
     kind: stageKindEnum("kind").notNull().default("open"),
     position: integer("position").notNull().default(0),
+    // Win probability for forecasting (0-100). Won=100, Lost=0 by default.
+    probability: integer("probability").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
@@ -201,6 +215,14 @@ export const leads = pgTable(
     createdById: uuid("created_by_id").references(() => users.id, {
       onDelete: "set null",
     }),
+    // Deal value (monetary) for pipeline forecasting.
+    value: numeric("value", { precision: 14, scale: 2 }),
+    // Expected close date for forecasting.
+    expectedCloseDate: timestamp("expected_close_date", { withTimezone: true }),
+    // Lead score (0-100), computed from activity recency, stage, source, etc.
+    score: integer("score").notNull().default(0),
+    // Custom field values: { fieldKey: value }
+    customFields: jsonb("custom_fields").notNull().default({}),
     // Freeform reason captured when a lead is moved to a Lost stage.
     lostReasonText: text("lost_reason_text"),
     lostReasonId: uuid("lost_reason_id").references(() => lostReasons.id, {
@@ -352,6 +374,122 @@ export const notes = pgTable(
   (t) => ({
     orgUserIdx: index("notes_org_user_idx").on(t.orgId, t.userId),
     leadIdx: index("notes_lead_idx").on(t.leadId),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Lead documents / quote attachments
+// ---------------------------------------------------------------------------
+
+export const leadDocuments = pgTable(
+  "lead_documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    uploadedBy: uuid("uploaded_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    filename: text("filename").notNull(),
+    // URL or path to the stored file (R2, local, or external URL).
+    url: text("url").notNull(),
+    // MIME type (e.g. application/pdf, image/png).
+    mimeType: text("mime_type"),
+    // File size in bytes.
+    size: integer("size"),
+    // Whether this document has been viewed by the lead (for quote tracking).
+    viewedAt: timestamp("viewed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    leadIdx: index("lead_documents_lead_idx").on(t.leadId),
+    orgIdx: index("lead_documents_org_idx").on(t.orgId),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Sales sequences (automated drip follow-ups)
+// ---------------------------------------------------------------------------
+
+export const sequences = pgTable(
+  "sequences",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    // Whether this sequence is active and can enroll new leads.
+    active: boolean("active").notNull().default(true),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("sequences_org_idx").on(t.orgId),
+  }),
+);
+
+export const sequenceSteps = pgTable(
+  "sequence_steps",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sequenceId: uuid("sequence_id")
+      .notNull()
+      .references(() => sequences.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    // Step order within the sequence.
+    position: integer("position").notNull().default(0),
+    // Days after enrollment to trigger this step.
+    delayDays: integer("delay_days").notNull().default(0),
+    // What to do: create a reminder, send an email, send a WhatsApp message.
+    action: text("action").notNull().default("reminder"),
+    // The template/content for the step.
+    subject: text("subject"),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    seqPosIdx: index("sequence_steps_seq_pos_idx").on(t.sequenceId, t.position),
+  }),
+);
+
+export const sequenceEnrollments = pgTable(
+  "sequence_enrollments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sequenceId: uuid("sequence_id")
+      .notNull()
+      .references(() => sequences.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    enrolledBy: uuid("enrolled_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    // Current step position (0 = not started yet).
+    currentStep: integer("current_step").notNull().default(0),
+    status: text("status").notNull().default("active"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    enrolledAt: timestamp("enrolled_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    seqLeadIdx: index("sequence_enrollments_seq_lead_idx").on(t.sequenceId, t.leadId),
+    orgStatusIdx: index("sequence_enrollments_org_status_idx").on(t.orgId, t.status),
+    leadIdx: index("sequence_enrollments_lead_idx").on(t.leadId),
   }),
 );
 

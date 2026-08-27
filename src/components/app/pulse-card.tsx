@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ActivityForm } from "@/components/app/activity-form";
 import type { PulseLead, TimelineEntry } from "@/lib/dashboard";
 import { completeReminderFromDashboard, snoozeReminderFromDashboard } from "@/app/actions/activities";
+import { whatsappClickToChat } from "@/lib/whatsapp";
 
 const SOURCE_LABELS: Record<string, string> = {
   referral: "Referral",
@@ -139,6 +140,23 @@ export function PulseCard({ lead }: { lead: PulseLead }) {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {lead.score > 0 && (
+            <span
+              className={`font-mono text-[11px] font-bold px-1.5 py-0.5 rounded ${
+                lead.score >= 70 ? "bg-register/12 text-register"
+                  : lead.score >= 40 ? "bg-amber/14 text-[#9c6014]"
+                  : "bg-paper-2 text-ink-soft"
+              }`}
+              title="Lead score"
+            >
+              {lead.score}
+            </span>
+          )}
+          {lead.value && (
+            <span className="font-mono text-[11px] text-ink-soft">
+              ₦{parseFloat(lead.value).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </span>
+          )}
           {reminderBadge}
           <span className="text-xs text-ink-soft font-mono">
             {expanded ? "▾" : "▸"}
@@ -156,7 +174,28 @@ export function PulseCard({ lead }: { lead: PulseLead }) {
             {lead.daysSinceContact !== null && (
               <span>· {lead.daysSinceContact}d since contact</span>
             )}
+            {lead.score > 0 && <span>· Score: {lead.score}</span>}
           </div>
+
+          {/* Quick contact actions */}
+          {lead.phone && (
+            <div className="flex gap-2 mb-3">
+              <a
+                href={whatsappClickToChat(lead.phone, `Hi ${lead.leadName}, following up on our conversation.`)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#075E54] hover:text-[#128C7E] px-3 py-1.5 rounded border border-[#128C7E]/20 hover:bg-[#128C7E]/5"
+              >
+                WhatsApp
+              </a>
+              <a
+                href={`tel:${lead.phone}`}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-soft hover:text-ink px-3 py-1.5 rounded border border-rule hover:bg-paper-2"
+              >
+                Call
+              </a>
+            </div>
+          )}
 
           {/* Quick actions for reminders */}
           {lead.reminderId && (

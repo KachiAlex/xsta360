@@ -1,14 +1,14 @@
 "use client";
 
 import { useActionState, useTransition } from "react";
-import { addStage, updateStage, deleteStage, type OrgFormState } from "@/app/actions/org";
+import { addStage, updateStage, deleteStage, updateStageProbability, type OrgFormState } from "@/app/actions/org";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/field";
 
 export function StageManager({
   stages,
 }: {
-  stages: { id: string; name: string; kind: string; position: number }[];
+  stages: { id: string; name: string; kind: string; position: number; probability: number }[];
 }) {
   const [state, action, pending] = useActionState<OrgFormState, FormData>(addStage, {});
   const [, startTransition] = useTransition();
@@ -31,6 +31,26 @@ export function StageManager({
                 });
               }}
             />
+            {/* Probability input */}
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                defaultValue={s.probability}
+                className="text-sm border border-rule bg-paper rounded px-2 py-1 w-16 text-right"
+                title="Win probability %"
+                onChange={(e) => {
+                  const fd = new FormData();
+                  fd.set("stageId", s.id);
+                  fd.set("probability", e.currentTarget.value);
+                  startTransition(async () => {
+                    await updateStageProbability({}, fd);
+                  });
+                }}
+              />
+              <span className="text-xs text-ink-soft font-mono">%</span>
+            </div>
             <span className="font-mono text-[11px] uppercase tracking-wider text-ink-soft">{s.kind}</span>
             <button
               type="button"

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -17,6 +17,19 @@ export const metadata: Metadata = {
   title: "Xsta360 — Manage. Follow Up. Close.",
   description:
     "Your complete sales management hub. Never let a lead go cold — from first contact to closed-won.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Xsta360",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  themeColor: "#1e2a22",
 };
 
 export default function RootLayout({

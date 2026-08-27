@@ -103,6 +103,23 @@ export function AddLeadModal({ stages, members, currentUserId }: AddLeadModalPro
             <Textarea name="notes" rows={2} placeholder="Initial context, what they're looking for..." />
           </div>
 
+          {/* Deal value + expected close date */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Deal value (₦)</Label>
+              <Input name="value" type="number" placeholder="500000" />
+            </div>
+            <div>
+              <Label>Expected close date</Label>
+              <Input name="expectedCloseDate" type="date" />
+            </div>
+          </div>
+
+          {/* Duplicate warning re-submit hidden field */}
+          {state.errors?.duplicate && (
+            <input type="hidden" name="forceCreate" value="true" />
+          )}
+
           {state.message && (
             <p className="text-sm text-stamp bg-stamp/10 px-3 py-2 rounded">{state.message}</p>
           )}

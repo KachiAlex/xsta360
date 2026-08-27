@@ -1,5 +1,6 @@
 import { requireAuth } from "@/lib/dal";
 import { getSourceReport, getRepReport } from "@/lib/reports";
+import { getPipelineForecast, formatCurrency } from "@/lib/forecast";
 import { Topbar } from "@/components/app/topbar";
 import { Panel, PanelHead } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
@@ -16,9 +17,10 @@ const SOURCE_LABELS: Record<string, string> = {
 
 export default async function ReportsPage() {
   const ctx = await requireAuth();
-  const [sourceReport, repReport] = await Promise.all([
+  const [sourceReport, repReport, forecast] = await Promise.all([
     getSourceReport(ctx.orgId),
     getRepReport(ctx.orgId),
+    getPipelineForecast(ctx.orgId),
   ]);
 
   return (
@@ -26,6 +28,63 @@ export default async function ReportsPage() {
       <Topbar />
       <div className="content flex-1 px-8 py-7 max-w-[1240px] w-full mx-auto space-y-6">
         <h1 className="font-mono text-xl">Reports</h1>
+
+        {/* Pipeline forecast */}
+        <Panel>
+          <PanelHead title="Pipeline forecast" sub="Deal value by stage, weighted by win probability" />
+          <div className="p-5">
+            {/* Summary cards */}
+            <div className="grid grid-cols-4 gap-3 mb-5">
+              <div className="bg-paper-2 rounded p-3">
+                <div className="text-[11px] font-mono uppercase tracking-wider text-ink-soft mb-1">Pipeline value</div>
+                <div className="font-mono text-xl font-bold">{formatCurrency(forecast.totalPipelineValue)}</div>
+              </div>
+              <div className="bg-paper-2 rounded p-3">
+                <div className="text-[11px] font-mono uppercase tracking-wider text-ink-soft mb-1">Weighted forecast</div>
+                <div className="font-mono text-xl font-bold text-register">{formatCurrency(forecast.totalWeightedValue)}</div>
+              </div>
+              <div className="bg-paper-2 rounded p-3">
+                <div className="text-[11px] font-mono uppercase tracking-wider text-ink-soft mb-1">Won (all-time)</div>
+                <div className="font-mono text-xl font-bold text-register">{formatCurrency(forecast.wonValue)}</div>
+              </div>
+              <div className="bg-paper-2 rounded p-3">
+                <div className="text-[11px] font-mono uppercase tracking-wider text-ink-soft mb-1">Open leads</div>
+                <div className="font-mono text-xl font-bold">{forecast.totalLeads}</div>
+              </div>
+            </div>
+
+            {/* Per-stage table */}
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft py-2 border-b border-rule font-semibold">Stage</th>
+                  <th className="text-right font-mono text-[11px] uppercase tracking-wider text-ink-soft py-2 border-b border-rule font-semibold">Leads</th>
+                  <th className="text-right font-mono text-[11px] uppercase tracking-wider text-ink-soft py-2 border-b border-rule font-semibold">Probability</th>
+                  <th className="text-right font-mono text-[11px] uppercase tracking-wider text-ink-soft py-2 border-b border-rule font-semibold">Total value</th>
+                  <th className="text-right font-mono text-[11px] uppercase tracking-wider text-ink-soft py-2 border-b border-rule font-semibold">Weighted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {forecast.stages.map((row) => (
+                  <tr key={row.stageId} className="hover:bg-paper-2">
+                    <td className="py-3 border-b border-dashed border-rule font-semibold">
+                      {row.stageName}
+                      <span className={`ml-2 text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                        row.stageKind === "won" ? "bg-register/12 text-register"
+                        : row.stageKind === "lost" ? "bg-stamp/12 text-stamp-deep"
+                        : "bg-paper-2 text-ink-soft"
+                      }`}>{row.stageKind}</span>
+                    </td>
+                    <td className="py-3 border-b border-dashed border-rule font-mono text-right">{row.leadCount}</td>
+                    <td className="py-3 border-b border-dashed border-rule font-mono text-right">{row.probability}%</td>
+                    <td className="py-3 border-b border-dashed border-rule font-mono text-right">{formatCurrency(row.totalValue)}</td>
+                    <td className="py-3 border-b border-dashed border-rule font-mono text-right font-bold">{formatCurrency(row.weightedValue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
 
         {/* Source attribution */}
         <Panel>

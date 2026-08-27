@@ -117,3 +117,87 @@ export async function deleteStage(
   revalidatePath("/pipeline");
   return { ok: true };
 }
+
+// ---------------------------------------------------------------------------
+// Stage probability (for forecasting)
+// ---------------------------------------------------------------------------
+
+export async function updateStageProbability(
+  _prev: OrgFormState,
+  formData: FormData,
+): Promise<OrgFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+  if (!can(ctx, "configure")) return { message: "Only admins can configure stages" };
+
+  const stageId = String(formData.get("stageId"));
+  const probabilityStr = String(formData.get("probability") || "0");
+  const probability = Math.max(0, Math.min(100, parseInt(probabilityStr) || 0));
+
+  const [stage] = await db
+    .select()
+    .from(schema.pipelineStages)
+    .where(
+      and(eq(schema.pipelineStages.id, stageId), eq(schema.pipelineStages.orgId, ctx.orgId)),
+    )
+    .limit(1);
+  if (!stage) return { message: "Stage not found" };
+
+  await db
+    .update(schema.pipelineStages)
+    .set({ probability })
+    .where(eq(schema.pipelineStages.id, stage.id));
+
+  revalidatePath("/settings");
+  revalidatePath("/pipeline");
+  revalidatePath("/reports");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Org settings: WhatsApp config, custom fields, currency
+// ---------------------------------------------------------------------------
+
+export async function updateOrgSettings(
+  _prev: OrgFormState,
+  formData: FormData,
+): Promise<OrgFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+  if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
+
+  const currency = String(formData.get("currency") || "₦");
+  const whatsappEnabled = formData.get("whatsappEnabled") === "true";
+  const whatsappPhoneNumberId = String(formData.get("whatsappPhoneNumberId") || "");
+  const whatsappApiKey = String(formData.get("whatsappApiKey") || "");
+  const customFieldsJson = String(formData.get("customFields") || "[]");
+
+  let customFieldDefs: unknown = [];
+  try {
+    customFieldDefs = JSON.parse(customFieldsJson);
+  } catch {
+    return { errors: { customFields: ["Invalid JSON for custom field definitions"] } };
+  }
+
+  const whatsappConfig = whatsappEnabled
+    ? {
+        enabled: true,
+        phoneNumberId: whatsappPhoneNumberId || undefined,
+        apiKey: whatsappApiKey || undefined,
+      }
+    : { enabled: false };
+
+  await db
+    .update(schema.organizations)
+    .set({
+      currency,
+      customFieldDefs: customFieldDefs as any,
+      whatsappConfig: whatsappConfig as any,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.organizations.id, ctx.orgId));
+
+  revalidatePath("/settings");
+  revalidatePath("/dashboard");
+  return { ok: true };
+}

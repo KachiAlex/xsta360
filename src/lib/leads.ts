@@ -15,6 +15,10 @@ export interface LeadListItem {
   stageKind: string | null;
   assigneeId: string | null;
   assigneeName: string | null;
+  value: string | null;
+  score: number;
+  expectedCloseDate: Date | null;
+  customFields: unknown;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -58,6 +62,10 @@ export async function getLeads(orgId: string, filters: LeadListFilters = {}): Pr
       stageKind: schema.pipelineStages.kind,
       assigneeId: schema.leads.assigneeId,
       assigneeName: schema.users.name,
+      value: schema.leads.value,
+      score: schema.leads.score,
+      expectedCloseDate: schema.leads.expectedCloseDate,
+      customFields: schema.leads.customFields,
       createdAt: schema.leads.createdAt,
       updatedAt: schema.leads.updatedAt,
     })

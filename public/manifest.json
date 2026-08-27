@@ -1,0 +1,18 @@
+{
+  "name": "Xsta360 — Sales Management",
+  "short_name": "Xsta360",
+  "description": "Manage leads, follow-ups, and close deals.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#f5f3ee",
+  "theme_color": "#1e2a22",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

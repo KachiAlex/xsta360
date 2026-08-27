@@ -1,6 +1,9 @@
 import { and, eq, lte } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { sendReminderEmail } from "@/lib/email";
+import { sendWhatsAppMessage, formatReminderMessage } from "@/lib/whatsapp";
+import { processSequenceSteps } from "@/lib/sequences";
+import { recomputeOrgLeadScores } from "@/lib/scoring";
 
 // Hit by an external cron (or Vercel Cron) with:
 //   GET /api/cron/reminders (header: Authorization: Bearer <CRON_SECRET>)
@@ -28,11 +31,15 @@ export async function GET(request: Request) {
       note: schema.reminders.note,
       leadName: schema.leads.name,
       leadCompany: schema.leads.company,
+      leadPhone: schema.leads.phone,
       assigneeEmail: schema.users.email,
+      orgName: schema.organizations.name,
+      whatsappConfig: schema.organizations.whatsappConfig,
     })
     .from(schema.reminders)
     .innerJoin(schema.leads, eq(schema.reminders.leadId, schema.leads.id))
     .leftJoin(schema.users, eq(schema.reminders.assigneeId, schema.users.id))
+    .leftJoin(schema.organizations, eq(schema.reminders.orgId, schema.organizations.id))
     .where(
       and(
         eq(schema.reminders.status, "pending"),
@@ -43,41 +50,86 @@ export async function GET(request: Request) {
 
   let sent = 0;
   let failed = 0;
+  let whatsappSent = 0;
 
   for (const r of due) {
-    if (!r.assigneeEmail) {
-      // No email on the assignee — mark failed with a reason.
-      await db
-        .update(schema.reminders)
-        .set({ status: "failed", lastError: "Assignee has no email address", updatedAt: now })
-        .where(eq(schema.reminders.id, r.reminderId));
-      failed++;
-      continue;
+    let didSend = false;
+
+    // Try WhatsApp first if configured and lead has a phone.
+    if (r.whatsappConfig && (r.whatsappConfig as any)?.enabled && r.leadPhone) {
+      const msg = formatReminderMessage(
+        r.leadName,
+        r.note || "Follow-up due",
+        r.orgName || "Xsta360",
+      );
+      const result = await sendWhatsAppMessage(
+        r.whatsappConfig as any,
+        r.leadPhone,
+        msg,
+      );
+      if (result.success) {
+        whatsappSent++;
+        didSend = true;
+      }
     }
 
-    try {
-      await sendReminderEmail({
-        to: r.assigneeEmail,
-        leadName: r.leadName,
-        leadCompany: r.leadCompany,
-        dueAt: r.dueAt,
-        note: r.note,
-        appUrl,
-      });
+    // Also send email to the assignee.
+    if (r.assigneeEmail) {
+      try {
+        await sendReminderEmail({
+          to: r.assigneeEmail,
+          leadName: r.leadName,
+          leadCompany: r.leadCompany,
+          dueAt: r.dueAt,
+          note: r.note,
+          appUrl,
+        });
+        didSend = true;
+      } catch (err) {
+        // Email failed — but WhatsApp may have succeeded.
+        if (!didSend) {
+          const message = err instanceof Error ? err.message : "Unknown error";
+          await db
+            .update(schema.reminders)
+            .set({ status: "failed", lastError: message, updatedAt: now })
+            .where(eq(schema.reminders.id, r.reminderId));
+          failed++;
+          continue;
+        }
+      }
+    }
+
+    if (didSend) {
       await db
         .update(schema.reminders)
         .set({ status: "sent", lastError: null, updatedAt: now })
         .where(eq(schema.reminders.id, r.reminderId));
       sent++;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown error";
+    } else if (!r.assigneeEmail) {
       await db
         .update(schema.reminders)
-        .set({ status: "failed", lastError: message, updatedAt: now })
+        .set({ status: "failed", lastError: "Assignee has no email and WhatsApp not configured", updatedAt: now })
         .where(eq(schema.reminders.id, r.reminderId));
       failed++;
     }
   }
 
-  return Response.json({ sent, failed, checked: due.length });
+  // Process sequence steps.
+  const seqResult = await processSequenceSteps();
+
+  // Recompute lead scores for all orgs with due reminders.
+  const orgIds = [...new Set(due.map((r) => r.orgId))];
+  let scoresUpdated = 0;
+  for (const orgId of orgIds) {
+    scoresUpdated += await recomputeOrgLeadScores(orgId);
+  }
+
+  return Response.json({
+    sent,
+    failed,
+    whatsappSent,
+    checked: due.length,
+    sequenceSteps: seqResult.processed,
+    scoresUpdated,
+  });
 }

@@ -30,6 +30,10 @@ const CreateLeadSchema = z.object({
   notes: z.string().trim().optional(),
   assigneeId: z.string().uuid().optional().or(z.literal("")),
   stageId: z.string().uuid().optional().or(z.literal("")),
+  value: z.string().trim().optional().or(z.literal("")),
+  expectedCloseDate: z.string().trim().optional().or(z.literal("")),
+  customFields: z.string().trim().optional().or(z.literal("")),
+  forceCreate: z.string().optional().or(z.literal("")),
 });
 
 const RemarkSchema = z.object({
@@ -107,6 +111,10 @@ export async function createLead(
     notes: formData.get("notes"),
     assigneeId: formData.get("assigneeId"),
     stageId: formData.get("stageId"),
+    value: formData.get("value"),
+    expectedCloseDate: formData.get("expectedCloseDate"),
+    customFields: formData.get("customFields"),
+    forceCreate: formData.get("forceCreate"),
   });
 
   if (!parsed.success) {
@@ -119,7 +127,27 @@ export async function createLead(
     };
   }
 
-  const { assigneeId, stageId, ...rest } = parsed.data;
+  const { assigneeId, stageId, value, expectedCloseDate, customFields, forceCreate, ...rest } = parsed.data;
+
+  // Duplicate detection — unless forceCreate is set.
+  if (forceCreate !== "true" && (rest.email || rest.phone || rest.company)) {
+    const { checkDuplicates } = await import("@/lib/duplicate");
+    const dupes = await checkDuplicates(ctx.orgId, {
+      email: rest.email,
+      phone: rest.phone,
+      name: rest.name,
+      company: rest.company,
+    });
+    if (dupes.length > 0) {
+      const dupeList = dupes.map((d) =>
+        `${d.name}${d.company ? ` (${d.company})` : ""} — matched on ${d.matchField.replace("_", " + ")}`,
+      ).join("; ");
+      return {
+        message: `Possible duplicate found: ${dupeList}. Submit again to create anyway.`,
+        errors: { duplicate: ["true"] },
+      };
+    }
+  }
 
   // Default to the first open stage if none provided.
   let stage = stageId ? await loadOrgStage(ctx, stageId) : null;
@@ -133,6 +161,23 @@ export async function createLead(
     stage = first ?? undefined;
   }
 
+  // Parse custom fields JSON.
+  let parsedCustomFields = {};
+  if (customFields) {
+    try {
+      parsedCustomFields = JSON.parse(customFields);
+    } catch {
+      // ignore invalid JSON
+    }
+  }
+
+  // Parse expected close date.
+  let closeDate: Date | null = null;
+  if (expectedCloseDate) {
+    closeDate = new Date(expectedCloseDate);
+    if (isNaN(closeDate.getTime())) closeDate = null;
+  }
+
   const [lead] = await db
     .insert(schema.leads)
     .values({
@@ -141,13 +186,16 @@ export async function createLead(
       assigneeId: assigneeId || ctx.userId,
       stageId: stage?.id,
       createdById: ctx.userId,
+      value: value || null,
+      expectedCloseDate: closeDate,
+      customFields: parsedCustomFields,
     })
     .returning();
 
   await logEvent(ctx.orgId, "lead_created", {
     leadId: lead.id,
     actorId: ctx.userId,
-    meta: { source: lead.source, stage: stage?.name },
+    meta: { source: lead.source, stage: stage?.name, value: value || null },
   });
 
   revalidatePath("/dashboard");

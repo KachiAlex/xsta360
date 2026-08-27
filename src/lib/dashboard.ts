@@ -35,6 +35,10 @@ export interface PulseLead {
   reminderId: string | null;
   reminderDueAt: Date | null;
   reminderNote: string | null;
+  // Deal value + score.
+  value: string | null;
+  score: number;
+  phone: string | null;
   // Full timeline (loaded on expand).
   timeline: TimelineEntry[];
 }
@@ -89,6 +93,9 @@ export async function getPulseLeads(orgId: string, userId: string): Promise<{
       source: schema.leads.source,
       stageId: schema.leads.stageId,
       createdAt: schema.leads.createdAt,
+      value: schema.leads.value,
+      score: schema.leads.score,
+      phone: schema.leads.phone,
     })
     .from(schema.leads)
     .where(
@@ -247,6 +254,9 @@ export async function getPulseLeads(orgId: string, userId: string): Promise<{
       reminderId: reminder?.id ?? null,
       reminderDueAt: reminder?.dueAt ?? null,
       reminderNote: reminder?.note ?? null,
+      value: lead.value,
+      score: lead.score,
+      phone: lead.phone,
       timeline: [], // loaded on expand
     });
   }

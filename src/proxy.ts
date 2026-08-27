@@ -6,7 +6,7 @@ const SESSION_COOKIE = "xsta_session";
 
 // Routes that require a session. Anything else is public (homepage, login,
 // signup, the embedded form endpoint, the cron route).
-const PROTECTED = ["/dashboard", "/leads", "/pipeline", "/reports", "/settings", "/team", "/tasks"];
+const PROTECTED = ["/dashboard", "/leads", "/pipeline", "/reports", "/settings", "/team", "/tasks", "/sequences"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -36,6 +36,6 @@ export const config = {
   // Run on everything except static assets and the embedded-form / cron APIs
   // (which are public and validated by token instead).
   matcher: [
-    "/((?!api/embed|api/cron|_next/static|_next/image|favicon.ico|.*\\.svg$).*)",
+    "/((?!api/embed|api/cron|api/timeline|_next/static|_next/image|favicon.ico|.*\\.svg$).*)",
   ],
 };

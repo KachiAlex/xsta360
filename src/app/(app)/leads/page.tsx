@@ -96,6 +96,8 @@ export default async function LeadsPage(props: {
                   <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Lead</th>
                   <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Stage</th>
                   <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Source</th>
+                  <th className="text-right font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Value</th>
+                  <th className="text-right font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Score</th>
                   <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Assignee</th>
                   <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Updated</th>
                 </tr>
@@ -123,6 +125,20 @@ export default async function LeadsPage(props: {
                     <td className="px-5 py-3.5 border-b border-dashed border-rule text-sm">
                       {SOURCE_LABELS[lead.source] ?? lead.source}
                       {lead.campaign && <div className="text-xs text-ink-soft">{lead.campaign}</div>}
+                    </td>
+                    <td className="px-5 py-3.5 border-b border-dashed border-rule text-sm font-mono text-right">
+                      {lead.value ? `₦${parseFloat(lead.value).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
+                    </td>
+                    <td className="px-5 py-3.5 border-b border-dashed border-rule text-right">
+                      {lead.score > 0 ? (
+                        <span className={`font-mono text-xs font-bold px-1.5 py-0.5 rounded ${
+                          lead.score >= 70 ? "bg-register/12 text-register"
+                          : lead.score >= 40 ? "bg-amber/14 text-[#9c6014]"
+                          : "bg-paper-2 text-ink-soft"
+                        }`}>
+                          {lead.score}
+                        </span>
+                      ) : "—"}
                     </td>
                     <td className="px-5 py-3.5 border-b border-dashed border-rule text-sm">
                       {lead.assigneeName ?? <span className="text-ink-soft">Unassigned</span>}

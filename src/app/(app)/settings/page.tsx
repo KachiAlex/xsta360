@@ -8,17 +8,19 @@ import { Badge } from "@/components/ui/badge";
 import { InviteForm } from "@/components/app/invite-form";
 import { StageManager } from "@/components/app/stage-manager";
 import { MemberRow } from "@/components/app/member-row";
+import { OrgSettingsForm } from "@/components/app/org-settings-form";
 
 export default async function SettingsPage() {
   const ctx = await requireAuth();
   const isAdmin = can(ctx, "manage_team");
 
-  const [stages, members, invitations] = await Promise.all([
+  const [stages, members, invitations, org] = await Promise.all([
     getOrgStages(ctx.orgId),
     getOrgMembers(ctx.orgId),
     isAdmin
       ? db.select().from(schema.invitations).where(eq(schema.invitations.orgId, ctx.orgId))
       : Promise.resolve([]),
+    db.select().from(schema.organizations).where(eq(schema.organizations.id, ctx.orgId)).limit(1),
   ]);
 
   return (
@@ -87,8 +89,20 @@ export default async function SettingsPage() {
         {/* Pipeline stages */}
         {can(ctx, "configure") && (
           <Panel>
-            <PanelHead title="Pipeline stages" sub="Customize how your team sells" />
+            <PanelHead title="Pipeline stages" sub="Customize how your team sells — set win probability per stage for forecasting" />
             <StageManager stages={stages} />
+          </Panel>
+        )}
+
+        {/* Org settings: WhatsApp, custom fields, currency */}
+        {can(ctx, "configure") && org[0] && (
+          <Panel>
+            <PanelHead title="Organization settings" sub="WhatsApp, custom fields, currency" />
+            <OrgSettingsForm
+              currency={org[0].currency}
+              whatsappConfig={org[0].whatsappConfig as any}
+              customFieldDefs={org[0].customFieldDefs as any}
+            />
           </Panel>
         )}
       </div>
