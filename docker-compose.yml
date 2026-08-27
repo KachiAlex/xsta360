@@ -8,8 +8,6 @@ services:
       POSTGRES_DB: xsta360
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U xsta360 -d xsta360"]
       interval: 5s
@@ -36,17 +34,7 @@ services:
       EMAIL_FROM: ${EMAIL_FROM:-Xsta360 <noreply@xsta360.app>}
       CRON_SECRET: ${CRON_SECRET:-dev}
     ports:
-      - "127.0.0.1:3000:3000"
-
-  nginx:
-    image: nginx:alpine
-    restart: unless-stopped
-    depends_on:
-      - app
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - "127.0.0.1:3009:3000"
 
 volumes:
   pgdata:
