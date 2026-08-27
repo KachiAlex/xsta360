@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { SESSION_COOKIE } from "@/lib/session";
+
+// Cookie name — kept in sync with src/lib/session.ts (can't import it here
+// because session.ts has "server-only" which may break in Edge runtime).
+const SESSION_COOKIE = "xsta_session";
 
 // Routes that require a session. Anything else is public (homepage, login,
 // signup, the embedded form endpoint, the cron route).

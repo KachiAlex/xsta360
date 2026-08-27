@@ -78,43 +78,50 @@ export async function signup(
 
   const { name, email, orgName, password } = parsed.data;
 
-  // Reject if email already in use.
-  const [existing] = await db
-    .select({ id: schema.users.id })
-    .from(schema.users)
-    .where(eq(schema.users.email, email))
-    .limit(1);
-  if (existing) {
-    return { errors: { email: ["An account with this email already exists"] } };
-  }
+  try {
+    // Reject if email already in use.
+    const [existing] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, email))
+      .limit(1);
+    if (existing) {
+      return { errors: { email: ["An account with this email already exists"] } };
+    }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 10);
 
-  const [created] = await db.transaction(async (tx) => {
-    const [org] = await tx
-      .insert(schema.organizations)
-      .values({ name: orgName, formToken: nanoid(24) })
-      .returning();
-    const [user] = await tx
-      .insert(schema.users)
-      .values({ name, email, passwordHash })
-      .returning();
-    await tx.insert(schema.memberships).values({
-      orgId: org.id,
-      userId: user.id,
-      role: "admin",
+    const [created] = await db.transaction(async (tx) => {
+      const [org] = await tx
+        .insert(schema.organizations)
+        .values({ name: orgName, formToken: nanoid(24) })
+        .returning();
+      const [user] = await tx
+        .insert(schema.users)
+        .values({ name, email, passwordHash })
+        .returning();
+      await tx.insert(schema.memberships).values({
+        orgId: org.id,
+        userId: user.id,
+        role: "admin",
+      });
+      await tx.insert(schema.pipelineStages).values(
+        DEFAULT_STAGES.map((s) => ({ ...s, orgId: org.id })),
+      );
+      await tx.insert(schema.lostReasons).values(
+        DEFAULT_LOST_REASONS.map((r) => ({ ...r, orgId: org.id, isDefault: r.position === 0 })),
+      );
+      return [{ org, user }] as const;
     });
-    await tx.insert(schema.pipelineStages).values(
-      DEFAULT_STAGES.map((s) => ({ ...s, orgId: org.id })),
-    );
-    await tx.insert(schema.lostReasons).values(
-      DEFAULT_LOST_REASONS.map((r) => ({ ...r, orgId: org.id, isDefault: r.position === 0 })),
-    );
-    return [{ org, user }] as const;
-  });
 
-  await createSession({ userId: created.user.id, orgId: created.org.id, role: "admin" });
-  redirect("/dashboard");
+    await createSession({ userId: created.user.id, orgId: created.org.id, role: "admin" });
+    redirect("/dashboard");
+  } catch (err) {
+    // redirect() throws a special error — re-throw it so Next.js handles it.
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
+    const message = err instanceof Error ? err.message : "Something went wrong";
+    return { message: `Signup failed: ${message}` };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -139,33 +146,39 @@ export async function signin(
 
   const { email, password } = parsed.data;
 
-  const [user] = await db
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.email, email))
-    .limit(1);
-  if (!user) {
-    return { message: "Invalid email or password" };
+  try {
+    const [user] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, email))
+      .limit(1);
+    if (!user) {
+      return { message: "Invalid email or password" };
+    }
+
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) {
+      return { message: "Invalid email or password" };
+    }
+
+    // Load the user's first org membership to seed the session.
+    const [membership] = await db
+      .select()
+      .from(schema.memberships)
+      .where(eq(schema.memberships.userId, user.id))
+      .limit(1);
+
+    if (!membership) {
+      return { message: "Your account is not part of any organization yet." };
+    }
+
+    await createSession({ userId: user.id, orgId: membership.orgId, role: membership.role });
+    redirect("/dashboard");
+  } catch (err) {
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
+    const message = err instanceof Error ? err.message : "Something went wrong";
+    return { message: `Sign in failed: ${message}` };
   }
-
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) {
-    return { message: "Invalid email or password" };
-  }
-
-  // Load the user's first org membership to seed the session.
-  const [membership] = await db
-    .select()
-    .from(schema.memberships)
-    .where(eq(schema.memberships.userId, user.id))
-    .limit(1);
-
-  if (!membership) {
-    return { message: "Your account is not part of any organization yet." };
-  }
-
-  await createSession({ userId: user.id, orgId: membership.orgId, role: membership.role });
-  redirect("/dashboard");
 }
 
 // ---------------------------------------------------------------------------
