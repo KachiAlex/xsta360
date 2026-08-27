@@ -1,3 +1,4 @@
+process.env.SKIP_SERVER_ONLY = "1";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db, schema } from "./index";
