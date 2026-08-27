@@ -2,11 +2,15 @@ import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-const secretKey = process.env.SESSION_SECRET;
-if (!secretKey) {
-  throw new Error("SESSION_SECRET is not set. Copy .env.example to .env.local.");
+// Lazy: don't throw at module load time (breaks Vercel build phase).
+// Only throw when actually creating/verifying a session at runtime.
+function getEncodedKey(): Uint8Array {
+  const secretKey = process.env.SESSION_SECRET;
+  if (!secretKey) {
+    throw new Error("SESSION_SECRET is not set. Copy .env.example to .env.local.");
+  }
+  return new TextEncoder().encode(secretKey);
 }
-const encodedKey = new TextEncoder().encode(secretKey);
 
 export interface SessionPayload {
   userId: string;
@@ -25,14 +29,14 @@ export async function encrypt(payload: Omit<SessionPayload, "expiresAt">) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(encodedKey);
+    .sign(getEncodedKey());
 }
 
 export async function decrypt(
   token: string | undefined = "",
 ): Promise<SessionPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, encodedKey, {
+    const { payload } = await jwtVerify(token, getEncodedKey(), {
       algorithms: ["HS256"],
     });
     return payload as unknown as SessionPayload;
