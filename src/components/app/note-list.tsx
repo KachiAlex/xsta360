@@ -11,6 +11,7 @@ import {
 } from "@/app/actions/tasks";
 import { Button } from "@/components/ui/button";
 import { Label, Input, Textarea } from "@/components/ui/field";
+import { DictationButton } from "@/components/app/dictation-button";
 import type { NoteRow } from "@/lib/tasks";
 
 function formatRelative(d: Date): string {
@@ -63,7 +64,10 @@ export function NoteList({ notes, leadId }: { notes: NoteRow[]; leadId?: string 
           </div>
           <div>
             <Label>Content</Label>
-            <Textarea name="body" rows={4} placeholder="Write your note…" />
+            <Textarea id="note-body" name="body" rows={4} placeholder="Write your note…" />
+            <div className="mt-1.5">
+              <DictationButton targetId="note-body" label="Dictate note" />
+            </div>
           </div>
           {state.message && (
             <p className="text-sm text-stamp bg-stamp/10 px-3 py-2 rounded">{state.message}</p>

@@ -9,6 +9,7 @@ function toLocalDatetimeInput(date: Date): string {
 import { logActivity, type ActivityFormState } from "@/app/actions/activities";
 import { Button } from "@/components/ui/button";
 import { Label, Textarea, Input, Select } from "@/components/ui/field";
+import { DictationButton } from "@/components/app/dictation-button";
 
 const ACTIVITY_TYPES = [
   { value: "call", label: "📞 Call" },
@@ -73,11 +74,15 @@ export function ActivityForm({ leadId }: { leadId: string }) {
           <div>
             <Label>What happened?</Label>
             <Textarea
+              id="activity-body"
               name="body"
               rows={2}
               placeholder="e.g. Called, discussed pricing — they'll review internally"
               autoFocus
             />
+            <div className="mt-1.5">
+              <DictationButton targetId="activity-body" label="Dictate activity" />
+            </div>
             {state.errors?.body && (
               <p className="text-xs text-stamp mt-1">{state.errors.body[0]}</p>
             )}

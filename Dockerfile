@@ -20,6 +20,9 @@ ENV APP_URL=$APP_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 
+# Pre-download Whisper model so it's cached in the image (avoids cold-start download)
+RUN node -e "const{env}=require('@xenova/transformers');env.cacheDir='./node_modules/.cache/transformers';env.allowRemoteModels=true;require('@xenova/transformers').pipeline('automatic-speech-recognition','Xenova/whisper-tiny.en',{quantized:true}).then(()=>console.log('Whisper model cached')).catch(e=>console.error('Model preload failed:',e.message))"
+
 # ---- runner stage ----
 FROM node:22-slim AS runner
 WORKDIR /app
@@ -33,7 +36,12 @@ RUN groupadd --system --gid 1001 nodejs && \
 COPY --from=builder --chown=nextjs:nodejs /app ./
 
 # Install postgresql-client for healthcheck + pg_isready
-RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client && rm -rf /var/lib/apt/lists/*
+# Install libgomp1 + libstdc++6 for ONNX Runtime (Whisper transcription)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    postgresql-client \
+    libgomp1 \
+    libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh

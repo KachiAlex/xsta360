@@ -5,6 +5,7 @@ import { updateLead, type LeadFormState } from "@/app/actions/leads";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
+import { DictationButton } from "@/components/app/dictation-button";
 
 export interface EditLeadModalProps {
   lead: {
@@ -132,7 +133,10 @@ export function EditLeadModal({ lead, stages, members, currentUserId }: EditLead
           </div>
           <div>
             <Label>Notes</Label>
-            <Textarea name="notes" rows={2} defaultValue={lead.notes ?? ""} placeholder="Initial context, what they're looking for..." />
+            <Textarea id="edit-lead-notes" name="notes" rows={2} defaultValue={lead.notes ?? ""} placeholder="Initial context, what they're looking for..." />
+            <div className="mt-1.5">
+              <DictationButton targetId="edit-lead-notes" label="Dictate notes" />
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

@@ -5,6 +5,7 @@ import { createLead, type LeadFormState } from "@/app/actions/leads";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
+import { DictationButton } from "@/components/app/dictation-button";
 
 export interface AddLeadModalProps {
   stages: { id: string; name: string }[];
@@ -110,7 +111,10 @@ export function AddLeadModal({ stages, members, currentUserId }: AddLeadModalPro
           </div>
           <div>
             <Label>Notes</Label>
-            <Textarea name="notes" rows={2} placeholder="Initial context, what they're looking for..." />
+            <Textarea id="add-lead-notes" name="notes" rows={2} placeholder="Initial context, what they're looking for..." />
+            <div className="mt-1.5">
+              <DictationButton targetId="add-lead-notes" label="Dictate notes" />
+            </div>
           </div>
 
           {/* Deal value + expected close date */}

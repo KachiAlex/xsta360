@@ -5,6 +5,7 @@ import { addRemark, type LeadFormState } from "@/app/actions/leads";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Label, Textarea, Input } from "@/components/ui/field";
+import { DictationButton } from "@/components/app/dictation-button";
 
 export interface LogRemarkModalProps {
   leadId: string;
@@ -52,11 +53,15 @@ export function LogRemarkModal({
           <div>
             <Label>What happened?</Label>
             <Textarea
+              id="remark-body"
               name="body"
               rows={3}
               placeholder="e.g. Called, asked for revised quote by Friday"
               autoFocus
             />
+            <div className="mt-1.5">
+              <DictationButton targetId="remark-body" label="Dictate remark" />
+            </div>
             {state.errors?.body && <p className="text-xs text-stamp mt-1">{state.errors.body[0]}</p>}
           </div>
           <div>
