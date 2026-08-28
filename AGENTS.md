@@ -150,3 +150,38 @@ To deploy the frontend on Vercel (connecting to the server's Postgres):
 - `cookies()` is async (`await cookies()`).
 - `params` and `searchParams` in pages are **Promises** (must `await`).
 - Server Actions use `useActionState` (React 19).
+
+## Mobile app (Android, Capacitor)
+
+The Android app is a thin Capacitor wrapper around the deployed web app. It loads from the VPS server (`http://xsta360.67-211-210-8.sslip.io`), so all backend/database calls go to the same server as the web app.
+
+**Architecture:**
+- `capacitor.config.ts` — Capacitor config (appId: `com.xsta360.app`)
+- `out/index.html` — local splash screen (animated logo, 3s, then redirects to VPS `/login`)
+- `android/` — native Android project (Gradle)
+
+**Splash screen flow:**
+1. App launches → native dark splash (`#1e2a22`) shows instantly
+2. `out/index.html` loads → animated XSTA360 logo with pulsing amber dot + loading bar
+3. After 3 seconds → fades out → redirects to `http://xsta360.67-211-210-8.sslip.io/login`
+4. All subsequent navigation happens on the live web app
+
+**Commands:**
+```bash
+pnpm mobile:copy     # copy out/ → android assets
+pnpm mobile:sync     # copy + update native plugins
+pnpm mobile:open     # open in Android Studio
+pnpm mobile:build    # copy + sync + build debug APK
+pnpm mobile:release   # copy + sync + build release APK
+```
+
+**Build APK:**
+```bash
+pnpm mobile:build
+# Output: android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+**Prerequisites:**
+- Android SDK at `C:\Users\opdli\AppData\Local\Android\Sdk`
+- `android/local.properties` with `sdk.dir` pointing to it (gitignored)
+- Java 17+ (bundled with Android Studio)

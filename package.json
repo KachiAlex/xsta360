@@ -11,9 +11,20 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed.ts",
-    "seed": "tsx src/db/seed.ts"
+    "seed": "tsx src/db/seed.ts",
+    "mobile:copy": "cap copy android",
+    "mobile:sync": "cap sync android",
+    "mobile:open": "cap open android",
+    "mobile:build": "cap copy android && cap sync android && cd android && ./gradlew.bat assembleDebug",
+    "mobile:release": "cap copy android && cap sync android && cd android && ./gradlew.bat assembleRelease"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.2",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.2",
     "jose": "^6.2.10",
