@@ -73,13 +73,16 @@ export async function deleteLeadDocument(
   if (!ctx) return { message: "Not signed in" };
 
   const docId = String(formData.get("id"));
-  await db
+  const [deleted] = await db
     .delete(schema.leadDocuments)
     .where(
       and(eq(schema.leadDocuments.id, docId), eq(schema.leadDocuments.orgId, ctx.orgId)),
-    );
+    )
+    .returning({ leadId: schema.leadDocuments.leadId });
 
-  revalidatePath(`/leads/${docId}`);
+  if (deleted) {
+    revalidatePath(`/leads/${deleted.leadId}`);
+  }
   return { ok: true };
 }
 
@@ -87,13 +90,16 @@ export async function markDocumentViewed(
   _prev: DocFormState,
   formData: FormData,
 ): Promise<DocFormState> {
-  // Public-ish: called when a lead views a document link.
-  // In production, this would be a public route with a token.
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+
   const docId = String(formData.get("id"));
   await db
     .update(schema.leadDocuments)
     .set({ viewedAt: new Date() })
-    .where(eq(schema.leadDocuments.id, docId));
+    .where(
+      and(eq(schema.leadDocuments.id, docId), eq(schema.leadDocuments.orgId, ctx.orgId)),
+    );
 
   return { ok: true };
 }

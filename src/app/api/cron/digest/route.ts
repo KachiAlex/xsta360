@@ -15,7 +15,11 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
-  const expected = `Bearer ${process.env.CRON_SECRET ?? "dev"}`;
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return new Response("CRON_SECRET not configured", { status: 500 });
+  }
+  const expected = `Bearer ${cronSecret}`;
   if (authHeader !== expected) {
     return new Response("Unauthorized", { status: 401 });
   }

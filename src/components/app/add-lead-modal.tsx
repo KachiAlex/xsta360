@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { createLead, type LeadFormState } from "@/app/actions/leads";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -25,8 +25,11 @@ export function AddLeadModal({ stages, members, currentUserId }: AddLeadModalPro
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState<LeadFormState, FormData>(createLead, {});
 
-  // Close on success: derive from state during render.
-  const showOpen = open && !state.ok;
+  // Close on success: reset open state so the modal can be reopened.
+  const showOpen = open;
+  useEffect(() => {
+    if (state.ok) setOpen(false);
+  }, [state.ok]);
 
   return (
     <>

@@ -1,6 +1,11 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+
+function toLocalDatetimeInput(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 import { logActivity, type ActivityFormState } from "@/app/actions/activities";
 import { Button } from "@/components/ui/button";
 import { Label, Textarea, Input, Select } from "@/components/ui/field";
@@ -26,8 +31,11 @@ export function ActivityForm({ leadId }: { leadId: string }) {
   const [showForm, setShowForm] = useState(false);
   const [state, action, pending] = useActionState<ActivityFormState, FormData>(logActivity, {});
 
-  // Close on success.
-  const visible = showForm && !state.ok;
+  // Close on success: reset showForm so the form can be reopened.
+  const visible = showForm;
+  useEffect(() => {
+    if (state.ok) setShowForm(false);
+  }, [state.ok]);
 
   return (
     <div className="border-t border-dashed border-rule pt-3 mt-3">
@@ -57,7 +65,7 @@ export function ActivityForm({ leadId }: { leadId: string }) {
               <Input
                 name="occurredAt"
                 type="datetime-local"
-                defaultValue={new Date().toISOString().slice(0, 16)}
+                defaultValue={toLocalDatetimeInput(new Date())}
               />
             </div>
           </div>

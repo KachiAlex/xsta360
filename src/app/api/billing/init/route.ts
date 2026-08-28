@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
-import { requireAuth } from "@/lib/dal";
+import { verifySession } from "@/lib/dal";
 import { getOrgBilling } from "@/lib/dal";
 import { initializeTransaction, nairaToKobo, generateReference } from "@/lib/paystack";
 import { logEvent } from "@/lib/audit";
@@ -17,7 +17,10 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: Request) {
   try {
-    const ctx = await requireAuth();
+    const ctx = await verifySession();
+    if (!ctx) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // Only workspace admins can initiate payments.
     if (ctx.role !== "admin") {
@@ -38,7 +41,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const amountNaira = body.amount ?? billing.monthlyAmount;
+    const amountNaira = typeof body.amount === "number" && body.amount > 0 ? body.amount : billing.monthlyAmount;
 
     if (amountNaira <= 0) {
       return NextResponse.json({ error: "Amount must be greater than 0" }, { status: 400 });
@@ -75,8 +78,7 @@ export async function POST(request: Request) {
       access_code: result.access_code,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Unknown error";
-    console.error("Payment init error:", msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.error("Payment init error:", err);
+    return NextResponse.json({ error: "Failed to initialize payment" }, { status: 500 });
   }
 }

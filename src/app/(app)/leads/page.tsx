@@ -57,6 +57,14 @@ export default async function LeadsPage(props: {
         {/* Filter bar */}
         <div className="mb-5">
           <form method="get" className="flex flex-col sm:flex-row gap-2 sm:flex-wrap">
+            <input
+              type="text"
+              name="q"
+              defaultValue={filters.q ?? ""}
+              placeholder="Search by name, company, email, or phone..."
+              className="text-sm border border-rule bg-panel rounded px-3 py-2.5 flex-1 min-w-0 sm:min-w-[200px] min-h-[44px]"
+              aria-label="Search leads"
+            />
             <select name="stageId" defaultValue={filters.stageId ?? ""} className="text-sm border border-rule bg-panel rounded px-3 py-2.5 flex-1 min-w-0 sm:min-w-[120px] min-h-[44px]">
               <option value="">All stages</option>
               {stages.map((s) => (
@@ -75,7 +83,6 @@ export default async function LeadsPage(props: {
                 <option key={m.userId} value={m.userId}>{m.name}</option>
               ))}
             </select>
-            <input type="hidden" name="q" value={filters.q ?? ""} />
             <button type="submit" className="text-sm font-semibold border border-ink rounded px-4 py-2.5 hover:bg-paper-2 min-h-[44px] active:bg-paper-2">
               Apply
             </button>

@@ -7,6 +7,18 @@ import { logEvent } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
+/** Safely add months to a date, handling month-end rollover. */
+function addMonths(date: Date, months: number): Date {
+  const d = new Date(date);
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + months);
+  // If the day rolled over (e.g. Jan 31 + 1 = Mar 3), clamp to last day of target month.
+  if (d.getDate() < day) {
+    d.setDate(0); // Last day of previous month
+  }
+  return d;
+}
+
 /**
  * GET /api/cron/billing
  * Runs monthly (via external cron) to charge active subscriptions
@@ -23,7 +35,11 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
-  const expected = `Bearer ${process.env.CRON_SECRET ?? "dev"}`;
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
+  }
+  const expected = `Bearer ${cronSecret}`;
   if (authHeader !== expected) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -87,8 +103,7 @@ export async function GET(request: Request) {
       });
 
       if (chargeResult.status === "success") {
-        const periodEnd = new Date();
-        periodEnd.setMonth(periodEnd.getMonth() + 1);
+        const periodEnd = addMonths(new Date(), 1);
 
         await db
           .update(schema.subscriptions)
@@ -104,7 +119,7 @@ export async function GET(request: Request) {
           .where(eq(schema.subscriptions.id, sub.id));
 
         await logEvent(sub.orgId, "subscription_updated", {
-          actorId: "billing_cron",
+          actorId: undefined,
           meta: { action: "recurring_charge_success", reference, amount: amountNaira, members: memberCount },
         });
 
@@ -117,7 +132,7 @@ export async function GET(request: Request) {
           .where(eq(schema.subscriptions.id, sub.id));
 
         await logEvent(sub.orgId, "subscription_updated", {
-          actorId: "billing_cron",
+          actorId: undefined,
           meta: { action: "recurring_charge_failed", reference, status: chargeResult.status },
         });
 

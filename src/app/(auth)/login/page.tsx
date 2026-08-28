@@ -1,13 +1,17 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { useActionState } from "react";
+import { useSearchParams } from "next/navigation";
 import { signin, type AuthFormState } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 
-export default function LoginPage() {
+function LoginForm() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(signin, {});
+  const params = useSearchParams();
+  const next = params.get("next") || "/dashboard";
 
   return (
     <div className="w-full max-w-sm">
@@ -15,6 +19,7 @@ export default function LoginPage() {
       <p className="text-ink-soft text-sm mb-6">Sign in to your Xsta360 workspace.</p>
 
       <form action={action} className="space-y-4">
+        <input type="hidden" name="next" value={next} />
         <div>
           <Label>Email</Label>
           <Input name="email" type="email" placeholder="you@company.com" autoComplete="email" />
@@ -31,7 +36,7 @@ export default function LoginPage() {
         </div>
 
         {state.message && (
-          <p className="text-sm text-stamp bg-stamp/10 px-3 py-2 rounded">{state.message}</p>
+          <p className="text-sm text-stamp bg-stamp/10 px-3 py-2 rounded" role="alert">{state.message}</p>
         )}
 
         <Button type="submit" size="lg" className="w-full" disabled={pending}>
@@ -46,5 +51,13 @@ export default function LoginPage() {
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="w-full max-w-sm"><p className="text-ink-soft text-sm">Loading...</p></div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -1,6 +1,11 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+
+function toLocalDatetimeInput(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 import { setReminder, type ActivityFormState } from "@/app/actions/activities";
 import { Button } from "@/components/ui/button";
 import { Label, Input, Select } from "@/components/ui/field";
@@ -25,13 +30,13 @@ const REMINDER_NOTES = [
 function getDefaultDue(offset: number | null): string {
   const now = new Date();
   if (offset !== null) {
-    return new Date(now.getTime() + offset).toISOString().slice(0, 16);
+    return toLocalDatetimeInput(new Date(now.getTime() + offset));
   }
   // Tomorrow 9am
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(9, 0, 0, 0);
-  return tomorrow.toISOString().slice(0, 16);
+  return toLocalDatetimeInput(tomorrow);
 }
 
 export function QuickReminderForm({ leadId }: { leadId: string }) {
@@ -41,7 +46,11 @@ export function QuickReminderForm({ leadId }: { leadId: string }) {
   const [noteMode, setNoteMode] = useState("Follow-up call");
   const [state, action, pending] = useActionState<ActivityFormState, FormData>(setReminder, {});
 
-  const visible = showForm && !state.ok;
+  // Close on success: reset showForm so the form can be reopened.
+  const visible = showForm;
+  useEffect(() => {
+    if (state.ok) setShowForm(false);
+  }, [state.ok]);
 
   function handlePresetChange(value: string) {
     setPreset(value);

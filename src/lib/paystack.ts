@@ -1,3 +1,5 @@
+import "server-only";
+
 /**
  * Paystack API client — handles transaction init, verification,
  * and recurring charges via saved authorization codes.

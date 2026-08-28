@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useTransition } from "react";
+import { useActionState, useTransition, useRef, useEffect } from "react";
 import { addStage, updateStage, deleteStage, updateStageProbability, type OrgFormState } from "@/app/actions/org";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/field";
@@ -19,13 +19,14 @@ export function StageManager({
         {stages.map((s) => (
           <li key={s.id} className="px-4 sm:px-5 py-3 flex items-center gap-2 sm:gap-3 flex-wrap">
             <span className="font-mono text-xs text-ink-soft w-6">{s.position}</span>
-            <input
+            <DebouncedInput
+              key={`name-${s.id}`}
               defaultValue={s.name}
               className="text-sm border border-rule bg-paper rounded px-3 py-2 flex-1 min-w-[120px] min-h-[40px]"
-              onChange={(e) => {
+              onDebounce={(value) => {
                 const fd = new FormData();
                 fd.set("stageId", s.id);
-                fd.set("name", e.currentTarget.value);
+                fd.set("name", value);
                 startTransition(async () => {
                   await updateStage({}, fd);
                 });
@@ -33,17 +34,18 @@ export function StageManager({
             />
             {/* Probability input */}
             <div className="flex items-center gap-1">
-              <input
+              <DebouncedInput
+                key={`prob-${s.id}`}
                 type="number"
                 min={0}
                 max={100}
-                defaultValue={s.probability}
+                defaultValue={String(s.probability)}
                 className="text-sm border border-rule bg-paper rounded px-2 py-2 w-16 text-right min-h-[40px]"
                 title="Win probability %"
-                onChange={(e) => {
+                onDebounce={(value) => {
                   const fd = new FormData();
                   fd.set("stageId", s.id);
-                  fd.set("probability", e.currentTarget.value);
+                  fd.set("probability", value);
                   startTransition(async () => {
                     await updateStageProbability({}, fd);
                   });
@@ -89,5 +91,50 @@ export function StageManager({
         {state.message && <p className="text-xs text-stamp w-full">{state.message}</p>}
       </form>
     </div>
+  );
+}
+
+/** Input that debounces onChange before calling onDebounce. */
+function DebouncedInput({
+  onDebounce,
+  className,
+  defaultValue,
+  type,
+  min,
+  max,
+  title,
+}: {
+  onDebounce: (value: string) => void;
+  className?: string;
+  defaultValue?: string;
+  type?: string;
+  min?: number;
+  max?: number;
+  title?: string;
+}) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  return (
+    <input
+      type={type}
+      min={min}
+      max={max}
+      defaultValue={defaultValue}
+      title={title}
+      className={className}
+      onChange={(e) => {
+        const value = e.currentTarget.value;
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+          onDebounce(value);
+        }, 600);
+      }}
+    />
   );
 }

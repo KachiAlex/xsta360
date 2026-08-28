@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentPayload } from "@/lib/session";
+import { verifySession } from "@/lib/dal";
 import { getLeadTimeline } from "@/lib/dashboard";
 
 export async function GET(request: NextRequest) {
-  const payload = await getCurrentPayload();
-  if (!payload) {
+  const ctx = await verifySession();
+  if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -13,15 +13,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "leadId required" }, { status: 400 });
   }
 
-  const timeline = await getLeadTimeline(payload.orgId, leadId);
+  try {
+    const timeline = await getLeadTimeline(ctx.orgId, leadId);
 
-  return NextResponse.json({
-    timeline: timeline.map((e) => ({
-      id: e.id,
-      type: e.type,
-      body: e.body,
-      occurredAt: e.occurredAt.toISOString(),
-      authorName: e.authorName,
-    })),
-  });
+    return NextResponse.json({
+      timeline: timeline.map((e) => ({
+        id: e.id,
+        type: e.type,
+        body: e.body,
+        occurredAt: e.occurredAt.toISOString(),
+        authorName: e.authorName,
+      })),
+    });
+  } catch (err) {
+    console.error("Timeline fetch error:", err);
+    return NextResponse.json({ error: "Failed to load timeline" }, { status: 500 });
+  }
 }

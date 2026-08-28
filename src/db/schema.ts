@@ -80,6 +80,13 @@ export const auditEventTypeEnum = pgEnum("audit_event_type", [
   "user_suspended",
   "user_reactivated",
   "org_suspended",
+  "stage_created",
+  "stage_updated",
+  "stage_deleted",
+  "stage_probability_updated",
+  "org_settings_updated",
+  "reminder_deleted",
+  "invite_revoked",
 ]);
 export type AuditEventType = (typeof auditEventTypeEnum.enumValues)[number];
 
@@ -240,7 +247,9 @@ export const invitations = pgTable("invitations", {
     .notNull()
     .default(sql`now() + interval '7 days'`),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  orgIdx: index("invitations_org_idx").on(t.orgId),
+}));
 
 // ---------------------------------------------------------------------------
 // Pipeline configuration (per org)
@@ -330,6 +339,8 @@ export const leads = pgTable(
     orgStageIdx: index("leads_org_stage_idx").on(t.orgId, t.stageId),
     orgAssigneeIdx: index("leads_org_assignee_idx").on(t.orgId, t.assigneeId),
     orgSourceIdx: index("leads_org_source_idx").on(t.orgId, t.source),
+    orgUpdatedIdx: index("leads_org_updated_idx").on(t.orgId, t.updatedAt),
+    orgCreatedIdx: index("leads_org_created_idx").on(t.orgId, t.createdAt),
   }),
 );
 
@@ -351,6 +362,7 @@ export const remarks = pgTable(
   },
   (t) => ({
     leadCreatedIdx: index("remarks_lead_created_idx").on(t.leadId, t.createdAt),
+    orgIdx: index("remarks_org_idx").on(t.orgId),
   }),
 );
 
@@ -408,6 +420,7 @@ export const reminders = pgTable(
   (t) => ({
     assigneeDueIdx: index("reminders_assignee_due_idx").on(t.assigneeId, t.dueAt),
     statusDueIdx: index("reminders_status_due_idx").on(t.status, t.dueAt),
+    orgIdx: index("reminders_org_idx").on(t.orgId),
   }),
 );
 

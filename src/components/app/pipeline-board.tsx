@@ -41,12 +41,21 @@ export function PipelineBoard({ initialColumns }: { initialColumns: PipelineColu
       );
     });
 
-    // Persist via server action.
+    // Persist via server action — revert on failure.
     const fd = new FormData();
     fd.set("leadId", draggedId);
     fd.set("toStageId", targetStageId);
     startTransition(async () => {
-      await changeStage({}, fd);
+      try {
+        const result = await changeStage({}, fd);
+        if (result && (result.message || result.errors)) {
+          // Revert to original state on failure.
+          setColumns(initialColumns);
+        }
+      } catch {
+        // Revert to original state on error.
+        setColumns(initialColumns);
+      }
     });
 
     setDraggedId(null);

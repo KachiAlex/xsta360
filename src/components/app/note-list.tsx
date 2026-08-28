@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   createNote,
@@ -29,7 +29,11 @@ export function NoteList({ notes, leadId }: { notes: NoteRow[]; leadId?: string 
   const [showForm, setShowForm] = useState(false);
   const [state, action, pending] = useActionState<TaskFormState, FormData>(createNote, {});
 
-  const visible = showForm && !state.ok;
+  // Close on success: reset showForm so the form can be reopened.
+  const visible = showForm;
+  useEffect(() => {
+    if (state.ok) setShowForm(false);
+  }, [state.ok]);
   const pinned = notes.filter((n) => n.pinned);
   const unpinned = notes.filter((n) => !n.pinned);
 

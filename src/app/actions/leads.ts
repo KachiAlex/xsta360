@@ -320,7 +320,7 @@ export async function changeStage(
       lostReasonId: target.kind === "lost" ? (lostReasonId || null) : null,
       lostReasonText: target.kind === "lost" ? (lostReasonText || null) : null,
     })
-    .where(eq(schema.leads.id, leadId))
+    .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, ctx.orgId)))
     .returning();
 
   const eventType = target.kind === "won" ? "lead_won" : target.kind === "lost" ? "lead_lost" : "stage_changed";
@@ -450,7 +450,7 @@ export async function assignLead(
   await db
     .update(schema.leads)
     .set({ assigneeId: assigneeId || null, updatedAt: new Date() })
-    .where(eq(schema.leads.id, leadId));
+    .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, ctx.orgId)));
 
   await logEvent(ctx.orgId, "lead_assigned", {
     leadId,

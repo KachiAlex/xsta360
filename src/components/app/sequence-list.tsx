@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import {
   createSequence,
   deleteSequence,
@@ -34,7 +34,11 @@ interface Sequence {
 export function SequenceList({ sequences }: { sequences: Sequence[] }) {
   const [showForm, setShowForm] = useState(false);
   const [state, action, pending] = useActionState<SequenceFormState, FormData>(createSequence, {});
-  const visible = showForm && !state.ok;
+  // Close on success: reset showForm so the form can be reopened.
+  const visible = showForm;
+  useEffect(() => {
+    if (state.ok) setShowForm(false);
+  }, [state.ok]);
 
   return (
     <div>
@@ -79,7 +83,11 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
   const [, startTransition] = useTransition();
   const [showStepForm, setShowStepForm] = useState(false);
   const [stepState, stepAction, stepPending] = useActionState<SequenceFormState, FormData>(addSequenceStep, {});
-  const stepVisible = showStepForm && !stepState.ok;
+  // Close on success: reset showStepForm so the form can be reopened.
+  const stepVisible = showStepForm;
+  useEffect(() => {
+    if (stepState.ok) setShowStepForm(false);
+  }, [stepState.ok]);
 
   return (
     <div className="px-3.5 sm:px-5 py-3.5 sm:py-4">

@@ -81,6 +81,16 @@ export async function createTodo(
     return { errors: { dueAt: ["Invalid date"] } };
   }
 
+  // Verify lead belongs to org if specified.
+  if (leadId) {
+    const [lead] = await db
+      .select({ id: schema.leads.id })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, ctx.orgId)))
+      .limit(1);
+    if (!lead) return { message: "Lead not found" };
+  }
+
   const [todo] = await db
     .insert(schema.todos)
     .values({
@@ -205,6 +215,16 @@ export async function createNote(
   }
 
   const { title, body, leadId } = parsed.data;
+
+  // Verify lead belongs to org if specified.
+  if (leadId) {
+    const [lead] = await db
+      .select({ id: schema.leads.id })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, ctx.orgId)))
+      .limit(1);
+    if (!lead) return { message: "Lead not found" };
+  }
 
   const [note] = await db
     .insert(schema.notes)

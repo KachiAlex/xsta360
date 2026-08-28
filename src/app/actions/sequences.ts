@@ -132,6 +132,14 @@ export async function addSequenceStep(
     };
   }
 
+  // Verify sequence belongs to org.
+  const [seq] = await db
+    .select({ id: schema.sequences.id })
+    .from(schema.sequences)
+    .where(and(eq(schema.sequences.id, parsed.data.sequenceId), eq(schema.sequences.orgId, ctx.orgId)))
+    .limit(1);
+  if (!seq) return { message: "Sequence not found" };
+
   // Get current max position.
   const steps = await db
     .select()
@@ -185,6 +193,14 @@ export async function enrollLead(
   if (!parsed.success) {
     return { message: "Invalid input" };
   }
+
+  // Verify lead belongs to org.
+  const [lead] = await db
+    .select({ id: schema.leads.id })
+    .from(schema.leads)
+    .where(and(eq(schema.leads.id, parsed.data.leadId), eq(schema.leads.orgId, ctx.orgId)))
+    .limit(1);
+  if (!lead) return { message: "Lead not found" };
 
   const result = await enrollLeadInSequence(
     ctx.orgId,

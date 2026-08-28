@@ -23,9 +23,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = "primary", size = "md", className = "", ...props }, ref) => (
+  ({ variant = "primary", size = "md", type = "button", className = "", ...props }, ref) => (
     <button
       ref={ref}
+      type={type}
       className={`${base} ${variants[variant]} ${sizes[size]} ${className}`}
       {...props}
     />

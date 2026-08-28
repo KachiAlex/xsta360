@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, eq, count } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { verifySession, can } from "@/lib/dal";
+import { logEvent } from "@/lib/audit";
 
 export type OrgFormState = { errors?: Record<string, string[]>; message?: string; ok?: boolean };
 
@@ -53,6 +54,11 @@ export async function addStage(
     position: maxPos + 1,
   });
 
+  await logEvent(ctx.orgId, "stage_created", {
+    actorId: ctx.userId,
+    meta: { name: parsed.data.name, kind: parsed.data.kind },
+  });
+
   revalidatePath("/settings");
   revalidatePath("/pipeline");
   return { ok: true };
@@ -88,6 +94,11 @@ export async function updateStage(
     .set({ name: parsed.data.name })
     .where(eq(schema.pipelineStages.id, stage.id));
 
+  await logEvent(ctx.orgId, "stage_updated", {
+    actorId: ctx.userId,
+    meta: { stageId: stage.id, oldName: stage.name, newName: parsed.data.name },
+  });
+
   revalidatePath("/settings");
   revalidatePath("/pipeline");
   return { ok: true };
@@ -111,7 +122,21 @@ export async function deleteStage(
     .limit(1);
   if (!stage) return { message: "Stage not found" };
 
+  // Prevent deleting a stage that still has leads — reassign them first.
+  const [{ value: leadCount }] = await db
+    .select({ value: count() })
+    .from(schema.leads)
+    .where(eq(schema.leads.stageId, stage.id));
+  if (leadCount > 0) {
+    return { message: `Cannot delete: ${leadCount} lead(s) are in this stage. Move them first.` };
+  }
+
   await db.delete(schema.pipelineStages).where(eq(schema.pipelineStages.id, stage.id));
+
+  await logEvent(ctx.orgId, "stage_deleted", {
+    actorId: ctx.userId,
+    meta: { stageId: stage.id, stageName: stage.name },
+  });
 
   revalidatePath("/settings");
   revalidatePath("/pipeline");
@@ -147,6 +172,11 @@ export async function updateStageProbability(
     .update(schema.pipelineStages)
     .set({ probability })
     .where(eq(schema.pipelineStages.id, stage.id));
+
+  await logEvent(ctx.orgId, "stage_probability_updated", {
+    actorId: ctx.userId,
+    meta: { stageId: stage.id, probability },
+  });
 
   revalidatePath("/settings");
   revalidatePath("/pipeline");
@@ -196,6 +226,11 @@ export async function updateOrgSettings(
       updatedAt: new Date(),
     })
     .where(eq(schema.organizations.id, ctx.orgId));
+
+  await logEvent(ctx.orgId, "org_settings_updated", {
+    actorId: ctx.userId,
+    meta: { currency, whatsappEnabled },
+  });
 
   revalidatePath("/settings");
   revalidatePath("/dashboard");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -17,6 +17,25 @@ export function Topbar({ children, searchPlaceholder = "Search leads...", action
   const router = useRouter();
   const params = useSearchParams();
   const [searchOpen, setSearchOpen] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced search — updates URL after 300ms of inactivity.
+  function handleSearch(value: string) {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      const q = value.trim();
+      const url = new URL(window.location.href);
+      if (q) url.searchParams.set("q", q);
+      else url.searchParams.delete("q");
+      router.replace(url.pathname + url.search);
+    }, 300);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, []);
 
   return (
     <div className="topbar sticky top-0 z-10 bg-panel border-b border-rule">
@@ -43,13 +62,7 @@ export function Topbar({ children, searchPlaceholder = "Search leads...", action
             type="text"
             placeholder={searchPlaceholder}
             defaultValue={params.get("q") ?? ""}
-            onChange={(e) => {
-              const q = e.target.value.trim();
-              const url = new URL(window.location.href);
-              if (q) url.searchParams.set("q", q);
-              else url.searchParams.delete("q");
-              router.replace(url.pathname + url.search);
-            }}
+            onChange={(e) => handleSearch(e.target.value)}
           />
           {/* Mobile search toggle */}
           <button
@@ -73,13 +86,7 @@ export function Topbar({ children, searchPlaceholder = "Search leads...", action
             type="text"
             placeholder={searchPlaceholder}
             defaultValue={params.get("q") ?? ""}
-            onChange={(e) => {
-              const q = e.target.value.trim();
-              const url = new URL(window.location.href);
-              if (q) url.searchParams.set("q", q);
-              else url.searchParams.delete("q");
-              router.replace(url.pathname + url.search);
-            }}
+            onChange={(e) => handleSearch(e.target.value)}
             autoFocus
           />
         </div>

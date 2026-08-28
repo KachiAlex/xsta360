@@ -5,6 +5,17 @@ import { logEvent } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
+/** Safely add months to a date, handling month-end rollover. */
+function addMonths(date: Date, months: number): Date {
+  const d = new Date(date);
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + months);
+  if (d.getDate() < day) {
+    d.setDate(0);
+  }
+  return d;
+}
+
 /**
  * POST /api/webhooks/paystack
  * Handles Paystack webhook events for subscription billing.
@@ -31,14 +42,16 @@ export async function POST(request: Request) {
 
   const rawBody = await request.text();
 
-  // Verify HMAC SHA512 signature.
+  // Verify HMAC SHA512 signature using timing-safe comparison.
   const crypto = await import("node:crypto");
   const expectedSig = crypto
     .createHmac("sha512", secret)
     .update(rawBody)
     .digest("hex");
 
-  if (signature !== expectedSig) {
+  const sigBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expectedSig);
+  if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
@@ -60,6 +73,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   }
 
+  // Process event — return 500 on DB failures so Paystack retries.
   try {
     switch (eventType) {
       case "charge.success": {
@@ -67,8 +81,7 @@ export async function POST(request: Request) {
         const authorization = data.authorization as Record<string, unknown>;
         const amount = data.amount as number;
         const now = new Date();
-        const periodEnd = new Date();
-        periodEnd.setMonth(periodEnd.getMonth() + 1);
+        const periodEnd = addMonths(now, 1);
 
         const [sub] = await db
           .select()
@@ -77,6 +90,12 @@ export async function POST(request: Request) {
           .limit(1);
 
         if (sub) {
+          // Extend from max(now, existingPeriodEnd) to not lose early payments.
+          const baseDate = sub.currentPeriodEnd && sub.currentPeriodEnd > now
+            ? sub.currentPeriodEnd
+            : now;
+          const extendedPeriodEnd = addMonths(baseDate, 1);
+
           await db
             .update(schema.subscriptions)
             .set({
@@ -88,14 +107,14 @@ export async function POST(request: Request) {
               lastPaymentAmount: amount,
               lastPaymentReference: reference,
               currentPeriodStart: now,
-              currentPeriodEnd: periodEnd,
+              currentPeriodEnd: extendedPeriodEnd,
               updatedAt: now,
             })
             .where(eq(schema.subscriptions.id, sub.id));
         }
 
         await logEvent(orgId, "subscription_updated", {
-          actorId: "paystack_webhook",
+          actorId: undefined,
           meta: { action: "charge_success", reference, amount },
         });
         break;
@@ -119,7 +138,7 @@ export async function POST(request: Request) {
         }
 
         await logEvent(orgId, "subscription_updated", {
-          actorId: "paystack_webhook",
+          actorId: undefined,
           meta: { action: "charge_failed", reference },
         });
         break;
@@ -144,7 +163,7 @@ export async function POST(request: Request) {
         }
 
         await logEvent(orgId, "subscription_canceled", {
-          actorId: "paystack_webhook",
+          actorId: undefined,
           meta: { action: "subscription_disabled", reference },
         });
         break;
@@ -156,7 +175,8 @@ export async function POST(request: Request) {
     }
   } catch (err) {
     console.error("Webhook processing error:", err);
-    // Return 200 anyway so Paystack doesn't retry unnecessarily.
+    // Return 500 so Paystack retries — the DB write may have failed.
+    return NextResponse.json({ error: "Processing failed" }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });

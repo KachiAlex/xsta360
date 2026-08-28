@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { createTodo, completeTodo, reopenTodo, deleteTodo, type TaskFormState } from "@/app/actions/tasks";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,11 @@ export function TodoList({ todos, leadId }: { todos: TodoRow[]; leadId?: string 
   const [showForm, setShowForm] = useState(false);
   const [state, action, pending] = useActionState<TaskFormState, FormData>(createTodo, {});
 
-  const visible = showForm && !state.ok;
+  // Close on success: reset showForm so the form can be reopened.
+  const visible = showForm;
+  useEffect(() => {
+    if (state.ok) setShowForm(false);
+  }, [state.ok]);
   const pending_todos = todos.filter((t) => t.status === "pending");
   const completed_todos = todos.filter((t) => t.status === "completed");
 

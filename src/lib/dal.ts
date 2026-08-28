@@ -39,10 +39,15 @@ export async function verifySession(): Promise<AuthContext | null> {
     };
   }
 
-  // Re-confirm membership is still valid (user may have been removed / demoted).
+  // Re-confirm membership is still valid (user may have been removed / demoted / suspended).
   const [membership] = await db
-    .select()
+    .select({
+      id: schema.memberships.id,
+      role: schema.memberships.role,
+      suspendedAt: schema.users.suspendedAt,
+    })
     .from(schema.memberships)
+    .innerJoin(schema.users, eq(schema.memberships.userId, schema.users.id))
     .where(
       and(
         eq(schema.memberships.userId, payload.userId),
@@ -52,6 +57,9 @@ export async function verifySession(): Promise<AuthContext | null> {
     .limit(1);
 
   if (!membership) return null;
+
+  // Suspended users cannot access the app.
+  if (membership.suspendedAt) return null;
 
   // Keep the session role in sync with the DB in case it changed.
   if (membership.role !== payload.role) {
