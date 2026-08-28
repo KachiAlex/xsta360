@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
@@ -138,7 +139,7 @@ export async function signup(
     redirect("/dashboard");
   } catch (err) {
     // redirect() throws a special error — re-throw it so Next.js handles it.
-    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
+    if (isRedirectError(err)) throw err;
     const message = err instanceof Error ? err.message : "Something went wrong";
     return { message: `Signup failed: ${message}` };
   }
@@ -216,7 +217,7 @@ export async function signupAndJoin(
     });
     redirect("/dashboard");
   } catch (err) {
-    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
+    if (isRedirectError(err)) throw err;
     const message = err instanceof Error ? err.message : "Something went wrong";
     return { message: `Join failed: ${message}` };
   }
@@ -271,7 +272,7 @@ export async function signin(
     const redirectTo = next && isInternalPath(next) ? next : "/dashboard";
     redirect(redirectTo);
   } catch (err) {
-    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
+    if (isRedirectError(err)) throw err;
     const message = err instanceof Error ? err.message : "Something went wrong";
     return { message: `Sign in failed: ${message}` };
   }
