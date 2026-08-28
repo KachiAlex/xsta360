@@ -40,7 +40,9 @@ Copy `.env.example` to `.env.local` and fill in:
 - `APP_URL` — public base URL
 - `RESEND_API_KEY` — optional; if unset, reminder emails log to console
 - `EMAIL_FROM` — from address for transactional email
-- `CRON_SECRET` — shared secret for the `/api/cron/reminders` endpoint
+- `CRON_SECRET` — shared secret for the `/api/cron/reminders` and `/api/cron/billing` endpoints
+- `PAYSTACK_SECRET_KEY` — Paystack secret key (sk_test_... or sk_live_...)
+- `PAYSTACK_PUBLIC_KEY` — Paystack public key (pk_test_... or pk_live_...)
 
 ## Seed data
 ```bash
@@ -58,6 +60,14 @@ Superadmin login: `admin@kreatix.tech` / `Kreatix2026!`
 Override via env: `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`, `SUPERADMIN_NAME`
 Superadmins access `/admin` — manage orgs, users, plans, subscriptions.
 On server: `docker exec -e SKIP_SERVER_ONLY=1 xsta360-app-1 npx tsx src/db/seed-admin.ts`
+
+## Billing (Paystack)
+Hybrid per-seat pricing: base fee (₦1000/mo for admin) + per-seat (₦500/mo per additional member).
+- Workspace admins pay via `/billing` → Paystack checkout
+- Authorization code saved for recurring charges (no card details stored)
+- Monthly cron: `curl -H "Authorization: Bearer $CRON_SECRET" http://xsta360.67-211-210-8.sslip.io/api/cron/billing`
+- Webhook: `POST /api/webhooks/paystack` (set webhook URL in Paystack dashboard)
+- Paystack dashboard: https://dashboard.paystack.com
 
 ## Architecture
 - **Multi-tenant**: every table has `orgId`; all queries filter by the session's org.
