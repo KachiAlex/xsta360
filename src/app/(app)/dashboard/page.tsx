@@ -49,6 +49,9 @@ export default async function DashboardPage() {
         <ViewTab active href="/dashboard">
           Overview
         </ViewTab>
+        <ViewTab active={false} href="/follow-ups">
+          Follow-Ups
+        </ViewTab>
         <ViewTab active={false} href="/pipeline">
           Pipeline
         </ViewTab>

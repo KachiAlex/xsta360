@@ -15,6 +15,7 @@ export interface SidebarProps {
 
 const NAV = [
   { href: "/dashboard", label: "Overview", icon: "▤", key: "today" },
+  { href: "/follow-ups", label: "Follow-Ups", icon: "☎", key: "followups" },
   { href: "/tasks", label: "To-Dos & Notes", icon: "✓", key: "tasks" },
   { href: "/pipeline", label: "Pipeline", icon: "▦", key: "pipeline" },
   { href: "/leads", label: "Leads", icon: "▥", key: "leads" },

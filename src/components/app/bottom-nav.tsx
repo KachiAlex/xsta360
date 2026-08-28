@@ -9,10 +9,10 @@ export interface BottomNavProps {
 
 const NAV = [
   { href: "/dashboard", label: "Overview", icon: "▤" },
+  { href: "/follow-ups", label: "Follow-Ups", icon: "☎" },
   { href: "/pipeline", label: "Pipeline", icon: "▦" },
   { href: "/leads", label: "Leads", icon: "▥" },
   { href: "/tasks", label: "Tasks", icon: "✓" },
-  { href: "/reports", label: "Reports", icon: "▧" },
 ];
 
 export function BottomNav({ todayCount }: BottomNavProps) {
