@@ -47,7 +47,7 @@ export default async function DashboardPage() {
     <>
       <Topbar actions={addLead}>
         <ViewTab active href="/dashboard">
-          Follow-Ups
+          Overview
         </ViewTab>
         <ViewTab active={false} href="/pipeline">
           Pipeline

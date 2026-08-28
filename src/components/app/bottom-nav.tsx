@@ -8,7 +8,7 @@ export interface BottomNavProps {
 }
 
 const NAV = [
-  { href: "/dashboard", label: "Today", icon: "▤" },
+  { href: "/dashboard", label: "Overview", icon: "▤" },
   { href: "/pipeline", label: "Pipeline", icon: "▦" },
   { href: "/leads", label: "Leads", icon: "▥" },
   { href: "/tasks", label: "Tasks", icon: "✓" },
