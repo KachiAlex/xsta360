@@ -38,12 +38,12 @@ export function SequenceList({ sequences }: { sequences: Sequence[] }) {
 
   return (
     <div>
-      <div className="px-5 py-4 border-b border-rule">
+      <div className="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-rule">
         <Button type="button" size="sm" onClick={() => setShowForm(true)}>+ New sequence</Button>
       </div>
 
       {visible && (
-        <form action={action} className="px-5 py-4 border-b border-rule space-y-3 bg-paper-2">
+        <form action={action} className="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-rule space-y-3 bg-paper-2">
           <div>
             <Label>Sequence name</Label>
             <Input name="name" placeholder="e.g. New lead follow-up" autoFocus />
@@ -82,7 +82,7 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
   const stepVisible = showStepForm && !stepState.ok;
 
   return (
-    <div className="px-4 sm:px-5 py-4">
+    <div className="px-3.5 sm:px-5 py-3.5 sm:py-4">
       <div className="flex items-start gap-3 mb-3 flex-wrap">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -101,7 +101,7 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
         <div className="flex gap-2 shrink-0">
           <button
             type="button"
-            className="text-xs text-ink-soft hover:text-ink"
+            className="text-xs text-ink-soft hover:text-ink min-h-[36px] px-2 active:bg-paper-2 rounded"
             onClick={() => {
               const fd = new FormData();
               fd.set("id", sequence.id);
@@ -114,7 +114,7 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
           </button>
           <button
             type="button"
-            className="text-xs text-stamp hover:underline"
+            className="text-xs text-stamp hover:underline min-h-[36px] px-2 active:bg-stamp/10 rounded"
             onClick={() => {
               if (!confirm("Delete this sequence?")) return;
               const fd = new FormData();

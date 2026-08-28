@@ -17,15 +17,15 @@ export function InviteForm() {
   };
 
   return (
-    <form action={action} className="flex gap-2 items-end flex-wrap">
-      <div className="flex-1 min-w-[180px]">
+    <form action={action} className="flex flex-col sm:flex-row gap-2 sm:gap-2 sm:items-end sm:flex-wrap">
+      <div className="flex-1 min-w-0 sm:min-w-[180px]">
         <Label>Email</Label>
         <Input name="email" type="email" placeholder="teammate@company.com" />
         {state.errors?.email && (
           <p className="text-xs text-stamp mt-1">{state.errors.email[0]}</p>
         )}
       </div>
-      <div className="min-w-[120px]">
+      <div className="min-w-0 sm:min-w-[120px]">
         <Label>Role</Label>
         <Select name="role" defaultValue="rep">
           <option value="rep">Rep</option>
@@ -33,7 +33,7 @@ export function InviteForm() {
           <option value="admin">Admin</option>
         </Select>
       </div>
-      <Button type="submit" size="sm" disabled={pending}>
+      <Button type="submit" size="sm" disabled={pending} className="sm:self-end">
         {pending ? "Creating…" : "Invite"}
       </Button>
 

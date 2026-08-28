@@ -131,7 +131,7 @@ function NoteCard({ note }: { note: NoteRow }) {
 
   return (
     <div className={`bg-panel border border-rule rounded p-4 ${note.pinned ? "border-amber/40" : ""}`}>
-      <div className="flex items-start gap-2 mb-1.5">
+      <div className="flex items-start gap-1 sm:gap-2 mb-1.5">
         <h3 className="font-semibold text-sm m-0 flex-1">{note.title}</h3>
         <form
           onSubmit={(e) => {
@@ -145,7 +145,7 @@ function NoteCard({ note }: { note: NoteRow }) {
           <input type="hidden" name="id" value={note.id} />
           <button
             type="submit"
-            className={`text-xs ${note.pinned ? "text-amber" : "text-ink-soft"} hover:text-ink`}
+            className={`text-xs ${note.pinned ? "text-amber" : "text-ink-soft"} hover:text-ink min-w-[32px] min-h-[32px] flex items-center justify-center active:bg-paper-2 rounded`}
             title={note.pinned ? "Unpin" : "Pin"}
           >
             {note.pinned ? "📌" : "○"}
@@ -154,7 +154,7 @@ function NoteCard({ note }: { note: NoteRow }) {
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="text-xs text-ink-soft hover:text-ink"
+          className="text-xs text-ink-soft hover:text-ink min-w-[32px] min-h-[32px] flex items-center justify-center active:bg-paper-2 rounded"
           title="Edit"
         >
           ✎
@@ -169,7 +169,7 @@ function NoteCard({ note }: { note: NoteRow }) {
           }}
         >
           <input type="hidden" name="id" value={note.id} />
-          <button type="submit" className="text-xs text-ink-soft hover:text-stamp" title="Delete">
+          <button type="submit" className="text-xs text-ink-soft hover:text-stamp min-w-[32px] min-h-[32px] flex items-center justify-center active:bg-stamp/10 rounded" title="Delete">
             ✕
           </button>
         </form>

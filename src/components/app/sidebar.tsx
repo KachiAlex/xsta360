@@ -34,10 +34,10 @@ export function Sidebar({ orgName, userName, userInitials, role, todayCount }: S
 
   return (
     <>
-      {/* Mobile toggle button */}
+      {/* Mobile toggle button — opens full menu for secondary nav items */}
       <button
         type="button"
-        className="md:hidden fixed top-3 left-3 z-50 bg-ink text-paper w-10 h-10 rounded-md font-mono text-lg flex items-center justify-center shadow-lg"
+        className="md:hidden fixed top-2.5 left-2.5 z-50 bg-ink text-paper w-9 h-9 rounded-md font-mono text-sm flex items-center justify-center shadow-lg active:scale-95 transition-transform"
         onClick={() => setMobileOpen(!mobileOpen)}
         aria-label="Toggle menu"
       >
@@ -53,7 +53,7 @@ export function Sidebar({ orgName, userName, userInitials, role, todayCount }: S
       )}
 
       <aside
-        className={`bg-ink text-paper w-64 flex flex-col py-6 px-4 shrink-0 fixed md:relative top-0 left-0 h-full md:h-auto z-40 transition-transform duration-200 ${
+        className={`bg-ink text-paper w-72 flex flex-col py-6 px-4 shrink-0 fixed md:relative top-0 left-0 h-full md:h-auto z-40 transition-transform duration-200 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >

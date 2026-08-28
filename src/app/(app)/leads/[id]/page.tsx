@@ -59,18 +59,18 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   return (
     <>
       <Topbar>
-        <Link href="/leads" className="text-sm text-ink-soft hover:text-ink px-4 py-2">
-          ← Back to leads
+        <Link href="/leads" className="text-sm text-ink-soft hover:text-ink px-3 py-2 min-h-[40px] flex items-center active:text-ink">
+          ← Leads
         </Link>
       </Topbar>
 
-      <div className="content flex-1 px-4 sm:px-6 lg:px-8 py-5 sm:py-7 max-w-[1240px] w-full mx-auto">
+      <div className="content flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-7 max-w-[1240px] w-full mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
           {/* Main: header + history */}
-          <div className="space-y-6 min-w-0">
+          <div className="space-y-5 sm:space-y-6 min-w-0">
             <div>
-              <div className="flex items-center gap-3 mb-1 flex-wrap">
-                <h1 className="font-mono text-xl sm:text-2xl m-0">{lead.name}</h1>
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <h1 className="font-mono text-lg sm:text-2xl m-0">{lead.name}</h1>
                 {lead.stageKind === "won" && <Badge tone="won">Won</Badge>}
                 {lead.stageKind === "lost" && <Badge tone="lost">Lost</Badge>}
               </div>
@@ -78,7 +78,6 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-              <span className="text-sm font-semibold text-ink-soft">Stage:</span>
               <StageSelect
                 leadId={lead.id}
                 stages={stages}
@@ -101,8 +100,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               ) : (
                 <ol className="divide-y divide-dashed divide-rule">
                   {history.map((entry, i) => (
-                    <li key={i} className="px-4 sm:px-5 py-3.5 sm:py-4">
-                      <div className="flex justify-between items-baseline gap-3 sm:gap-4 flex-wrap sm:flex-nowrap">
+                    <li key={i} className="px-4 sm:px-5 py-3 sm:py-4">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-baseline gap-1 sm:gap-4">
                         <div className="min-w-0">
                           <span className="font-mono text-xs text-ink-soft uppercase tracking-wider">
                             {entry.type === "remark" ? "Remark" : EVENT_LABELS[entry.type] ?? entry.type}

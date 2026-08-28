@@ -7,7 +7,7 @@ export function Label({ children }: { children: React.ReactNode }) {
 }
 
 const inputBase =
-  "w-full font-sans text-sm px-3 py-2.5 border border-rule rounded bg-paper focus:outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 transition-colors";
+  "w-full font-sans text-sm px-3 py-2.5 border border-rule rounded bg-paper focus:outline-none focus:border-ink focus:ring-2 focus:ring-ink/10 transition-colors min-h-[44px]";
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={`${inputBase} ${props.className ?? ""}`} />;

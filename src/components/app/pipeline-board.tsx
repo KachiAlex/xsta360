@@ -53,11 +53,11 @@ export function PipelineBoard({ initialColumns }: { initialColumns: PipelineColu
   }
 
   return (
-    <div className="board flex md:grid md:grid-cols-[repeat(4,1fr)] gap-3 md:gap-3.5 overflow-x-auto pb-2 md:pb-0 snap-x snap-mandatory">
+    <div className="board flex md:grid md:grid-cols-[repeat(4,1fr)] gap-2.5 sm:gap-3 md:gap-3.5 overflow-x-auto pb-2 md:pb-0 snap-x snap-mandatory -mx-4 px-4 sm:mx-0 sm:px-0">
       {columns.map((col) => (
         <div
           key={col.id}
-          className={`col bg-paper-2 border border-rule rounded-md min-h-[420px] flex flex-col w-[75vw] sm:w-[280px] md:w-auto shrink-0 snap-start ${
+          className={`col bg-paper-2 border border-rule rounded-md min-h-[400px] sm:min-h-[420px] flex flex-col w-[78vw] sm:w-[280px] md:w-auto shrink-0 snap-start ${
             dragOverCol === col.id ? "bg-[#E4E9DF]" : ""
           }`}
           onDragOver={(e) => {
@@ -67,11 +67,11 @@ export function PipelineBoard({ initialColumns }: { initialColumns: PipelineColu
           onDragLeave={() => setDragOverCol(null)}
           onDrop={() => onDrop(col.id)}
         >
-          <div className="col-head px-4 py-3.5 border-b border-rule flex justify-between items-center">
-            <h3 className="font-mono text-[13px] m-0 uppercase tracking-wider">{col.name}</h3>
-            <span className="col-count font-mono text-[11px] text-ink-soft">{col.leads.length}</span>
+          <div className="col-head px-3 sm:px-4 py-3 border-b border-rule flex justify-between items-center">
+            <h3 className="font-mono text-[12px] sm:text-[13px] m-0 uppercase tracking-wider truncate">{col.name}</h3>
+            <span className="col-count font-mono text-[11px] text-ink-soft shrink-0 ml-2">{col.leads.length}</span>
           </div>
-          <div className="col-body p-3 flex flex-col gap-2.5 flex-1">
+          <div className="col-body p-2.5 sm:p-3 flex flex-col gap-2 sm:gap-2.5 flex-1">
             {col.leads.map((lead) => (
               <Link
                 key={lead.id}
@@ -82,7 +82,7 @@ export function PipelineBoard({ initialColumns }: { initialColumns: PipelineColu
                   setDraggedId(null);
                   setDragOverCol(null);
                 }}
-                className={`card bg-panel border border-rule rounded p-3 cursor-grab shadow-[0_1px_0_var(--color-rule)] active:cursor-grabbing hover:border-ink hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all ${
+                className={`card bg-panel border border-rule rounded p-2.5 sm:p-3 cursor-grab shadow-[0_1px_0_var(--color-rule)] active:cursor-grabbing hover:border-ink hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all active:bg-paper-2/50 ${
                   draggedId === lead.id ? "opacity-40" : ""
                 }`}
               >

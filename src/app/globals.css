@@ -24,6 +24,8 @@
 
 html {
   scroll-behavior: smooth;
+  /* Prevent overscroll bounce on mobile */
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -31,6 +33,35 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  /* Use dynamic viewport height for mobile browsers */
+  min-height: 100dvh;
+  /* Prevent text size adjust on rotation */
+  -webkit-text-size-adjust: 100%;
+  /* Prevent tap highlight delay */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent iOS input zoom — inputs must be >= 16px */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Better tap feedback on mobile */
+@media (max-width: 767px) {
+  button, a, [role="button"] {
+    -webkit-tap-highlight-color: rgba(30, 42, 34, 0.08);
+    touch-action: manipulation;
+  }
+}
+
+/* Smooth scrolling for horizontal scroll containers on mobile */
+@media (max-width: 767px) {
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+  }
 }
 
 ::selection {

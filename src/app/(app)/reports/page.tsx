@@ -26,7 +26,7 @@ export default async function ReportsPage() {
   return (
     <>
       <Topbar />
-      <div className="content flex-1 px-4 sm:px-6 lg:px-8 py-5 sm:py-7 max-w-[1240px] w-full mx-auto space-y-5 sm:space-y-6">
+      <div className="content flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-7 max-w-[1240px] w-full mx-auto space-y-4 sm:space-y-6">
         <h1 className="font-mono text-xl">Reports</h1>
 
         {/* Pipeline forecast */}
@@ -34,22 +34,22 @@ export default async function ReportsPage() {
           <PanelHead title="Pipeline forecast" sub="Deal value by stage, weighted by win probability" />
           <div className="p-4 sm:p-5">
             {/* Summary cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-              <div className="bg-paper-2 rounded p-3">
-                <div className="text-[11px] font-mono uppercase tracking-wider text-ink-soft mb-1">Pipeline value</div>
-                <div className="font-mono text-xl font-bold">{formatCurrency(forecast.totalPipelineValue)}</div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-5">
+              <div className="bg-paper-2 rounded p-2.5 sm:p-3">
+                <div className="text-[10px] sm:text-[11px] font-mono uppercase tracking-wider text-ink-soft mb-1">Pipeline value</div>
+                <div className="font-mono text-base sm:text-xl font-bold">{formatCurrency(forecast.totalPipelineValue)}</div>
               </div>
-              <div className="bg-paper-2 rounded p-3">
-                <div className="text-[11px] font-mono uppercase tracking-wider text-ink-soft mb-1">Weighted forecast</div>
-                <div className="font-mono text-xl font-bold text-register">{formatCurrency(forecast.totalWeightedValue)}</div>
+              <div className="bg-paper-2 rounded p-2.5 sm:p-3">
+                <div className="text-[10px] sm:text-[11px] font-mono uppercase tracking-wider text-ink-soft mb-1">Weighted forecast</div>
+                <div className="font-mono text-base sm:text-xl font-bold text-register">{formatCurrency(forecast.totalWeightedValue)}</div>
               </div>
-              <div className="bg-paper-2 rounded p-3">
-                <div className="text-[11px] font-mono uppercase tracking-wider text-ink-soft mb-1">Won (all-time)</div>
-                <div className="font-mono text-xl font-bold text-register">{formatCurrency(forecast.wonValue)}</div>
+              <div className="bg-paper-2 rounded p-2.5 sm:p-3">
+                <div className="text-[10px] sm:text-[11px] font-mono uppercase tracking-wider text-ink-soft mb-1">Won (all-time)</div>
+                <div className="font-mono text-base sm:text-xl font-bold text-register">{formatCurrency(forecast.wonValue)}</div>
               </div>
-              <div className="bg-paper-2 rounded p-3">
-                <div className="text-[11px] font-mono uppercase tracking-wider text-ink-soft mb-1">Open leads</div>
-                <div className="font-mono text-xl font-bold">{forecast.totalLeads}</div>
+              <div className="bg-paper-2 rounded p-2.5 sm:p-3">
+                <div className="text-[10px] sm:text-[11px] font-mono uppercase tracking-wider text-ink-soft mb-1">Open leads</div>
+                <div className="font-mono text-base sm:text-xl font-bold">{forecast.totalLeads}</div>
               </div>
             </div>
 

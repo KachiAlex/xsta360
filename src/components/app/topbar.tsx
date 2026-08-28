@@ -19,10 +19,10 @@ export function Topbar({ children, searchPlaceholder = "Search leads...", action
 
   return (
     <div className="topbar sticky top-0 z-10 bg-panel border-b border-rule">
-      <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-3.5 gap-2">
+      <div className="flex items-center justify-between px-3 sm:px-6 lg:px-8 py-2 sm:py-3.5 gap-2">
         {/* Left: view tabs */}
         {children && (
-          <div className="flex gap-1 bg-paper-2 rounded-md p-[3px] shrink-0 overflow-x-auto">{children}</div>
+          <div className="flex gap-1 bg-paper-2 rounded-md p-[3px] shrink-0 overflow-x-auto max-w-[50%] sm:max-w-none">{children}</div>
         )}
 
         {/* Right: search + actions */}
@@ -44,13 +44,14 @@ export function Topbar({ children, searchPlaceholder = "Search leads...", action
           {/* Mobile search toggle */}
           <button
             type="button"
-            className="sm:hidden text-sm font-mono border border-rule bg-paper px-2.5 py-2 rounded"
+            className="sm:hidden text-sm font-mono border border-rule bg-paper px-3 py-2 rounded min-w-[40px] min-h-[40px] flex items-center justify-center active:bg-paper-2 transition-colors"
             onClick={() => setSearchOpen(!searchOpen)}
             aria-label="Search"
           >
             {searchOpen ? "✕" : "🔍"}
           </button>
-          {actions}
+          {/* Desktop actions only — mobile uses FAB */}
+          <div className="hidden sm:flex items-center gap-2">{actions}</div>
         </div>
       </div>
 
@@ -58,7 +59,7 @@ export function Topbar({ children, searchPlaceholder = "Search leads...", action
       {searchOpen && (
         <div className="sm:hidden px-4 pb-3">
           <input
-            className="search font-mono text-[13px] border border-rule bg-paper px-3 py-2 rounded w-full"
+            className="search font-mono text-[13px] border border-rule bg-paper px-3 py-2.5 rounded w-full min-h-[44px]"
             type="text"
             placeholder={searchPlaceholder}
             defaultValue={params.get("q") ?? ""}
@@ -89,7 +90,7 @@ export function ViewTab({
   return (
     <a
       href={href}
-      className={`border-none bg-none px-3 sm:px-4 py-2 text-[12px] sm:text-[13.5px] font-semibold rounded whitespace-nowrap ${
+      className={`border-none bg-none px-3 sm:px-4 py-2 text-[12px] sm:text-[13.5px] font-semibold rounded whitespace-nowrap min-h-[40px] flex items-center ${
         active ? "bg-panel text-ink shadow-[0_1px_0_var(--color-rule)]" : "text-ink-soft"
       }`}
     >

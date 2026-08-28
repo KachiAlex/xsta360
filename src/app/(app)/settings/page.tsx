@@ -29,7 +29,7 @@ export default async function SettingsPage() {
   return (
     <>
       <Topbar />
-      <div className="content flex-1 px-4 sm:px-6 lg:px-8 py-5 sm:py-7 max-w-[1240px] w-full mx-auto space-y-5 sm:space-y-6">
+      <div className="content flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-7 max-w-[1240px] w-full mx-auto space-y-4 sm:space-y-6">
         <h1 className="font-mono text-xl">Workspace settings</h1>
 
         {/* Team management */}
@@ -73,9 +73,9 @@ export default async function SettingsPage() {
           {/* Mobile: card list */}
           <div className="md:hidden divide-y divide-dashed divide-rule">
             {members.map((m) => (
-              <div key={m.membershipId} className="px-4 py-3.5">
+              <div key={m.membershipId} className="px-4 py-3.5 active:bg-paper-2/30 transition-colors">
                 <div className="font-semibold text-sm">{m.name}</div>
-                <div className="text-xs text-ink-soft mb-2">{m.email}</div>
+                <div className="text-xs text-ink-soft mb-2.5">{m.email}</div>
                 {isAdmin ? (
                   <MemberRow
                     membershipId={m.membershipId}

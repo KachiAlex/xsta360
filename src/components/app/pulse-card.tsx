@@ -118,7 +118,7 @@ export function PulseCard({ lead }: { lead: PulseLead }) {
       <button
         type="button"
         onClick={toggleExpand}
-        className="w-full text-left px-3 sm:px-4 py-3 flex items-center gap-2.5 sm:gap-3 cursor-pointer"
+        className="w-full text-left px-3 py-2.5 sm:px-4 sm:py-3 flex items-center gap-2 sm:gap-3 cursor-pointer active:bg-paper-2/50 transition-colors"
       >
         <HeatDot heat={lead.heat} />
         <div className="flex-1 min-w-0">
@@ -167,7 +167,7 @@ export function PulseCard({ lead }: { lead: PulseLead }) {
 
       {/* Expanded section */}
       {expanded && (
-        <div className="border-t border-rule px-3 sm:px-4 py-3 bg-paper/40">
+        <div className="border-t border-rule px-3 py-2.5 sm:px-4 sm:py-3 bg-paper/40">
           {/* Meta row */}
           <div className="flex items-center gap-3 text-xs text-ink-soft mb-3 font-mono">
             <span>{SOURCE_LABELS[lead.source] ?? lead.source}</span>
@@ -185,13 +185,13 @@ export function PulseCard({ lead }: { lead: PulseLead }) {
                 href={whatsappClickToChat(lead.phone, `Hi ${lead.leadName}, following up on our conversation.`)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#075E54] hover:text-[#128C7E] px-3 py-1.5 rounded border border-[#128C7E]/20 hover:bg-[#128C7E]/5"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#075E54] hover:text-[#128C7E] px-3 py-2 rounded border border-[#128C7E]/20 hover:bg-[#128C7E]/5 min-h-[40px] active:bg-[#128C7E]/10"
               >
                 WhatsApp
               </a>
               <a
                 href={`tel:${lead.phone}`}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-soft hover:text-ink px-3 py-1.5 rounded border border-rule hover:bg-paper-2"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-soft hover:text-ink px-3 py-2 rounded border border-rule hover:bg-paper-2 min-h-[40px] active:bg-paper-2"
               >
                 Call
               </a>
@@ -207,7 +207,7 @@ export function PulseCard({ lead }: { lead: PulseLead }) {
                 size="sm"
                 onClick={() => handleComplete(lead.reminderId!)}
               >
-                Done
+                ✓ Done
               </Button>
               <Button
                 type="button"
@@ -215,13 +215,13 @@ export function PulseCard({ lead }: { lead: PulseLead }) {
                 size="sm"
                 onClick={() => handleSnooze(lead.reminderId!)}
               >
-                Snooze
+                ⏰ Snooze
               </Button>
               <Link
                 href={`/leads/${lead.leadId}`}
-                className="text-xs font-semibold text-ink-soft hover:text-ink ml-auto self-center"
+                className="text-xs font-semibold text-ink-soft hover:text-ink ml-auto self-center min-h-[40px] flex items-center px-2 active:text-ink"
               >
-                Open lead →
+                Open →
               </Link>
             </div>
           )}

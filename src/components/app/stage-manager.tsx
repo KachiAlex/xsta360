@@ -21,7 +21,7 @@ export function StageManager({
             <span className="font-mono text-xs text-ink-soft w-6">{s.position}</span>
             <input
               defaultValue={s.name}
-              className="text-sm border border-rule bg-paper rounded px-2 py-1 flex-1 min-w-[120px]"
+              className="text-sm border border-rule bg-paper rounded px-3 py-2 flex-1 min-w-[120px] min-h-[40px]"
               onChange={(e) => {
                 const fd = new FormData();
                 fd.set("stageId", s.id);
@@ -38,7 +38,7 @@ export function StageManager({
                 min={0}
                 max={100}
                 defaultValue={s.probability}
-                className="text-sm border border-rule bg-paper rounded px-2 py-1 w-16 text-right"
+                className="text-sm border border-rule bg-paper rounded px-2 py-2 w-16 text-right min-h-[40px]"
                 title="Win probability %"
                 onChange={(e) => {
                   const fd = new FormData();
@@ -54,7 +54,7 @@ export function StageManager({
             <span className="font-mono text-[11px] uppercase tracking-wider text-ink-soft">{s.kind}</span>
             <button
               type="button"
-              className="text-xs text-stamp hover:underline"
+              className="text-xs text-stamp hover:underline min-h-[36px] px-2 active:bg-stamp/10 rounded"
               onClick={() => {
                 const fd = new FormData();
                 fd.set("stageId", s.id);

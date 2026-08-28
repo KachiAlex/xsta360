@@ -27,29 +27,29 @@ export function TaskWidget({ summary }: { summary: TaskSummary }) {
   const hasNotes = summary.pinnedNotes.length > 0 || summary.recentNotes.length > 0;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-rule border border-rule mb-5 sm:mb-7">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-rule border border-rule mb-4 sm:mb-7">
       {/* To-Dos summary */}
-      <div className="bg-panel px-[22px] py-[18px]">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-panel px-4 sm:px-[22px] py-3.5 sm:py-[18px]">
+        <div className="flex items-center justify-between mb-2.5 sm:mb-3">
           <div className="label font-mono text-[11px] uppercase tracking-wider text-ink-soft font-semibold">
             To-Dos
           </div>
-          <Link href="/tasks" className="text-[11px] font-semibold text-ink-soft hover:text-ink">
+          <Link href="/tasks" className="text-[11px] font-semibold text-ink-soft hover:text-ink min-h-[32px] flex items-center active:text-ink">
             View all →
           </Link>
         </div>
-        <div className="flex gap-4 mb-3">
+        <div className="flex gap-3 sm:gap-4 mb-2.5 sm:mb-3">
           <div>
-            <span className="font-mono text-xl font-bold text-stamp">{summary.todosOverdue}</span>
-            <span className="text-[11px] text-ink-soft ml-1">overdue</span>
+            <span className="font-mono text-lg sm:text-xl font-bold text-stamp">{summary.todosOverdue}</span>
+            <span className="text-[10px] sm:text-[11px] text-ink-soft ml-1">overdue</span>
           </div>
           <div>
-            <span className="font-mono text-xl font-bold">{summary.todosDueToday}</span>
-            <span className="text-[11px] text-ink-soft ml-1">today</span>
+            <span className="font-mono text-lg sm:text-xl font-bold">{summary.todosDueToday}</span>
+            <span className="text-[10px] sm:text-[11px] text-ink-soft ml-1">today</span>
           </div>
           <div>
-            <span className="font-mono text-xl font-bold text-ink-soft">{summary.todosPending}</span>
-            <span className="text-[11px] text-ink-soft ml-1">pending</span>
+            <span className="font-mono text-lg sm:text-xl font-bold text-ink-soft">{summary.todosPending}</span>
+            <span className="text-[10px] sm:text-[11px] text-ink-soft ml-1">pending</span>
           </div>
         </div>
         {hasTodos ? (
@@ -72,12 +72,12 @@ export function TaskWidget({ summary }: { summary: TaskSummary }) {
       </div>
 
       {/* Notes summary */}
-      <div className="bg-panel px-[22px] py-[18px]">
-        <div className="flex items-center justify-between mb-3">
+      <div className="bg-panel px-4 sm:px-[22px] py-3.5 sm:py-[18px]">
+        <div className="flex items-center justify-between mb-2.5 sm:mb-3">
           <div className="label font-mono text-[11px] uppercase tracking-wider text-ink-soft font-semibold">
             Notes
           </div>
-          <Link href="/tasks" className="text-[11px] font-semibold text-ink-soft hover:text-ink">
+          <Link href="/tasks" className="text-[11px] font-semibold text-ink-soft hover:text-ink min-h-[32px] flex items-center active:text-ink">
             View all →
           </Link>
         </div>

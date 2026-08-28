@@ -159,8 +159,8 @@ function TodoItem({ todo }: { todo: TodoRow }) {
         <input type="hidden" name="id" value={todo.id} />
         <button
           type="submit"
-          className={`mt-0.5 w-4 h-4 rounded-[3px] border-[1.5px] border-ink shrink-0 flex items-center justify-center cursor-pointer ${
-            isDone ? "bg-ink text-paper" : "bg-transparent hover:bg-paper-2"
+          className={`mt-0.5 w-6 h-6 sm:w-4 sm:h-4 rounded-[3px] border-[1.5px] border-ink shrink-0 flex items-center justify-center cursor-pointer text-xs ${
+            isDone ? "bg-ink text-paper" : "bg-transparent hover:bg-paper-2 active:bg-paper-2"
           }`}
         >
           {isDone && "✓"}
@@ -206,7 +206,7 @@ function TodoItem({ todo }: { todo: TodoRow }) {
         <input type="hidden" name="id" value={todo.id} />
         <button
           type="submit"
-          className="text-xs text-ink-soft hover:text-stamp transition-colors"
+          className="text-xs text-ink-soft hover:text-stamp transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center active:text-stamp"
           title="Delete"
         >
           ✕

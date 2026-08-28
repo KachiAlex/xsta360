@@ -4,6 +4,7 @@ import { getPulseLeads, getDashboardStats, getUpcomingReminders } from "@/lib/da
 import { getTaskSummary } from "@/lib/tasks";
 import { Topbar, ViewTab } from "@/components/app/topbar";
 import { AddLeadModal } from "@/components/app/add-lead-modal";
+import { MobileFab } from "@/components/app/fab";
 import { PulseCard } from "@/components/app/pulse-card";
 import { TaskWidget } from "@/components/app/task-widget";
 import { ReminderPanel } from "@/components/app/reminder-panel";
@@ -36,6 +37,11 @@ export default async function DashboardPage() {
   const addLead = (
     <AddLeadModal stages={stages} members={members} currentUserId={ctx.userId} />
   );
+  const addLeadFab = (
+    <MobileFab>
+      <AddLeadModal stages={stages} members={members} currentUserId={ctx.userId} />
+    </MobileFab>
+  );
 
   return (
     <>
@@ -48,34 +54,35 @@ export default async function DashboardPage() {
         </ViewTab>
       </Topbar>
 
-      <div className="content flex-1 px-4 sm:px-6 lg:px-8 py-5 sm:py-7 max-w-[1240px] w-full mx-auto">
+      <div className="content flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-7 max-w-[1240px] w-full mx-auto">
+        {addLeadFab}
         {/* Stat strip */}
-        <div className="stats grid grid-cols-2 sm:grid-cols-4 gap-px bg-rule border border-rule mb-5 sm:mb-7">
-          <div className="stat bg-panel px-4 sm:px-[22px] py-3.5 sm:py-[18px]">
-            <div className="label font-mono text-[10px] sm:text-[11px] uppercase tracking-wider text-ink-soft mb-2">
+        <div className="stats grid grid-cols-2 sm:grid-cols-4 gap-px bg-rule border border-rule mb-4 sm:mb-7">
+          <div className="stat bg-panel px-3 sm:px-[22px] py-3 sm:py-[18px]">
+            <div className="label font-mono text-[9px] sm:text-[11px] uppercase tracking-wider text-ink-soft mb-1.5 sm:mb-2">
               Leads today
             </div>
-            <div className="value font-mono text-xl sm:text-[26px] font-bold">{stats.leadsToday}</div>
+            <div className="value font-mono text-lg sm:text-[26px] font-bold">{stats.leadsToday}</div>
           </div>
-          <div className="stat bg-panel px-4 sm:px-[22px] py-3.5 sm:py-[18px]">
-            <div className="label font-mono text-[10px] sm:text-[11px] uppercase tracking-wider text-ink-soft mb-2">
+          <div className="stat bg-panel px-3 sm:px-[22px] py-3 sm:py-[18px]">
+            <div className="label font-mono text-[9px] sm:text-[11px] uppercase tracking-wider text-ink-soft mb-1.5 sm:mb-2">
               Overdue
             </div>
-            <div className="value font-mono text-xl sm:text-[26px] font-bold text-stamp">
+            <div className="value font-mono text-lg sm:text-[26px] font-bold text-stamp">
               {stats.overdue}
             </div>
           </div>
-          <div className="stat bg-panel px-4 sm:px-[22px] py-3.5 sm:py-[18px]">
-            <div className="label font-mono text-[10px] sm:text-[11px] uppercase tracking-wider text-ink-soft mb-2">
+          <div className="stat bg-panel px-3 sm:px-[22px] py-3 sm:py-[18px]">
+            <div className="label font-mono text-[9px] sm:text-[11px] uppercase tracking-wider text-ink-soft mb-1.5 sm:mb-2">
               Due today
             </div>
-            <div className="value font-mono text-xl sm:text-[26px] font-bold">{stats.dueToday}</div>
+            <div className="value font-mono text-lg sm:text-[26px] font-bold">{stats.dueToday}</div>
           </div>
-          <div className="stat bg-panel px-4 sm:px-[22px] py-3.5 sm:py-[18px]">
-            <div className="label font-mono text-[10px] sm:text-[11px] uppercase tracking-wider text-ink-soft mb-2">
+          <div className="stat bg-panel px-3 sm:px-[22px] py-3 sm:py-[18px]">
+            <div className="label font-mono text-[9px] sm:text-[11px] uppercase tracking-wider text-ink-soft mb-1.5 sm:mb-2">
               Win rate (7d)
             </div>
-            <div className="value font-mono text-xl sm:text-[26px] font-bold text-register">
+            <div className="value font-mono text-lg sm:text-[26px] font-bold text-register">
               {stats.winRate7d}%
             </div>
           </div>

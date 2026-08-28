@@ -57,7 +57,7 @@ export default function ImportPage() {
   }
 
   return (
-    <div className="content flex-1 px-4 sm:px-6 lg:px-8 py-5 sm:py-7 max-w-[1240px] w-full mx-auto">
+    <div className="content flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-7 max-w-[1240px] w-full mx-auto">
       <Link href="/leads" className="text-sm text-ink-soft hover:text-ink mb-4 inline-block">
         ← Back to leads
       </Link>

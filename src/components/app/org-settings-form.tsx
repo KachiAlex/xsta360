@@ -87,30 +87,32 @@ export function OrgSettingsForm({
         {fields.length > 0 && (
           <div className="space-y-2 mb-3">
             {fields.map((field, idx) => (
-              <div key={idx} className="flex gap-2 items-center flex-wrap sm:flex-nowrap">
+              <div key={idx} className="flex flex-col sm:flex-row gap-2 sm:items-center sm:flex-nowrap">
                 <Input
                   placeholder="Label (e.g. Industry)"
                   value={field.label}
                   onChange={(e) => updateField(idx, "label", e.target.value)}
-                  className="flex-1 min-w-[120px]"
+                  className="flex-1 min-w-0 sm:min-w-[120px]"
                 />
-                <select
-                  value={field.type}
-                  onChange={(e) => updateField(idx, "type", e.target.value)}
-                  className="font-sans text-sm px-3 py-2.5 border border-rule rounded bg-paper"
-                >
-                  <option value="text">Text</option>
-                  <option value="number">Number</option>
-                  <option value="select">Select</option>
-                  <option value="date">Date</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={() => removeField(idx)}
-                  className="text-xs text-ink-soft hover:text-stamp px-2"
-                >
-                  ✕
-                </button>
+                <div className="flex gap-2 items-center">
+                  <select
+                    value={field.type}
+                    onChange={(e) => updateField(idx, "type", e.target.value)}
+                    className="font-sans text-sm px-3 py-2.5 border border-rule rounded bg-paper min-h-[44px] flex-1 sm:flex-none"
+                  >
+                    <option value="text">Text</option>
+                    <option value="number">Number</option>
+                    <option value="select">Select</option>
+                    <option value="date">Date</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => removeField(idx)}
+                    className="text-xs text-ink-soft hover:text-stamp px-2 min-w-[40px] min-h-[40px] flex items-center justify-center active:bg-stamp/10 rounded"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             ))}
           </div>

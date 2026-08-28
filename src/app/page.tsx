@@ -21,13 +21,13 @@ export default function Home() {
         <div className="nav-links flex gap-3 sm:gap-8 items-center text-sm">
           <a href="#features" className="no-underline text-ink-soft font-medium hover:text-ink hidden sm:inline">Features</a>
           <a href="#how" className="no-underline text-ink-soft font-medium hover:text-ink hidden sm:inline">How it works</a>
-          <Link href="/login" className="btn btn-ghost inline-block font-semibold text-sm px-3 sm:px-5 py-2 sm:py-2.5 rounded-[3px] border-[1.5px] border-ink bg-transparent text-ink hover:bg-paper-2">Sign in</Link>
-          <Link href="/signup" className="btn btn-primary inline-block font-semibold text-sm px-3 sm:px-5 py-2 sm:py-2.5 rounded-[3px] border-[1.5px] border-ink bg-ink text-paper hover:bg-stamp-deep hover:border-stamp-deep">Start free</Link>
+          <Link href="/login" className="btn btn-ghost inline-block font-semibold text-sm px-3 sm:px-5 py-2 sm:py-2.5 rounded-[3px] border-[1.5px] border-ink bg-transparent text-ink hover:bg-paper-2 min-h-[40px] flex items-center">Sign in</Link>
+          <Link href="/signup" className="btn btn-primary inline-block font-semibold text-sm px-3 sm:px-5 py-2 sm:py-2.5 rounded-[3px] border-[1.5px] border-ink bg-ink text-paper hover:bg-stamp-deep hover:border-stamp-deep min-h-[40px] flex items-center">Start free</Link>
         </div>
       </nav>
 
       {/* HERO */}
-      <section className="hero ledger-lines relative pt-12 sm:pt-24 px-5 sm:px-12 pb-12 sm:pb-16 max-w-[1180px] mx-auto">
+      <section className="hero ledger-lines relative pt-8 sm:pt-24 px-4 sm:px-12 pb-10 sm:pb-16 max-w-[1180px] mx-auto">
         <div className="eyebrow font-mono text-[12px] sm:text-[13px] tracking-wider text-stamp uppercase font-semibold flex items-center gap-2.5 mb-[22px]">
           <span className="w-6 h-px bg-stamp" />
           Your complete sales management hub
@@ -40,9 +40,9 @@ export default function Home() {
         <p className="hero-sub text-base sm:text-[19px] text-ink-soft max-w-[560px] m-0 mb-8 sm:mb-10">
           Deals don&apos;t die from rejection. They die from silence. Xsta360 makes sure no lead ever goes cold on your watch — from first contact to closed-won.
         </p>
-        <div className="hero-ctas flex gap-3 sm:gap-4 mb-12 sm:mb-[72px] flex-wrap">
-          <Link href="/signup" className="btn btn-primary inline-block font-semibold text-sm sm:text-[15px] px-5 sm:px-[26px] py-3 sm:py-3.5 rounded-[3px] border-[1.5px] border-ink bg-ink text-paper hover:bg-stamp-deep hover:border-stamp-deep">Start free — no card needed</Link>
-          <a href="#how" className="btn btn-ghost inline-block font-semibold text-sm sm:text-[15px] px-5 sm:px-[26px] py-3 sm:py-3.5 rounded-[3px] border-[1.5px] border-ink bg-transparent text-ink hover:bg-paper-2">See how it works</a>
+        <div className="hero-ctas flex gap-3 sm:gap-4 mb-10 sm:mb-[72px] flex-wrap">
+          <Link href="/signup" className="btn btn-primary inline-block font-semibold text-sm sm:text-[15px] px-5 sm:px-[26px] py-3 sm:py-3.5 rounded-[3px] border-[1.5px] border-ink bg-ink text-paper hover:bg-stamp-deep hover:border-stamp-deep min-h-[48px] flex items-center">Start free — no card needed</Link>
+          <a href="#how" className="btn btn-ghost inline-block font-semibold text-sm sm:text-[15px] px-5 sm:px-[26px] py-3 sm:py-3.5 rounded-[3px] border-[1.5px] border-ink bg-transparent text-ink hover:bg-paper-2 min-h-[48px] flex items-center">See how it works</a>
         </div>
 
         {/* Receipt card */}
@@ -75,72 +75,72 @@ export default function Home() {
       </section>
 
       {/* STEPS */}
-      <div className="steps max-w-[1180px] mx-auto px-5 sm:px-12 pt-10 pb-12 sm:pb-[100px] grid grid-cols-1 sm:grid-cols-3 gap-0 border-t border-rule">
-        <div className="step-card px-5 sm:px-8 py-8 sm:py-10 sm:border-r border-rule border-b sm:border-b-0">
-          <div className="step-num font-mono text-[13px] text-ink-soft mb-[18px] tracking-wider">01 — Manage</div>
-          <h3 className="font-mono text-[20px] sm:text-[22px] m-0 mb-3">Every lead, one ledger</h3>
-          <p className="text-ink-soft text-[15px] m-0">Capture leads manually, import in bulk, or pull them straight from your marketing forms. Tag each one by source so you know exactly where your pipeline is coming from.</p>
+      <div className="steps max-w-[1180px] mx-auto px-4 sm:px-12 pt-8 pb-10 sm:pb-[100px] grid grid-cols-1 sm:grid-cols-3 gap-0 border-t border-rule">
+        <div className="step-card px-4 sm:px-8 py-6 sm:py-10 sm:border-r border-rule border-b sm:border-b-0">
+          <div className="step-num font-mono text-[13px] text-ink-soft mb-3 sm:mb-[18px] tracking-wider">01 — Manage</div>
+          <h3 className="font-mono text-lg sm:text-[22px] m-0 mb-2.5">Every lead, one ledger</h3>
+          <p className="text-ink-soft text-sm sm:text-[15px] m-0">Capture leads manually, import in bulk, or pull them straight from your marketing forms. Tag each one by source so you know exactly where your pipeline is coming from.</p>
         </div>
-        <div className="step-card px-5 sm:px-8 py-8 sm:py-10 sm:border-r border-rule border-b sm:border-b-0">
-          <div className="step-num font-mono text-[13px] text-ink-soft mb-[18px] tracking-wider">02 — Follow Up</div>
-          <h3 className="font-mono text-[20px] sm:text-[22px] m-0 mb-3">Never let it go cold</h3>
-          <p className="text-ink-soft text-[15px] m-0">Log a remark, set a reminder, done. Your &quot;Today&apos;s Follow-Ups&quot; list tells you exactly who to call — and flags anyone you&apos;ve let slip.</p>
+        <div className="step-card px-4 sm:px-8 py-6 sm:py-10 sm:border-r border-rule border-b sm:border-b-0">
+          <div className="step-num font-mono text-[13px] text-ink-soft mb-3 sm:mb-[18px] tracking-wider">02 — Follow Up</div>
+          <h3 className="font-mono text-lg sm:text-[22px] m-0 mb-2.5">Never let it go cold</h3>
+          <p className="text-ink-soft text-sm sm:text-[15px] m-0">Log a remark, set a reminder, done. Your &quot;Today&apos;s Follow-Ups&quot; list tells you exactly who to call — and flags anyone you&apos;ve let slip.</p>
         </div>
-        <div className="step-card px-5 sm:px-8 py-8 sm:py-10">
-          <div className="step-num font-mono text-[13px] text-ink-soft mb-[18px] tracking-wider">03 — Close</div>
-          <h3 className="font-mono text-[20px] sm:text-[22px] m-0 mb-3">Track the win, learn the loss</h3>
-          <p className="text-ink-soft text-[15px] m-0">Move deals through your pipeline, record why you won or lost, and see it all rolled up — by rep, by source, by stage.</p>
+        <div className="step-card px-4 sm:px-8 py-6 sm:py-10">
+          <div className="step-num font-mono text-[13px] text-ink-soft mb-3 sm:mb-[18px] tracking-wider">03 — Close</div>
+          <h3 className="font-mono text-lg sm:text-[22px] m-0 mb-2.5">Track the win, learn the loss</h3>
+          <p className="text-ink-soft text-sm sm:text-[15px] m-0">Move deals through your pipeline, record why you won or lost, and see it all rolled up — by rep, by source, by stage.</p>
         </div>
       </div>
 
       {/* FEATURES */}
-      <section className="section max-w-[1180px] mx-auto px-5 sm:px-12 pb-12 sm:pb-[100px]" id="features">
-        <div className="section-head max-w-[620px] mb-8 sm:mb-12">
+      <section className="section max-w-[1180px] mx-auto px-4 sm:px-12 pb-10 sm:pb-[100px]" id="features">
+        <div className="section-head max-w-[620px] mb-6 sm:mb-12">
           <div className="eyebrow font-mono text-[13px] tracking-wider text-stamp uppercase font-semibold flex items-center gap-2.5 mb-3.5">
             <span className="w-6 h-px bg-stamp" />
             Built for the whole funnel
           </div>
-          <h2 className="font-mono text-[clamp(24px,4vw,36px)] m-0 mb-3.5">One hub. Sales and marketing, on the same page.</h2>
-          <p className="text-ink-soft text-base m-0">Marketing generates the lead. Sales works the follow-up. Xsta360 keeps both sides looking at the same record instead of guessing what happened after the handoff.</p>
+          <h2 className="font-mono text-[clamp(22px,4vw,36px)] m-0 mb-3.5">One hub. Sales and marketing, on the same page.</h2>
+          <p className="text-ink-soft text-sm sm:text-base m-0">Marketing generates the lead. Sales works the follow-up. Xsta360 keeps both sides looking at the same record instead of guessing what happened after the handoff.</p>
         </div>
         <div className="feature-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-rule border border-rule">
           {FEATURES.map((f) => (
-            <div key={f.title} className="feature bg-paper px-5 sm:px-7 py-6 sm:py-[30px]">
-              <span className="tag font-mono text-[11px] text-stamp uppercase tracking-wider mb-3 block">{f.tag}</span>
-              <h4 className="text-[17px] m-0 mb-2.5">{f.title}</h4>
-              <p className="m-0 text-ink-soft text-[14.5px]">{f.body}</p>
+            <div key={f.title} className="feature bg-paper px-4 sm:px-7 py-5 sm:py-[30px]">
+              <span className="tag font-mono text-[11px] text-stamp uppercase tracking-wider mb-2.5 block">{f.tag}</span>
+              <h4 className="text-base sm:text-[17px] m-0 mb-2">{f.title}</h4>
+              <p className="m-0 text-ink-soft text-sm sm:text-[14.5px]">{f.body}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* CONTEXT STRIP */}
-      <section className="context bg-ink text-paper py-12 sm:py-16 px-5 sm:px-12">
-        <div className="context-inner max-w-[1180px] mx-auto flex gap-6 sm:gap-12 items-center flex-wrap">
+      <section className="context bg-ink text-paper py-10 sm:py-16 px-4 sm:px-12">
+        <div className="context-inner max-w-[1180px] mx-auto flex gap-4 sm:gap-12 items-center flex-wrap">
           <div className="flex-1 min-w-[280px]">
             <div className="eyebrow font-mono text-[13px] tracking-wider text-amber uppercase font-semibold flex items-center gap-2.5 mb-3.5">
               <span className="w-6 h-px bg-amber" />
               Built for how sales actually happens
             </div>
-            <h2 className="font-mono text-[clamp(20px,3vw,30px)] max-w-[480px] m-0 leading-[1.25]">
+            <h2 className="font-mono text-[clamp(18px,3vw,30px)] max-w-[480px] m-0 leading-[1.25]">
               Most of your pipeline already lives in WhatsApp. We&apos;re not pretending otherwise.
             </h2>
           </div>
-          <p className="text-[#C9CFC7] max-w-[420px] text-[15px] m-0">
+          <p className="text-[#C9CFC7] max-w-[420px] text-sm sm:text-[15px] m-0">
             Xsta360 is built around the tools your team already uses to close deals — not a rigid system that asks you to change how you sell.
           </p>
         </div>
       </section>
 
       {/* CTA */}
-      <section className="cta-band py-16 sm:py-[90px] px-5 sm:px-12 text-center border-t border-rule" id="how">
-        <h2 className="font-mono text-[clamp(26px,5vw,44px)] m-0 mb-5">Stop losing deals to silence.</h2>
-        <p className="text-ink-soft text-base m-0 mb-[34px]">Set up your first pipeline in under five minutes.</p>
-        <Link href="/signup" className="btn btn-primary inline-block font-semibold text-[15px] px-[26px] py-3.5 rounded-[3px] border-[1.5px] border-ink bg-ink text-paper hover:bg-stamp-deep hover:border-stamp-deep">Start free — no card needed</Link>
+      <section className="cta-band py-12 sm:py-[90px] px-4 sm:px-12 text-center border-t border-rule" id="how">
+        <h2 className="font-mono text-[clamp(24px,5vw,44px)] m-0 mb-4">Stop losing deals to silence.</h2>
+        <p className="text-ink-soft text-sm sm:text-base m-0 mb-8">Set up your first pipeline in under five minutes.</p>
+        <Link href="/signup" className="btn btn-primary inline-block font-semibold text-[15px] px-[26px] py-3.5 rounded-[3px] border-[1.5px] border-ink bg-ink text-paper hover:bg-stamp-deep hover:border-stamp-deep min-h-[52px] flex items-center">Start free — no card needed</Link>
       </section>
 
       {/* FOOTER */}
-      <footer className="border-t border-rule px-5 sm:px-12 py-8 flex justify-between items-center text-[13px] text-ink-soft font-mono flex-wrap gap-3">
+      <footer className="border-t border-rule px-4 sm:px-12 py-6 sm:py-8 flex justify-between items-center text-[13px] text-ink-soft font-mono flex-wrap gap-3">
         <span>© 2026 XSTA360</span>
         <span>MANAGE.&nbsp;&nbsp;FOLLOW UP.&nbsp;&nbsp;CLOSE.</span>
       </footer>

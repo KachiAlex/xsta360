@@ -4,6 +4,7 @@ import { getOrgStages, getOrgMembers } from "@/lib/queries";
 import { getLeads } from "@/lib/leads";
 import { Topbar } from "@/components/app/topbar";
 import { AddLeadModal } from "@/components/app/add-lead-modal";
+import { MobileFab } from "@/components/app/fab";
 import { Panel, PanelHead } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/app/empty-state";
@@ -43,34 +44,43 @@ export default async function LeadsPage(props: {
         }
       />
 
-      <div className="content flex-1 px-4 sm:px-6 lg:px-8 py-5 sm:py-7 max-w-[1240px] w-full mx-auto">
+      <div className="content flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-7 max-w-[1240px] w-full mx-auto">
+        <MobileFab>
+          <AddLeadModal stages={stages} members={members} currentUserId={ctx.userId} />
+        </MobileFab>
+
+        {/* Mobile: Import CSV link */}
+        <Link href="/leads/import" className="sm:hidden text-xs font-semibold text-ink-soft hover:text-ink mb-3 inline-flex items-center min-h-[36px] active:text-ink">
+          📥 Import CSV
+        </Link>
+
         {/* Filter bar */}
-        <div className="flex gap-3 mb-5 flex-wrap">
-          <form method="get" className="flex gap-2 flex-wrap w-full">
-            <select name="stageId" defaultValue={filters.stageId ?? ""} className="text-sm border border-rule bg-panel rounded px-3 py-2 flex-1 min-w-[120px]">
+        <div className="mb-5">
+          <form method="get" className="flex flex-col sm:flex-row gap-2 sm:flex-wrap">
+            <select name="stageId" defaultValue={filters.stageId ?? ""} className="text-sm border border-rule bg-panel rounded px-3 py-2.5 flex-1 min-w-0 sm:min-w-[120px] min-h-[44px]">
               <option value="">All stages</option>
               {stages.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-            <select name="source" defaultValue={filters.source ?? ""} className="text-sm border border-rule bg-panel rounded px-3 py-2 flex-1 min-w-[120px]">
+            <select name="source" defaultValue={filters.source ?? ""} className="text-sm border border-rule bg-panel rounded px-3 py-2.5 flex-1 min-w-0 sm:min-w-[120px] min-h-[44px]">
               <option value="">All sources</option>
               {SOURCES.map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
             </select>
-            <select name="assigneeId" defaultValue={filters.assigneeId ?? ""} className="text-sm border border-rule bg-panel rounded px-3 py-2 flex-1 min-w-[120px]">
+            <select name="assigneeId" defaultValue={filters.assigneeId ?? ""} className="text-sm border border-rule bg-panel rounded px-3 py-2.5 flex-1 min-w-0 sm:min-w-[120px] min-h-[44px]">
               <option value="">Anyone</option>
               {members.map((m) => (
                 <option key={m.userId} value={m.userId}>{m.name}</option>
               ))}
             </select>
             <input type="hidden" name="q" value={filters.q ?? ""} />
-            <button type="submit" className="text-sm font-semibold border border-ink rounded px-3 py-2 hover:bg-paper-2">
+            <button type="submit" className="text-sm font-semibold border border-ink rounded px-4 py-2.5 hover:bg-paper-2 min-h-[44px] active:bg-paper-2">
               Apply
             </button>
             {(filters.stageId || filters.source || filters.assigneeId) && (
-              <Link href="/leads" className="text-sm text-ink-soft underline underline-offset-2 self-center">
+              <Link href="/leads" className="text-sm text-ink-soft underline underline-offset-2 self-center min-h-[44px] flex items-center justify-center px-2">
                 Clear
               </Link>
             )}
@@ -154,7 +164,7 @@ export default async function LeadsPage(props: {
             {/* Mobile: card list */}
             <div className="md:hidden divide-y divide-dashed divide-rule">
               {leads.map((lead) => (
-                <Link key={lead.id} href={`/leads/${lead.id}`} className="block px-4 py-3.5 hover:bg-paper-2">
+                <Link key={lead.id} href={`/leads/${lead.id}`} className="block px-4 py-3 active:bg-paper-2/50 transition-colors">
                   <div className="flex items-start justify-between gap-2 mb-1.5">
                     <div className="min-w-0">
                       <div className="font-semibold text-sm truncate">{lead.name}</div>
@@ -168,7 +178,7 @@ export default async function LeadsPage(props: {
                       <Badge tone="neutral">{lead.stageName ?? "—"}</Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-ink-soft flex-wrap">
+                  <div className="flex items-center gap-2 text-xs text-ink-soft flex-wrap">
                     <span>{SOURCE_LABELS[lead.source] ?? lead.source}</span>
                     {lead.value && <span className="font-mono">₦{parseFloat(lead.value).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>}
                     {lead.score > 0 && (
@@ -180,7 +190,6 @@ export default async function LeadsPage(props: {
                         {lead.score}
                       </span>
                     )}
-                    <span>{lead.assigneeName ?? "Unassigned"}</span>
                     <span className="ml-auto">{lead.updatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                   </div>
                 </Link>

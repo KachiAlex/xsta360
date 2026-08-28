@@ -30,8 +30,15 @@ export function AddLeadModal({ stages, members, currentUserId }: AddLeadModalPro
 
   return (
     <>
-      <Button type="button" size="sm" onClick={() => setOpen(true)}>
-        + Add lead
+      <Button
+        type="button"
+        size="sm"
+        onClick={() => setOpen(true)}
+        className="sm:shadow-none shadow-lg rounded-full !min-h-[52px] !px-5 sm:!min-h-0 sm:!rounded-[3px] sm:!px-3 sm:!py-1.5"
+        aria-label="Add lead"
+      >
+        <span className="hidden sm:inline">+ Add lead</span>
+        <span className="sm:hidden text-lg leading-none">+</span>
       </Button>
 
       <Modal open={showOpen} onClose={() => setOpen(false)} title="Add a lead" sub="Capture the details while they're fresh.">
