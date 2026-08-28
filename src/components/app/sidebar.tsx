@@ -20,6 +20,7 @@ const NAV = [
   { href: "/leads", label: "Leads", icon: "▥", key: "leads" },
   { href: "/sequences", label: "Sequences", icon: "↻", key: "sequences" },
   { href: "/reports", label: "Reports", icon: "▧", key: "reports" },
+  { href: "/billing", label: "Billing", icon: "₦", key: "billing" },
   { href: "/settings", label: "Settings", icon: "⚙", key: "settings" },
 ];
 

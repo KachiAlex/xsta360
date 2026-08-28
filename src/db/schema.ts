@@ -172,6 +172,13 @@ export const subscriptions = pgTable(
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
     trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
     canceledAt: timestamp("canceled_at", { withTimezone: true }),
+    // Paystack payment integration
+    paystackCustomerCode: text("paystack_customer_code"),
+    paystackAuthorizationCode: text("paystack_authorization_code"),
+    paystackCustomerEmail: text("paystack_customer_email"),
+    lastPaymentAt: timestamp("last_payment_at", { withTimezone: true }),
+    lastPaymentAmount: integer("last_payment_amount"),
+    lastPaymentReference: text("last_payment_reference"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

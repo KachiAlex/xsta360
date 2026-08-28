@@ -45,6 +45,11 @@ export default async function AdminOrgDetailPage({
       trialEndsAt: schema.subscriptions.trialEndsAt,
       currentPeriodEnd: schema.subscriptions.currentPeriodEnd,
       canceledAt: schema.subscriptions.canceledAt,
+      paystackAuthorizationCode: schema.subscriptions.paystackAuthorizationCode,
+      paystackCustomerEmail: schema.subscriptions.paystackCustomerEmail,
+      lastPaymentAt: schema.subscriptions.lastPaymentAt,
+      lastPaymentAmount: schema.subscriptions.lastPaymentAmount,
+      lastPaymentReference: schema.subscriptions.lastPaymentReference,
     })
     .from(schema.subscriptions)
     .where(eq(schema.subscriptions.orgId, id))
@@ -115,6 +120,40 @@ export default async function AdminOrgDetailPage({
           )}
         </div>
       </div>
+
+      {/* Payment info */}
+      {sub?.paystackAuthorizationCode && (
+        <div className="bg-panel border border-rule rounded-md">
+          <div className="px-4 py-3 border-b border-rule">
+            <h2 className="font-mono text-sm uppercase tracking-wider m-0">Payment method</h2>
+          </div>
+          <div className="p-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-ink-soft">Paystack customer</span>
+              <span className="font-mono text-xs">{sub.paystackCustomerEmail}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-ink-soft">Authorization code</span>
+              <span className="font-mono text-xs">{sub.paystackAuthorizationCode}</span>
+            </div>
+            {sub.lastPaymentAt && (
+              <div className="flex justify-between text-sm">
+                <span className="text-ink-soft">Last payment</span>
+                <span className="font-mono text-xs">
+                  {sub.lastPaymentAmount ? `₦${(sub.lastPaymentAmount / 100).toLocaleString()} — ` : ""}
+                  {sub.lastPaymentAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </span>
+              </div>
+            )}
+            {sub.lastPaymentReference && (
+              <div className="flex justify-between text-sm">
+                <span className="text-ink-soft">Reference</span>
+                <span className="font-mono text-xs">{sub.lastPaymentReference}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Subscription management */}
       <div className="bg-panel border border-rule rounded-md">

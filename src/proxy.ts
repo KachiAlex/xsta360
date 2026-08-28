@@ -6,7 +6,7 @@ const SESSION_COOKIE = "xsta_session";
 
 // Routes that require a session. Anything else is public (homepage, login,
 // signup, the embedded form endpoint, the cron route).
-const PROTECTED = ["/dashboard", "/leads", "/pipeline", "/reports", "/settings", "/team", "/tasks", "/sequences", "/admin"];
+const PROTECTED = ["/dashboard", "/leads", "/pipeline", "/reports", "/settings", "/team", "/tasks", "/sequences", "/billing", "/admin"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
