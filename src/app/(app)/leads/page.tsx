@@ -43,23 +43,23 @@ export default async function LeadsPage(props: {
         }
       />
 
-      <div className="content flex-1 px-8 py-7 max-w-[1240px] w-full mx-auto">
+      <div className="content flex-1 px-4 sm:px-6 lg:px-8 py-5 sm:py-7 max-w-[1240px] w-full mx-auto">
         {/* Filter bar */}
         <div className="flex gap-3 mb-5 flex-wrap">
-          <form method="get" className="flex gap-2 flex-wrap">
-            <select name="stageId" defaultValue={filters.stageId ?? ""} className="text-sm border border-rule bg-panel rounded px-3 py-2">
+          <form method="get" className="flex gap-2 flex-wrap w-full">
+            <select name="stageId" defaultValue={filters.stageId ?? ""} className="text-sm border border-rule bg-panel rounded px-3 py-2 flex-1 min-w-[120px]">
               <option value="">All stages</option>
               {stages.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
-            <select name="source" defaultValue={filters.source ?? ""} className="text-sm border border-rule bg-panel rounded px-3 py-2">
+            <select name="source" defaultValue={filters.source ?? ""} className="text-sm border border-rule bg-panel rounded px-3 py-2 flex-1 min-w-[120px]">
               <option value="">All sources</option>
               {SOURCES.map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
               ))}
             </select>
-            <select name="assigneeId" defaultValue={filters.assigneeId ?? ""} className="text-sm border border-rule bg-panel rounded px-3 py-2">
+            <select name="assigneeId" defaultValue={filters.assigneeId ?? ""} className="text-sm border border-rule bg-panel rounded px-3 py-2 flex-1 min-w-[120px]">
               <option value="">Anyone</option>
               {members.map((m) => (
                 <option key={m.userId} value={m.userId}>{m.name}</option>
@@ -90,7 +90,8 @@ export default async function LeadsPage(props: {
         ) : (
           <Panel>
             <PanelHead title="Leads" sub={`${leads.length} total`} />
-            <table className="w-full border-collapse">
+            {/* Desktop: table */}
+            <table className="w-full border-collapse hidden md:table">
               <thead>
                 <tr>
                   <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Lead</th>
@@ -150,6 +151,41 @@ export default async function LeadsPage(props: {
                 ))}
               </tbody>
             </table>
+            {/* Mobile: card list */}
+            <div className="md:hidden divide-y divide-dashed divide-rule">
+              {leads.map((lead) => (
+                <Link key={lead.id} href={`/leads/${lead.id}`} className="block px-4 py-3.5 hover:bg-paper-2">
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-sm truncate">{lead.name}</div>
+                      {lead.company && <div className="text-xs text-ink-soft truncate">{lead.company}</div>}
+                    </div>
+                    {lead.stageKind === "won" ? (
+                      <Badge tone="won">{lead.stageName ?? "Won"}</Badge>
+                    ) : lead.stageKind === "lost" ? (
+                      <Badge tone="lost">{lead.stageName ?? "Lost"}</Badge>
+                    ) : (
+                      <Badge tone="neutral">{lead.stageName ?? "—"}</Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-ink-soft flex-wrap">
+                    <span>{SOURCE_LABELS[lead.source] ?? lead.source}</span>
+                    {lead.value && <span className="font-mono">₦{parseFloat(lead.value).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>}
+                    {lead.score > 0 && (
+                      <span className={`font-mono font-bold px-1.5 py-0.5 rounded ${
+                        lead.score >= 70 ? "bg-register/12 text-register"
+                        : lead.score >= 40 ? "bg-amber/14 text-[#9c6014]"
+                        : "bg-paper-2 text-ink-soft"
+                      }`}>
+                        {lead.score}
+                      </span>
+                    )}
+                    <span>{lead.assigneeName ?? "Unassigned"}</span>
+                    <span className="ml-auto">{lead.updatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
           </Panel>
         )}
       </div>

@@ -149,14 +149,14 @@ function ReminderItem({ reminder }: { reminder: ReminderRow }) {
   }
 
   return (
-    <div className="px-4 py-2.5 flex items-center gap-3 hover:bg-paper-2/30">
+    <div className="px-3 sm:px-4 py-2.5 flex items-center gap-2 sm:gap-3 hover:bg-paper-2/30 flex-wrap sm:flex-nowrap">
       {/* Due badge */}
       <Badge tone={reminder.bucket === "overdue" ? "overdue" : reminder.bucket === "today" ? "today" : "later"}>
         {formatDue(reminder.dueAt)}
       </Badge>
 
       {/* Lead info */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 order-3 sm:order-none w-full sm:w-auto">
         <Link
           href={`/leads/${reminder.leadId}`}
           className="text-sm font-semibold hover:underline truncate"
@@ -172,7 +172,7 @@ function ReminderItem({ reminder }: { reminder: ReminderRow }) {
       </div>
 
       {/* Quick actions */}
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto sm:ml-0">
         {reminder.leadPhone && (
           <a
             href={whatsappClickToChat(reminder.leadPhone, `Hi ${reminder.leadName}, following up.`)}
@@ -190,7 +190,7 @@ function ReminderItem({ reminder }: { reminder: ReminderRow }) {
           className="text-xs font-semibold text-register hover:underline px-1.5 py-1"
           title="Mark done"
         >
-          ✓ Done
+          ✓
         </button>
         <button
           type="button"
@@ -198,7 +198,7 @@ function ReminderItem({ reminder }: { reminder: ReminderRow }) {
           className="text-xs text-ink-soft hover:text-ink px-1.5 py-1"
           title="Snooze"
         >
-          Snooze
+          ⏰
         </button>
         <button
           type="button"

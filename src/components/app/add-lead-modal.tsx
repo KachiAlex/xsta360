@@ -45,7 +45,7 @@ export function AddLeadModal({ stages, members, currentUserId }: AddLeadModalPro
             <Label>Company</Label>
             <Input name="company" placeholder="Lagos Freight Co." />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Email</Label>
               <Input name="email" type="email" placeholder="ada@lagosfreight.com" />
@@ -55,7 +55,7 @@ export function AddLeadModal({ stages, members, currentUserId }: AddLeadModalPro
               <Input name="phone" placeholder="+234 ..." />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Source *</Label>
               <Select name="source" defaultValue="referral">
@@ -72,7 +72,7 @@ export function AddLeadModal({ stages, members, currentUserId }: AddLeadModalPro
               <Input name="campaign" placeholder="Q3 freight push" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Stage</Label>
               <Select name="stageId" defaultValue="">
@@ -104,7 +104,7 @@ export function AddLeadModal({ stages, members, currentUserId }: AddLeadModalPro
           </div>
 
           {/* Deal value + expected close date */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Deal value (₦)</Label>
               <Input name="value" type="number" placeholder="500000" />

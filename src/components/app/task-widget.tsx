@@ -27,7 +27,7 @@ export function TaskWidget({ summary }: { summary: TaskSummary }) {
   const hasNotes = summary.pinnedNotes.length > 0 || summary.recentNotes.length > 0;
 
   return (
-    <div className="grid grid-cols-2 gap-px bg-rule border border-rule mb-7">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-rule border border-rule mb-5 sm:mb-7">
       {/* To-Dos summary */}
       <div className="bg-panel px-[22px] py-[18px]">
         <div className="flex items-center justify-between mb-3">

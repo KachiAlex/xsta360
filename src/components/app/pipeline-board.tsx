@@ -53,11 +53,11 @@ export function PipelineBoard({ initialColumns }: { initialColumns: PipelineColu
   }
 
   return (
-    <div className="board grid grid-cols-[repeat(4,1fr)] gap-3.5">
+    <div className="board flex md:grid md:grid-cols-[repeat(4,1fr)] gap-3 md:gap-3.5 overflow-x-auto pb-2 md:pb-0 snap-x snap-mandatory">
       {columns.map((col) => (
         <div
           key={col.id}
-          className={`col bg-paper-2 border border-rule rounded-md min-h-[420px] flex flex-col ${
+          className={`col bg-paper-2 border border-rule rounded-md min-h-[420px] flex flex-col w-[75vw] sm:w-[280px] md:w-auto shrink-0 snap-start ${
             dragOverCol === col.id ? "bg-[#E4E9DF]" : ""
           }`}
           onDragOver={(e) => {

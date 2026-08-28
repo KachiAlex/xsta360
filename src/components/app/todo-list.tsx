@@ -77,7 +77,7 @@ export function TodoList({ todos, leadId }: { todos: TodoRow[]; leadId?: string 
             <Input name="title" placeholder="e.g. Send revised quote to Adaeze" autoFocus />
             {state.errors?.title && <p className="text-xs text-stamp mt-1">{state.errors.title[0]}</p>}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Priority</Label>
               <Select name="priority" defaultValue="medium">
@@ -146,7 +146,7 @@ function TodoItem({ todo }: { todo: TodoRow }) {
   const isDone = todo.status === "completed";
 
   return (
-    <div className={`flex items-start gap-3 p-3 bg-panel border border-rule rounded ${isDone ? "opacity-60" : ""}`}>
+    <div className={`flex items-start gap-2.5 sm:gap-3 p-3 bg-panel border border-rule rounded ${isDone ? "opacity-60" : ""}`}>
       <form
         onSubmit={(e) => {
           e.preventDefault();

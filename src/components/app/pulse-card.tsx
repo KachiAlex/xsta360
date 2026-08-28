@@ -118,14 +118,14 @@ export function PulseCard({ lead }: { lead: PulseLead }) {
       <button
         type="button"
         onClick={toggleExpand}
-        className="w-full text-left px-4 py-3 flex items-center gap-3 cursor-pointer"
+        className="w-full text-left px-3 sm:px-4 py-3 flex items-center gap-2.5 sm:gap-3 cursor-pointer"
       >
         <HeatDot heat={lead.heat} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-sm truncate">{lead.leadName}</span>
             {lead.company && (
-              <span className="text-xs text-ink-soft truncate">· {lead.company}</span>
+              <span className="text-xs text-ink-soft truncate hidden sm:inline">· {lead.company}</span>
             )}
           </div>
           <div className="text-xs text-ink-soft mt-0.5 truncate">
@@ -137,10 +137,10 @@ export function PulseCard({ lead }: { lead: PulseLead }) {
             ) : (
               "No activity yet"
             )}
-            <span className="ml-1.5">· {formatRelative(lead.lastActivityAt)}</span>
+            <span className="ml-1.5 hidden sm:inline">· {formatRelative(lead.lastActivityAt)}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {lead.score > 0 && (
             <span
               className={`font-mono text-[11px] font-bold px-1.5 py-0.5 rounded ${
@@ -154,7 +154,7 @@ export function PulseCard({ lead }: { lead: PulseLead }) {
             </span>
           )}
           {lead.value && (
-            <span className="font-mono text-[11px] text-ink-soft">
+            <span className="font-mono text-[11px] text-ink-soft hidden sm:inline">
               ₦{parseFloat(lead.value).toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </span>
           )}
@@ -167,7 +167,7 @@ export function PulseCard({ lead }: { lead: PulseLead }) {
 
       {/* Expanded section */}
       {expanded && (
-        <div className="border-t border-rule px-4 py-3 bg-paper/40">
+        <div className="border-t border-rule px-3 sm:px-4 py-3 bg-paper/40">
           {/* Meta row */}
           <div className="flex items-center gap-3 text-xs text-ink-soft mb-3 font-mono">
             <span>{SOURCE_LABELS[lead.source] ?? lead.source}</span>

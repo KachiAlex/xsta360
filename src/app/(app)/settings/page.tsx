@@ -29,7 +29,7 @@ export default async function SettingsPage() {
   return (
     <>
       <Topbar />
-      <div className="content flex-1 px-8 py-7 max-w-[1240px] w-full mx-auto space-y-6">
+      <div className="content flex-1 px-4 sm:px-6 lg:px-8 py-5 sm:py-7 max-w-[1240px] w-full mx-auto space-y-5 sm:space-y-6">
         <h1 className="font-mono text-xl">Workspace settings</h1>
 
         {/* Team management */}
@@ -37,7 +37,8 @@ export default async function SettingsPage() {
           <PanelHead title="Members" sub={`${members.length} member${members.length === 1 ? "" : "s"}`}>
             {isAdmin && <span className="text-xs text-ink-soft font-mono">Admin only</span>}
           </PanelHead>
-          <table className="w-full border-collapse">
+          {/* Desktop: table */}
+          <table className="w-full border-collapse hidden md:table">
             <thead>
               <tr>
                 <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Name</th>
@@ -69,6 +70,26 @@ export default async function SettingsPage() {
               ))}
             </tbody>
           </table>
+          {/* Mobile: card list */}
+          <div className="md:hidden divide-y divide-dashed divide-rule">
+            {members.map((m) => (
+              <div key={m.membershipId} className="px-4 py-3.5">
+                <div className="font-semibold text-sm">{m.name}</div>
+                <div className="text-xs text-ink-soft mb-2">{m.email}</div>
+                {isAdmin ? (
+                  <MemberRow
+                    membershipId={m.membershipId}
+                    currentRole={m.role}
+                    isSelf={m.userId === ctx.userId}
+                  />
+                ) : (
+                  <Badge tone={m.role === "admin" ? "won" : m.role === "manager" ? "today" : "neutral"}>
+                    {m.role}
+                  </Badge>
+                )}
+              </div>
+            ))}
+          </div>
           {isAdmin && (
             <div className="px-5 py-4 border-t border-rule">
               <InviteForm />

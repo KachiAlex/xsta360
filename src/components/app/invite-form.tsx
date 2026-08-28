@@ -18,16 +18,16 @@ export function InviteForm() {
 
   return (
     <form action={action} className="flex gap-2 items-end flex-wrap">
-      <div>
+      <div className="flex-1 min-w-[180px]">
         <Label>Email</Label>
-        <Input name="email" type="email" placeholder="teammate@company.com" className="w-auto" />
+        <Input name="email" type="email" placeholder="teammate@company.com" />
         {state.errors?.email && (
           <p className="text-xs text-stamp mt-1">{state.errors.email[0]}</p>
         )}
       </div>
-      <div>
+      <div className="min-w-[120px]">
         <Label>Role</Label>
-        <Select name="role" defaultValue="rep" className="w-auto">
+        <Select name="role" defaultValue="rep">
           <option value="rep">Rep</option>
           <option value="manager">Manager</option>
           <option value="admin">Admin</option>

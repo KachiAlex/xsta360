@@ -31,20 +31,22 @@ export function InvitationRow({ id, email, role, inviteUrl, expiresAt }: Invitat
           {role} · Expires {new Date(expiresAt).toLocaleDateString()}
         </span>
       </div>
-      <form action={action} className="flex items-center gap-2">
+      <form action={action} className="flex items-center gap-2 flex-wrap">
         <input type="hidden" name="invitationId" value={id} />
         <Input
           value={inviteUrl}
           readOnly
-          className="text-xs font-mono w-64 bg-paper-2"
+          className="text-xs font-mono w-full sm:w-64 bg-paper-2"
           onClick={(e) => e.currentTarget.select()}
         />
-        <Button type="button" size="sm" onClick={copy}>
-          {copied ? "Copied" : "Copy"}
-        </Button>
-        <Button type="submit" size="sm" variant="ghost" className="text-stamp border-stamp" disabled={pending}>
-          {pending ? "…" : "Revoke"}
-        </Button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <Button type="button" size="sm" onClick={copy}>
+            {copied ? "Copied" : "Copy"}
+          </Button>
+          <Button type="submit" size="sm" variant="ghost" className="text-stamp border-stamp" disabled={pending}>
+            {pending ? "…" : "Revoke"}
+          </Button>
+        </div>
       </form>
       {state?.message && (
         <p className={`text-xs ${state.ok ? "text-register" : "text-stamp"} w-full`}>

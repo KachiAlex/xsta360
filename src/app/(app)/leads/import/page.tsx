@@ -57,7 +57,7 @@ export default function ImportPage() {
   }
 
   return (
-    <div className="content flex-1 px-8 py-7 max-w-[1240px] w-full mx-auto">
+    <div className="content flex-1 px-4 sm:px-6 lg:px-8 py-5 sm:py-7 max-w-[1240px] w-full mx-auto">
       <Link href="/leads" className="text-sm text-ink-soft hover:text-ink mb-4 inline-block">
         ← Back to leads
       </Link>
@@ -79,7 +79,7 @@ export default function ImportPage() {
       {headers.length > 0 && (
         <div className="bg-panel border border-rule rounded-md p-6 mb-6">
           <h2 className="font-mono text-base mb-4">Map columns</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {headers.map((h) => (
               <div key={h} className="flex items-center gap-3">
                 <span className="text-sm font-mono w-40 truncate">{h}</span>

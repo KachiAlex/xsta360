@@ -80,7 +80,7 @@ export function NoteList({ notes, leadId }: { notes: NoteRow[]; leadId?: string 
           <div className="text-[11px] font-mono uppercase tracking-wider text-ink-soft mb-2 font-semibold">
             Pinned
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {pinned.map((note) => (
               <NoteCard key={note.id} note={note} />
             ))}
@@ -89,7 +89,7 @@ export function NoteList({ notes, leadId }: { notes: NoteRow[]; leadId?: string 
       )}
 
       {unpinned.length > 0 && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {unpinned.map((note) => (
             <NoteCard key={note.id} note={note} />
           ))}

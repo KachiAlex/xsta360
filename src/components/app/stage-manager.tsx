@@ -17,11 +17,11 @@ export function StageManager({
     <div>
       <ul className="divide-y divide-dashed divide-rule">
         {stages.map((s) => (
-          <li key={s.id} className="px-5 py-3 flex items-center gap-3">
+          <li key={s.id} className="px-4 sm:px-5 py-3 flex items-center gap-2 sm:gap-3 flex-wrap">
             <span className="font-mono text-xs text-ink-soft w-6">{s.position}</span>
             <input
               defaultValue={s.name}
-              className="text-sm border border-rule bg-paper rounded px-2 py-1 flex-1"
+              className="text-sm border border-rule bg-paper rounded px-2 py-1 flex-1 min-w-[120px]"
               onChange={(e) => {
                 const fd = new FormData();
                 fd.set("stageId", s.id);
@@ -69,15 +69,15 @@ export function StageManager({
         ))}
       </ul>
 
-      <form action={action} className="px-5 py-4 border-t border-rule flex gap-2 items-end flex-wrap">
-        <div>
+      <form action={action} className="px-4 sm:px-5 py-4 border-t border-rule flex gap-2 items-end flex-wrap">
+        <div className="flex-1 min-w-[140px]">
           <Label>Stage name</Label>
-          <Input name="name" placeholder="e.g. Qualified" className="w-auto" />
+          <Input name="name" placeholder="e.g. Qualified" />
           {state.errors?.name && <p className="text-xs text-stamp mt-1">{state.errors.name[0]}</p>}
         </div>
-        <div>
+        <div className="min-w-[120px]">
           <Label>Type</Label>
-          <Select name="kind" defaultValue="open" className="w-auto">
+          <Select name="kind" defaultValue="open">
             <option value="open">Open</option>
             <option value="won">Won</option>
             <option value="lost">Lost</option>

@@ -20,7 +20,7 @@ export default async function TasksPage() {
         </span>
       </Topbar>
 
-      <div className="content flex-1 px-8 py-7 max-w-[1240px] w-full mx-auto">
+      <div className="content flex-1 px-4 sm:px-6 lg:px-8 py-5 sm:py-7 max-w-[1240px] w-full mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* To-Dos */}
           <Panel>

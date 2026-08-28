@@ -64,20 +64,20 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         </Link>
       </Topbar>
 
-      <div className="content flex-1 px-8 py-7 max-w-[1240px] w-full mx-auto">
-        <div className="grid grid-cols-[1fr_320px] gap-6">
+      <div className="content flex-1 px-4 sm:px-6 lg:px-8 py-5 sm:py-7 max-w-[1240px] w-full mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
           {/* Main: header + history */}
-          <div className="space-y-6">
+          <div className="space-y-6 min-w-0">
             <div>
-              <div className="flex items-center gap-3 mb-1">
-                <h1 className="font-mono text-2xl m-0">{lead.name}</h1>
+              <div className="flex items-center gap-3 mb-1 flex-wrap">
+                <h1 className="font-mono text-xl sm:text-2xl m-0">{lead.name}</h1>
                 {lead.stageKind === "won" && <Badge tone="won">Won</Badge>}
                 {lead.stageKind === "lost" && <Badge tone="lost">Lost</Badge>}
               </div>
-              {lead.company && <p className="text-ink-soft">{lead.company}</p>}
+              {lead.company && <p className="text-ink-soft text-sm">{lead.company}</p>}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
               <span className="text-sm font-semibold text-ink-soft">Stage:</span>
               <StageSelect
                 leadId={lead.id}
@@ -101,8 +101,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               ) : (
                 <ol className="divide-y divide-dashed divide-rule">
                   {history.map((entry, i) => (
-                    <li key={i} className="px-5 py-4">
-                      <div className="flex justify-between items-baseline gap-4">
+                    <li key={i} className="px-4 sm:px-5 py-3.5 sm:py-4">
+                      <div className="flex justify-between items-baseline gap-3 sm:gap-4 flex-wrap sm:flex-nowrap">
                         <div className="min-w-0">
                           <span className="font-mono text-xs text-ink-soft uppercase tracking-wider">
                             {entry.type === "remark" ? "Remark" : EVENT_LABELS[entry.type] ?? entry.type}
@@ -121,10 +121,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                             </p>
                           )}
                         </div>
-                        <div className="text-right shrink-0">
-                          <div className="text-xs text-ink-soft">{formatDateTime(entry.at)}</div>
+                        <div className="text-left sm:text-right shrink-0 text-xs text-ink-soft">
+                          <div>{formatDateTime(entry.at)}</div>
                           {entry.authorName && (
-                            <div className="text-xs text-ink-soft font-mono">{entry.authorName}</div>
+                            <div className="font-mono">{entry.authorName}</div>
                           )}
                         </div>
                       </div>
@@ -139,7 +139,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <div className="space-y-6">
             <Panel>
               <PanelHead title="Details" />
-              <dl className="px-5 py-4 space-y-3 text-sm">
+              <dl className="px-4 sm:px-5 py-4 space-y-3 text-sm">
                 <div>
                   <dt className="font-mono text-[11px] uppercase tracking-wider text-ink-soft">Source</dt>
                   <dd>{SOURCE_LABELS[lead.source] ?? lead.source}</dd>
@@ -190,7 +190,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               ) : (
                 <ul className="divide-y divide-dashed divide-rule">
                   {reminders.map((r) => (
-                    <li key={r.id} className="px-5 py-3 flex justify-between items-center">
+                    <li key={r.id} className="px-4 sm:px-5 py-3 flex justify-between items-center gap-2 flex-wrap">
                       <div>
                         <div className="text-sm">{formatDateTime(r.dueAt)}</div>
                         {r.note && <div className="text-xs text-ink-soft">{r.note}</div>}

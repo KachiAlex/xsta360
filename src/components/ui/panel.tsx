@@ -20,9 +20,9 @@ export function PanelHead({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex justify-between items-center px-5 py-4 border-b border-rule">
-      <div>
-        <h2 className="font-mono text-base m-0">{title}</h2>
+    <div className="flex justify-between items-center px-4 sm:px-5 py-3.5 sm:py-4 border-b border-rule gap-3 flex-wrap">
+      <div className="min-w-0">
+        <h2 className="font-mono text-base m-0 truncate">{title}</h2>
         {sub && <span className="text-xs text-ink-soft font-mono">{sub}</span>}
       </div>
       {children}

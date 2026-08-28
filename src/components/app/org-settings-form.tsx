@@ -60,7 +60,7 @@ export function OrgSettingsForm({
         </div>
         <input type="hidden" name="whatsappEnabled" value={whatsappEnabled ? "true" : "false"} />
         {whatsappEnabled && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Phone Number ID</Label>
               <Input name="whatsappPhoneNumberId" defaultValue={whatsappConfig?.phoneNumberId ?? ""} placeholder="123456789" />
@@ -87,12 +87,12 @@ export function OrgSettingsForm({
         {fields.length > 0 && (
           <div className="space-y-2 mb-3">
             {fields.map((field, idx) => (
-              <div key={idx} className="flex gap-2 items-center">
+              <div key={idx} className="flex gap-2 items-center flex-wrap sm:flex-nowrap">
                 <Input
                   placeholder="Label (e.g. Industry)"
                   value={field.label}
                   onChange={(e) => updateField(idx, "label", e.target.value)}
-                  className="flex-1"
+                  className="flex-1 min-w-[120px]"
                 />
                 <select
                   value={field.type}

@@ -82,10 +82,10 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
   const stepVisible = showStepForm && !stepState.ok;
 
   return (
-    <div className="px-5 py-4">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
+    <div className="px-4 sm:px-5 py-4">
+      <div className="flex items-start gap-3 mb-3 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-sm">{sequence.name}</span>
             <Badge tone={sequence.active ? "won" : "neutral"}>
               {sequence.active ? "Active" : "Paused"}
@@ -94,37 +94,39 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
           {sequence.description && (
             <div className="text-xs text-ink-soft mt-0.5">{sequence.description}</div>
           )}
+          <div className="text-xs text-ink-soft font-mono mt-1">
+            {sequence.enrollmentCount} enrolled · {sequence.steps.length} steps
+          </div>
         </div>
-        <span className="text-xs text-ink-soft font-mono">
-          {sequence.enrollmentCount} enrolled · {sequence.steps.length} steps
-        </span>
-        <button
-          type="button"
-          className="text-xs text-ink-soft hover:text-ink"
-          onClick={() => {
-            const fd = new FormData();
-            fd.set("id", sequence.id);
-            startTransition(async () => {
-              await toggleSequenceActive({}, fd);
-            });
-          }}
-        >
-          {sequence.active ? "Pause" : "Activate"}
-        </button>
-        <button
-          type="button"
-          className="text-xs text-stamp hover:underline"
-          onClick={() => {
-            if (!confirm("Delete this sequence?")) return;
-            const fd = new FormData();
-            fd.set("id", sequence.id);
-            startTransition(async () => {
-              await deleteSequence({}, fd);
-            });
-          }}
-        >
-          Delete
-        </button>
+        <div className="flex gap-2 shrink-0">
+          <button
+            type="button"
+            className="text-xs text-ink-soft hover:text-ink"
+            onClick={() => {
+              const fd = new FormData();
+              fd.set("id", sequence.id);
+              startTransition(async () => {
+                await toggleSequenceActive({}, fd);
+              });
+            }}
+          >
+            {sequence.active ? "Pause" : "Activate"}
+          </button>
+          <button
+            type="button"
+            className="text-xs text-stamp hover:underline"
+            onClick={() => {
+              if (!confirm("Delete this sequence?")) return;
+              const fd = new FormData();
+              fd.set("id", sequence.id);
+              startTransition(async () => {
+                await deleteSequence({}, fd);
+              });
+            }}
+          >
+            Delete
+          </button>
+        </div>
       </div>
 
       {/* Steps */}
@@ -165,7 +167,7 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
       {stepVisible ? (
         <form action={stepAction} className="bg-paper-2 rounded p-3 space-y-2 ml-4">
           <input type="hidden" name="sequenceId" value={sequence.id} />
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
               <Label>Delay (days)</Label>
               <Input name="delayDays" type="number" defaultValue="0" />

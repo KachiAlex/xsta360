@@ -16,7 +16,7 @@ export default async function SequencesPage() {
         </span>
       </Topbar>
 
-      <div className="content flex-1 px-8 py-7 max-w-[1240px] w-full mx-auto">
+      <div className="content flex-1 px-4 sm:px-6 lg:px-8 py-5 sm:py-7 max-w-[1240px] w-full mx-auto">
         <Panel>
           <PanelHead title="Sales sequences" sub="Automated drip follow-ups — enroll leads and steps fire on a schedule" />
           <SequenceList sequences={sequences} />

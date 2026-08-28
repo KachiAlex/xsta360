@@ -43,7 +43,7 @@ export function ActivityForm({ leadId }: { leadId: string }) {
         <form action={action} className="space-y-3">
           <input type="hidden" name="leadId" value={leadId} />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Type</Label>
               <Select name="type" defaultValue="call">
@@ -75,7 +75,7 @@ export function ActivityForm({ leadId }: { leadId: string }) {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Next follow-up (optional)</Label>
               <Input name="reminderDue" type="datetime-local" />

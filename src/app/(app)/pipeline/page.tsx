@@ -29,7 +29,7 @@ export default async function PipelinePage() {
         </ViewTab>
       </Topbar>
 
-      <div className="content flex-1 px-8 py-7 max-w-[1240px] w-full mx-auto">
+      <div className="content flex-1 px-4 sm:px-6 lg:px-8 py-5 sm:py-7 max-w-[1240px] w-full mx-auto">
         {totalLeads === 0 ? (
           <EmptyState
             title="Your pipeline is empty"

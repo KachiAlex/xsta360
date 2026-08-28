@@ -26,15 +26,15 @@ export default async function ReportsPage() {
   return (
     <>
       <Topbar />
-      <div className="content flex-1 px-8 py-7 max-w-[1240px] w-full mx-auto space-y-6">
+      <div className="content flex-1 px-4 sm:px-6 lg:px-8 py-5 sm:py-7 max-w-[1240px] w-full mx-auto space-y-5 sm:space-y-6">
         <h1 className="font-mono text-xl">Reports</h1>
 
         {/* Pipeline forecast */}
         <Panel>
           <PanelHead title="Pipeline forecast" sub="Deal value by stage, weighted by win probability" />
-          <div className="p-5">
+          <div className="p-4 sm:p-5">
             {/* Summary cards */}
-            <div className="grid grid-cols-4 gap-3 mb-5">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
               <div className="bg-paper-2 rounded p-3">
                 <div className="text-[11px] font-mono uppercase tracking-wider text-ink-soft mb-1">Pipeline value</div>
                 <div className="font-mono text-xl font-bold">{formatCurrency(forecast.totalPipelineValue)}</div>
@@ -54,7 +54,8 @@ export default async function ReportsPage() {
             </div>
 
             {/* Per-stage table */}
-            <table className="w-full border-collapse">
+            <div className="overflow-x-auto">
+            <table className="w-full border-collapse min-w-[500px]">
               <thead>
                 <tr>
                   <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft py-2 border-b border-rule font-semibold">Stage</th>
@@ -83,6 +84,7 @@ export default async function ReportsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </Panel>
 
@@ -92,7 +94,8 @@ export default async function ReportsPage() {
           {sourceReport.length === 0 ? (
             <EmptyState title="No leads to report on yet" description="Add leads with a source tag to see conversion by channel here." />
           ) : (
-            <table className="w-full border-collapse">
+            <div className="overflow-x-auto">
+            <table className="w-full border-collapse min-w-[400px]">
               <thead>
                 <tr>
                   <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Source</th>
@@ -120,6 +123,7 @@ export default async function ReportsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </Panel>
 
@@ -129,7 +133,8 @@ export default async function ReportsPage() {
           {repReport.length === 0 ? (
             <EmptyState title="No team members yet" description="Invite teammates to see per-rep stats here." />
           ) : (
-            <table className="w-full border-collapse">
+            <div className="overflow-x-auto">
+            <table className="w-full border-collapse min-w-[400px]">
               <thead>
                 <tr>
                   <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Rep</th>
@@ -157,6 +162,7 @@ export default async function ReportsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </Panel>
       </div>
