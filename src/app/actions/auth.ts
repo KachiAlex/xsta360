@@ -28,7 +28,7 @@ const SignupSchema = z.object({
 const SigninSchema = z.object({
   email: z.email("Please enter a valid email").trim().toLowerCase(),
   password: z.string().min(1, "Password is required"),
-  next: z.string().optional(),
+  next: z.string().nullish(),
 });
 
 const SignupAndJoinSchema = z.object({
