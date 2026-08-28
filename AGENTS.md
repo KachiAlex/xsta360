@@ -30,6 +30,7 @@ pnpm lint         # eslint
 pnpm db:push      # push schema to DB (creates/updates tables)
 pnpm db:studio    # drizzle studio (DB GUI)
 pnpm db:seed      # seed demo data (see below)
+pnpm db:seed-admin # seed superadmin + default plans (see below)
 ```
 
 ## Environment
@@ -47,6 +48,16 @@ pnpm db:push   # create tables first
 pnpm db:seed   # creates demo org + rep + leads matching the mockup
 ```
 Login: `tunde@kreatix.com` / `password123`
+
+## Superadmin (platform admin)
+```bash
+pnpm db:push       # create tables first
+pnpm db:seed-admin # creates superadmin + default plans (Starter, Pro, Enterprise)
+```
+Superadmin login: `admin@kreatix.tech` / `Kreatix2026!`
+Override via env: `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`, `SUPERADMIN_NAME`
+Superadmins access `/admin` — manage orgs, users, plans, subscriptions.
+On server: `docker exec -e SKIP_SERVER_ONLY=1 xsta360-app-1 npx tsx src/db/seed-admin.ts`
 
 ## Architecture
 - **Multi-tenant**: every table has `orgId`; all queries filter by the session's org.
