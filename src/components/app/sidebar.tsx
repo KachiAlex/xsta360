@@ -57,10 +57,10 @@ export function Sidebar({ orgName, userName, userInitials, role, todayCount }: S
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
-        <div className="logo font-mono font-bold text-lg flex items-center gap-2 mb-7 px-1.5">
+        <Link href="/" className="logo font-mono font-bold text-lg flex items-center gap-2 mb-7 px-1.5 hover:opacity-80 transition-opacity">
           <span className="w-[9px] h-[9px] rounded-full bg-amber" />
           XSTA360
-        </div>
+        </Link>
 
         <div className="org-switch font-mono text-xs text-[#9fae9f] bg-white/[0.06] border border-white/10 rounded px-3 py-2 mb-6 cursor-default truncate">
           {orgName}

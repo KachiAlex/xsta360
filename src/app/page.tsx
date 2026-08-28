@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/app/logo";
 
 const FEATURES = [
   { tag: "Lead management", title: "Capture from anywhere", body: "Manual entry, CSV import, or an embeddable web form that drops leads straight into your pipeline — tagged and ready." },
@@ -14,10 +15,7 @@ export default function Home() {
     <>
       {/* NAV */}
       <nav className="sticky top-0 z-50 flex items-center justify-between px-5 sm:px-12 py-4 sm:py-5 bg-paper/92 backdrop-blur-[6px] border-b border-rule">
-        <div className="logo font-mono font-bold text-lg sm:text-xl flex items-center gap-2.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-stamp shadow-[0_0_0_3px_rgba(178,58,46,0.15)]" />
-          XSTA360
-        </div>
+        <Logo size="lg" />
         <div className="nav-links flex gap-3 sm:gap-8 items-center text-sm">
           <a href="#features" className="no-underline text-ink-soft font-medium hover:text-ink hidden sm:inline">Features</a>
           <a href="#how" className="no-underline text-ink-soft font-medium hover:text-ink hidden sm:inline">How it works</a>
@@ -141,8 +139,18 @@ export default function Home() {
 
       {/* FOOTER */}
       <footer className="border-t border-rule px-4 sm:px-12 py-6 sm:py-8 flex justify-between items-center text-[13px] text-ink-soft font-mono flex-wrap gap-3">
-        <span>© 2026 XSTA360</span>
-        <span>MANAGE.&nbsp;&nbsp;FOLLOW UP.&nbsp;&nbsp;CLOSE.</span>
+        <span>© {new Date().getFullYear()} XSTA360</span>
+        <span>
+          Powered by{" "}
+          <a
+            href="https://kreatix.tech"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ink font-semibold hover:text-stamp transition-colors"
+          >
+            Kreatix Technologies
+          </a>
+        </span>
       </footer>
     </>
   );

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 export interface TopbarProps {
   /** Optional leading content (e.g. view tabs). */
@@ -20,9 +21,18 @@ export function Topbar({ children, searchPlaceholder = "Search leads...", action
   return (
     <div className="topbar sticky top-0 z-10 bg-panel border-b border-rule">
       <div className="flex items-center justify-between px-3 sm:px-6 lg:px-8 py-2 sm:py-3.5 gap-2">
-        {/* Left: view tabs */}
+        {/* Left: logo (mobile) + view tabs */}
+        {/* Mobile logo — sits next to the hamburger button */}
+        <Link
+          href="/"
+          className="md:hidden font-mono font-bold text-sm flex items-center gap-1.5 shrink-0 pl-11 min-h-[40px] hover:opacity-80 transition-opacity"
+        >
+          <span className="w-2 h-2 rounded-full bg-stamp shadow-[0_0_0_3px_rgba(178,58,46,0.15)] shrink-0" />
+          XSTA360
+        </Link>
+
         {children && (
-          <div className="flex gap-1 bg-paper-2 rounded-md p-[3px] shrink-0 overflow-x-auto max-w-[50%] sm:max-w-none">{children}</div>
+          <div className="hidden md:flex gap-1 bg-paper-2 rounded-md p-[3px] shrink-0 overflow-x-auto max-w-[50%] sm:max-w-none">{children}</div>
         )}
 
         {/* Right: search + actions */}

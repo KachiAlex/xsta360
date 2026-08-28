@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { eq, and, lte } from "drizzle-orm";
 import { Sidebar } from "./sidebar";
 import { BottomNav } from "./bottom-nav";
+import { Footer } from "./footer";
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -53,7 +54,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         todayCount={todaysReminders.length}
       />
       <div className="flex-1 flex flex-col min-w-0 pt-12 md:pt-0 pb-14 md:pb-0">
-        {children}
+        <div className="flex-1">{children}</div>
+        <Footer />
       </div>
       <BottomNav todayCount={todaysReminders.length} />
     </div>
