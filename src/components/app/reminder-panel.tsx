@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { completeReminderFromDashboard, snoozeReminderFromDashboard, deleteReminder } from "@/app/actions/activities";
 import type { ReminderRow } from "@/lib/dashboard";
 import { whatsappClickToChat } from "@/lib/whatsapp";
+import { reminderCalendarUrl } from "@/lib/calendar";
 
 function formatDue(d: Date): string {
   const now = new Date();
@@ -185,6 +186,22 @@ function ReminderItem({ reminder }: { reminder: ReminderRow }) {
             <span className="sm:hidden">💬</span>
           </a>
         )}
+        <a
+          href={reminderCalendarUrl({
+            leadName: reminder.leadName,
+            leadCompany: reminder.leadCompany,
+            dueAt: reminder.dueAt,
+            note: reminder.note,
+            leadPhone: reminder.leadPhone,
+          })}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-ink-soft hover:text-ink px-2 py-2 min-w-[40px] min-h-[40px] flex items-center justify-center active:bg-paper-2 rounded"
+          title="Add to Google Calendar"
+        >
+          <span className="hidden sm:inline">Calendar</span>
+          <span className="sm:hidden">📅</span>
+        </a>
         <button
           type="button"
           onClick={handleComplete}

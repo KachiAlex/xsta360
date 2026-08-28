@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { HeatDot } from "@/components/ui/heat-dot";
 import Link from "next/link";
 import { whatsappClickToChat } from "@/lib/whatsapp";
+import { reminderCalendarUrl } from "@/lib/calendar";
 
 function formatDay(d: Date): string {
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -214,7 +215,7 @@ export default async function FollowUpsPage() {
                         </td>
                         <td className="px-3 sm:px-4 py-3">
                           {lead.phone ? (
-                            <div className="flex gap-1.5">
+                            <div className="flex gap-1.5 flex-wrap">
                               <a
                                 href={whatsappClickToChat(lead.phone, `Hi ${lead.leadName}, following up on our conversation.`)}
                                 target="_blank"
@@ -234,6 +235,23 @@ export default async function FollowUpsPage() {
                             </div>
                           ) : (
                             <span className="text-xs text-ink-soft">—</span>
+                          )}
+                          {lead.reminderDueAt && (
+                            <a
+                              href={reminderCalendarUrl({
+                                leadName: lead.leadName,
+                                leadCompany: lead.company,
+                                dueAt: lead.reminderDueAt,
+                                note: lead.reminderNote,
+                                leadPhone: lead.phone,
+                              })}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-semibold text-ink-soft hover:text-ink px-2 py-1 rounded border border-rule hover:bg-paper-2 min-h-[32px] flex items-center mt-1.5 active:bg-paper-2"
+                              title="Add to Google Calendar"
+                            >
+                              📅 Calendar
+                            </a>
                           )}
                         </td>
                         <td className="px-3 sm:px-4 py-3 text-right">

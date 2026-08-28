@@ -205,6 +205,128 @@ export async function createLead(
 }
 
 // ---------------------------------------------------------------------------
+// Update lead
+// ---------------------------------------------------------------------------
+
+const UpdateLeadSchema = z.object({
+  leadId: z.string().uuid(),
+  name: z.string().min(1, "Name is required").trim(),
+  company: z.string().trim().optional(),
+  email: z.string().trim().optional(),
+  phone: z.string().trim().optional(),
+  source: SourceSchema,
+  campaign: z.string().trim().optional(),
+  notes: z.string().trim().optional(),
+  assigneeId: z.string().uuid().optional().or(z.literal("")),
+  stageId: z.string().uuid().optional().or(z.literal("")),
+  value: z.string().trim().optional().or(z.literal("")),
+  expectedCloseDate: z.string().trim().optional().or(z.literal("")),
+  customFields: z.string().trim().optional().or(z.literal("")),
+});
+
+export async function updateLead(
+  _prev: LeadFormState,
+  formData: FormData,
+): Promise<LeadFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+
+  const parsed = UpdateLeadSchema.safeParse({
+    leadId: formData.get("leadId"),
+    name: formData.get("name"),
+    company: formData.get("company"),
+    email: formData.get("email"),
+    phone: formData.get("phone"),
+    source: formData.get("source"),
+    campaign: formData.get("campaign"),
+    notes: formData.get("notes"),
+    assigneeId: formData.get("assigneeId"),
+    stageId: formData.get("stageId"),
+    value: formData.get("value"),
+    expectedCloseDate: formData.get("expectedCloseDate"),
+    customFields: formData.get("customFields"),
+  });
+
+  if (!parsed.success) {
+    return {
+      errors: parsed.error.issues.reduce<Record<string, string[]>>((acc, i) => {
+        const key = i.path[0]?.toString() ?? "_";
+        (acc[key] ??= []).push(i.message);
+        return acc;
+      }, {}),
+    };
+  }
+
+  const { leadId, assigneeId, stageId, value, expectedCloseDate, customFields, ...rest } = parsed.data;
+
+  // Verify lead belongs to org.
+  const existing = await loadOrgLead(ctx, leadId);
+  if (!existing) return { message: "Lead not found" };
+
+  // Validate stage if provided.
+  let newStageId = existing.stageId;
+  if (stageId) {
+    const stage = await loadOrgStage(ctx, stageId);
+    if (!stage) return { message: "Stage not found" };
+    newStageId = stage.id;
+  }
+
+  // Validate assignee if provided.
+  if (assigneeId) {
+    const { getOrgMembers } = await import("@/lib/queries");
+    const members = await getOrgMembers(ctx.orgId);
+    if (!members.some((m) => m.userId === assigneeId)) {
+      return { message: "Assignee is not a member of this organization" };
+    }
+  }
+
+  // Parse custom fields JSON.
+  let parsedCustomFields = existing.customFields ?? {};
+  if (customFields) {
+    try {
+      parsedCustomFields = JSON.parse(customFields);
+    } catch {
+      // ignore invalid JSON, keep existing
+    }
+  }
+
+  // Parse expected close date.
+  let closeDate: Date | null = existing.expectedCloseDate ?? null;
+  if (expectedCloseDate) {
+    closeDate = new Date(expectedCloseDate);
+    if (isNaN(closeDate.getTime())) closeDate = existing.expectedCloseDate ?? null;
+  } else {
+    closeDate = null;
+  }
+
+  await db
+    .update(schema.leads)
+    .set({
+      ...rest,
+      assigneeId: assigneeId || null,
+      stageId: newStageId,
+      value: value || null,
+      expectedCloseDate: closeDate,
+      customFields: parsedCustomFields,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, ctx.orgId)));
+
+  await logEvent(ctx.orgId, "lead_updated", {
+    leadId,
+    actorId: ctx.userId,
+    meta: { name: rest.name, source: rest.source, stageId: newStageId },
+  });
+
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/leads");
+  revalidatePath("/dashboard");
+  revalidatePath("/pipeline");
+  revalidatePath("/reports");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
 // Log remark (+ optional reminder)
 // ---------------------------------------------------------------------------
 

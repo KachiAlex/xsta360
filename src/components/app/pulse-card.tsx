@@ -10,6 +10,7 @@ import { QuickReminderForm } from "@/components/app/quick-reminder-form";
 import type { PulseLead, TimelineEntry } from "@/lib/dashboard";
 import { completeReminderFromDashboard, snoozeReminderFromDashboard } from "@/app/actions/activities";
 import { whatsappClickToChat } from "@/lib/whatsapp";
+import { reminderCalendarUrl } from "@/lib/calendar";
 
 const SOURCE_LABELS: Record<string, string> = {
   referral: "Referral",
@@ -180,7 +181,7 @@ export function PulseCard({ lead }: { lead: PulseLead }) {
 
           {/* Quick contact actions */}
           {lead.phone && (
-            <div className="flex gap-2 mb-3">
+            <div className="flex gap-2 mb-3 flex-wrap">
               <a
                 href={whatsappClickToChat(lead.phone, `Hi ${lead.leadName}, following up on our conversation.`)}
                 target="_blank"
@@ -194,6 +195,26 @@ export function PulseCard({ lead }: { lead: PulseLead }) {
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-soft hover:text-ink px-3 py-2 rounded border border-rule hover:bg-paper-2 min-h-[40px] active:bg-paper-2"
               >
                 Call
+              </a>
+            </div>
+          )}
+
+          {/* Add to Google Calendar */}
+          {lead.reminderDueAt && (
+            <div className="flex gap-2 mb-3">
+              <a
+                href={reminderCalendarUrl({
+                  leadName: lead.leadName,
+                  leadCompany: lead.company,
+                  dueAt: lead.reminderDueAt,
+                  note: lead.reminderNote,
+                  leadPhone: lead.phone,
+                })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-soft hover:text-ink px-3 py-2 rounded border border-rule hover:bg-paper-2 min-h-[40px] active:bg-paper-2"
+              >
+                📅 Add to Calendar
               </a>
             </div>
           )}

@@ -17,6 +17,9 @@ export interface LeadDetail {
   assigneeId: string | null;
   assigneeName: string | null;
   lostReasonText: string | null;
+  value: string | null;
+  expectedCloseDate: Date | null;
+  customFields: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,6 +49,9 @@ export async function getLeadDetail(orgId: string, leadId: string): Promise<Lead
       assigneeId: schema.leads.assigneeId,
       assigneeName: schema.users.name,
       lostReasonText: schema.leads.lostReasonText,
+      value: schema.leads.value,
+      expectedCloseDate: schema.leads.expectedCloseDate,
+      customFields: schema.leads.customFields,
       createdAt: schema.leads.createdAt,
       updatedAt: schema.leads.updatedAt,
     })
@@ -54,7 +60,7 @@ export async function getLeadDetail(orgId: string, leadId: string): Promise<Lead
     .leftJoin(schema.users, eq(schema.leads.assigneeId, schema.users.id))
     .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, orgId)))
     .limit(1);
-  return row ?? null;
+  return row ? { ...row, customFields: row.customFields as Record<string, unknown> } : null;
 }
 
 export async function getLeadHistory(orgId: string, leadId: string): Promise<HistoryEntry[]> {

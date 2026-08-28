@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAuth } from "@/lib/dal";
-import { getOrgStages } from "@/lib/queries";
+import { getOrgStages, getOrgMembers } from "@/lib/queries";
 import { getLeadDetail, getLeadHistory, getLeadReminders } from "@/lib/lead-detail";
 import { Topbar } from "@/components/app/topbar";
 import { LogRemarkModal } from "@/components/app/log-remark-modal";
+import { EditLeadModal } from "@/components/app/edit-lead-modal";
 import { StageSelect } from "@/components/app/stage-select";
 import { Panel, PanelHead } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
+import { reminderCalendarUrl } from "@/lib/calendar";
 
 const SOURCE_LABELS: Record<string, string> = {
   referral: "Referral",
@@ -44,9 +46,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const ctx = await requireAuth();
   const { id } = await params;
 
-  const [lead, stages] = await Promise.all([
+  const [lead, stages, members] = await Promise.all([
     getLeadDetail(ctx.orgId, id),
     getOrgStages(ctx.orgId),
+    getOrgMembers(ctx.orgId),
   ]);
 
   if (!lead) notFound();
@@ -82,6 +85,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 leadId={lead.id}
                 stages={stages}
                 currentStageId={lead.stageId}
+              />
+              <EditLeadModal
+                lead={lead}
+                stages={stages}
+                members={members}
+                currentUserId={ctx.userId}
               />
               <LogRemarkModal
                 leadId={lead.id}
@@ -190,9 +199,26 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 <ul className="divide-y divide-dashed divide-rule">
                   {reminders.map((r) => (
                     <li key={r.id} className="px-4 sm:px-5 py-3 flex justify-between items-center gap-2 flex-wrap">
-                      <div>
+                      <div className="min-w-0">
                         <div className="text-sm">{formatDateTime(r.dueAt)}</div>
                         {r.note && <div className="text-xs text-ink-soft">{r.note}</div>}
+                        {r.status === "pending" && (
+                          <a
+                            href={reminderCalendarUrl({
+                              leadName: lead.name,
+                              leadCompany: lead.company,
+                              dueAt: r.dueAt,
+                              note: r.note,
+                              leadPhone: lead.phone,
+                            })}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs font-semibold text-ink-soft hover:text-ink mt-1 inline-flex items-center gap-1 active:text-ink"
+                            title="Add to Google Calendar"
+                          >
+                            📅 Add to Google Calendar
+                          </a>
+                        )}
                       </div>
                       <Badge
                         tone={
