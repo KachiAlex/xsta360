@@ -6,7 +6,8 @@
  * 1. A superadmin user (or promotes an existing one by email)
  * 2. Three default plans: Starter, Pro, Enterprise
  */
-import { db, schema } from "@/db";
+process.env.SKIP_SERVER_ONLY = "1";
+import { db, schema } from "./index";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
