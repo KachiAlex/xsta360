@@ -6,11 +6,9 @@
  * 1. A superadmin user (or promotes an existing one by email)
  * 2. Three default plans: Starter, Pro, Enterprise
  */
-import "server-only";
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { nanoid } from "nanoid";
 
 async function seedAdmin() {
   const email = process.env.SUPERADMIN_EMAIL ?? "admin@kreatix.tech";
