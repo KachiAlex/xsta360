@@ -31,6 +31,50 @@ export default async function AdminOverviewPage() {
     .from(schema.users)
     .where(sql`${schema.users.suspendedAt} IS NOT NULL`);
 
+  // Calculate MRR: for each active subscription, base + (memberCount - 1) * perSeat
+  const activeOrgBilling = await db
+    .select({
+      orgId: schema.subscriptions.orgId,
+      basePrice: schema.plans.basePriceMonthly,
+      perSeat: schema.plans.perSeatPriceMonthly,
+      currency: schema.plans.currency,
+    })
+    .from(schema.subscriptions)
+    .innerJoin(schema.plans, eq(schema.subscriptions.planId, schema.plans.id))
+    .where(eq(schema.subscriptions.status, "active"));
+
+  // Get member counts for each org
+  const memberCounts = await db
+    .select({
+      orgId: schema.memberships.orgId,
+      count: count(),
+    })
+    .from(schema.memberships)
+    .groupBy(schema.memberships.orgId);
+  const memberCountMap = new Map(memberCounts.map((m) => [m.orgId, m.count]));
+
+  let mrr = 0;
+  for (const b of activeOrgBilling) {
+    const members = memberCountMap.get(b.orgId) ?? 1;
+    mrr += b.basePrice + Math.max(0, members - 1) * b.perSeat;
+  }
+
+  // Also calculate potential MRR including trialing
+  let projectedMrr = mrr;
+  const trialingBilling = await db
+    .select({
+      orgId: schema.subscriptions.orgId,
+      basePrice: schema.plans.basePriceMonthly,
+      perSeat: schema.plans.perSeatPriceMonthly,
+    })
+    .from(schema.subscriptions)
+    .innerJoin(schema.plans, eq(schema.subscriptions.planId, schema.plans.id))
+    .where(eq(schema.subscriptions.status, "trialing"));
+  for (const b of trialingBilling) {
+    const members = memberCountMap.get(b.orgId) ?? 1;
+    projectedMrr += b.basePrice + Math.max(0, members - 1) * b.perSeat;
+  }
+
   // Recent orgs (last 5)
   const recentOrgs = await db
     .select({
@@ -72,6 +116,21 @@ export default async function AdminOverviewPage() {
         />
       </div>
 
+      {/* MRR cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Card
+          label="MRR (active)"
+          value={`₦${mrr.toLocaleString()}`}
+          sub={`${activeSubs.value} paying orgs`}
+          tone="register"
+        />
+        <Card
+          label="Projected MRR"
+          value={`₦${projectedMrr.toLocaleString()}`}
+          sub={`if all ${trialingSubs.value} trials convert`}
+        />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Recent orgs */}
         <div className="bg-panel border border-rule rounded-md">
@@ -110,7 +169,7 @@ export default async function AdminOverviewPage() {
           <div className="divide-y divide-dashed divide-rule">
             {planDist.length === 0 ? (
               <div className="px-4 py-6 text-sm text-ink-soft text-center">
-                No subscriptions yet. Create plans and assign them to orgs.
+                No subscriptions yet.
               </div>
             ) : (
               planDist.map((row) => (

@@ -115,13 +115,16 @@ export interface OrgPlan {
   planId: string;
   planName: string;
   status: SubscriptionStatus | null;
-  maxUsers: number;
-  maxLeads: number;
+  basePriceMonthly: number;
+  perSeatPriceMonthly: number;
+  trialDays: number;
+  currency: string;
   features: Record<string, unknown>;
   trialEndsAt: Date | null;
 }
 
 import type { SubscriptionStatus } from "@/db/schema";
+import { count as countFn } from "drizzle-orm";
 
 /**
  * Load the plan + subscription for an org. Returns a default "free" plan
@@ -133,8 +136,10 @@ export async function getOrgPlan(orgId: string): Promise<OrgPlan> {
       planId: schema.plans.id,
       planName: schema.plans.name,
       status: schema.subscriptions.status,
-      maxUsers: schema.plans.maxUsers,
-      maxLeads: schema.plans.maxLeads,
+      basePriceMonthly: schema.plans.basePriceMonthly,
+      perSeatPriceMonthly: schema.plans.perSeatPriceMonthly,
+      trialDays: schema.plans.trialDays,
+      currency: schema.plans.currency,
       features: schema.plans.features,
       trialEndsAt: schema.subscriptions.trialEndsAt,
     })
@@ -148,21 +153,64 @@ export async function getOrgPlan(orgId: string): Promise<OrgPlan> {
       planId: sub.planId,
       planName: sub.planName,
       status: sub.status,
-      maxUsers: sub.maxUsers,
-      maxLeads: sub.maxLeads,
+      basePriceMonthly: sub.basePriceMonthly,
+      perSeatPriceMonthly: sub.perSeatPriceMonthly,
+      trialDays: sub.trialDays,
+      currency: sub.currency,
       features: sub.features as Record<string, unknown>,
       trialEndsAt: sub.trialEndsAt,
     };
   }
 
-  // No subscription — return unlimited defaults (pre-billing behavior).
+  // No subscription — return defaults (pre-billing behavior).
   return {
     planId: "none",
     planName: "Free",
     status: null,
-    maxUsers: -1,
-    maxLeads: -1,
+    basePriceMonthly: 0,
+    perSeatPriceMonthly: 0,
+    trialDays: 0,
+    currency: "₦",
     features: {},
     trialEndsAt: null,
+  };
+}
+
+/**
+ * Compute the monthly billing amount for an org based on its plan + member count.
+ * Formula: basePrice + (memberCount - 1) * perSeatPrice
+ * (The workspace admin is the base; additional members are per-seat.)
+ */
+export async function getOrgBilling(orgId: string): Promise<{
+  plan: OrgPlan;
+  memberCount: number;
+  monthlyAmount: number;
+  trialEndsAt: Date | null;
+  daysLeftInTrial: number | null;
+}> {
+  const plan = await getOrgPlan(orgId);
+
+  const [memberRow] = await db
+    .select({ value: countFn() })
+    .from(schema.memberships)
+    .where(eq(schema.memberships.orgId, orgId));
+
+  const memberCount = memberRow?.value ?? 0;
+  // Base covers the admin (1 seat). Additional members are per-seat.
+  const additionalSeats = Math.max(0, memberCount - 1);
+  const monthlyAmount = plan.basePriceMonthly + additionalSeats * plan.perSeatPriceMonthly;
+
+  let daysLeftInTrial: number | null = null;
+  if (plan.trialEndsAt) {
+    const ms = plan.trialEndsAt.getTime() - Date.now();
+    daysLeftInTrial = Math.ceil(ms / (1000 * 60 * 60 * 24));
+  }
+
+  return {
+    plan,
+    memberCount,
+    monthlyAmount,
+    trialEndsAt: plan.trialEndsAt,
+    daysLeftInTrial,
   };
 }

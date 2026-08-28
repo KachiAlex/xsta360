@@ -121,6 +121,7 @@ export async function signup(
         .insert(schema.users)
         .values({ name, email, passwordHash })
         .returning();
+      // Workspace creator = workspace admin.
       await tx.insert(schema.memberships).values({
         orgId: org.id,
         userId: user.id,
@@ -132,6 +133,25 @@ export async function signup(
       await tx.insert(schema.lostReasons).values(
         DEFAULT_LOST_REASONS.map((r) => ({ ...r, orgId: org.id, isDefault: r.position === 0 })),
       );
+      // Auto-assign the first active plan as a trialing subscription (free trial).
+      const [defaultPlan] = await tx
+        .select({ id: schema.plans.id, trialDays: schema.plans.trialDays })
+        .from(schema.plans)
+        .where(eq(schema.plans.active, true))
+        .orderBy(schema.plans.position)
+        .limit(1);
+      if (defaultPlan) {
+        const trialEndsAt = new Date();
+        trialEndsAt.setDate(trialEndsAt.getDate() + defaultPlan.trialDays);
+        await tx.insert(schema.subscriptions).values({
+          orgId: org.id,
+          planId: defaultPlan.id,
+          status: "trialing",
+          trialEndsAt,
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: trialEndsAt,
+        });
+      }
       return [{ org, user }] as const;
     });
 

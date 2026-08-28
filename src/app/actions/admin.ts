@@ -15,10 +15,10 @@ export type SubFormState = { message?: string; error?: boolean };
 
 const PlanSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").trim(),
-  priceMonthly: z.coerce.number().int().min(0),
-  priceYearly: z.coerce.number().int().min(0),
-  maxUsers: z.coerce.number().int(),
-  maxLeads: z.coerce.number().int(),
+  basePriceMonthly: z.coerce.number().int().min(0),
+  perSeatPriceMonthly: z.coerce.number().int().min(0),
+  trialDays: z.coerce.number().int().min(0),
+  currency: z.string().min(1).max(3).default("₦"),
   features: z.string().optional(),
   position: z.coerce.number().int().min(0).default(0),
 });
@@ -30,10 +30,10 @@ export async function createPlan(
   const ctx = await requireSuperadmin();
   const parsed = PlanSchema.safeParse({
     name: formData.get("name"),
-    priceMonthly: formData.get("priceMonthly"),
-    priceYearly: formData.get("priceYearly"),
-    maxUsers: formData.get("maxUsers"),
-    maxLeads: formData.get("maxLeads"),
+    basePriceMonthly: formData.get("basePriceMonthly"),
+    perSeatPriceMonthly: formData.get("perSeatPriceMonthly"),
+    trialDays: formData.get("trialDays"),
+    currency: formData.get("currency") ?? "₦",
     features: formData.get("features"),
     position: formData.get("position") ?? 0,
   });
@@ -55,10 +55,10 @@ export async function createPlan(
       .insert(schema.plans)
       .values({
         name: parsed.data.name,
-        priceMonthly: parsed.data.priceMonthly,
-        priceYearly: parsed.data.priceYearly,
-        maxUsers: parsed.data.maxUsers,
-        maxLeads: parsed.data.maxLeads,
+        basePriceMonthly: parsed.data.basePriceMonthly,
+        perSeatPriceMonthly: parsed.data.perSeatPriceMonthly,
+        trialDays: parsed.data.trialDays,
+        currency: parsed.data.currency,
         features,
         position: parsed.data.position,
       })
@@ -86,10 +86,10 @@ export async function updatePlan(
 
   const parsed = PlanSchema.safeParse({
     name: formData.get("name"),
-    priceMonthly: formData.get("priceMonthly"),
-    priceYearly: formData.get("priceYearly"),
-    maxUsers: formData.get("maxUsers"),
-    maxLeads: formData.get("maxLeads"),
+    basePriceMonthly: formData.get("basePriceMonthly"),
+    perSeatPriceMonthly: formData.get("perSeatPriceMonthly"),
+    trialDays: formData.get("trialDays"),
+    currency: formData.get("currency") ?? "₦",
     features: formData.get("features"),
     position: formData.get("position") ?? 0,
   });
@@ -111,10 +111,10 @@ export async function updatePlan(
       .update(schema.plans)
       .set({
         name: parsed.data.name,
-        priceMonthly: parsed.data.priceMonthly,
-        priceYearly: parsed.data.priceYearly,
-        maxUsers: parsed.data.maxUsers,
-        maxLeads: parsed.data.maxLeads,
+        basePriceMonthly: parsed.data.basePriceMonthly,
+        perSeatPriceMonthly: parsed.data.perSeatPriceMonthly,
+        trialDays: parsed.data.trialDays,
+        currency: parsed.data.currency,
         features,
         position: parsed.data.position,
         updatedAt: new Date(),

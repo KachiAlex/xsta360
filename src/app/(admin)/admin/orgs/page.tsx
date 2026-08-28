@@ -16,11 +16,9 @@ export default async function AdminOrgsPage({
       name: schema.organizations.name,
       createdAt: schema.organizations.createdAt,
       memberCount: count(schema.memberships.id),
-      leadCount: count(schema.leads.id),
     })
     .from(schema.organizations)
     .leftJoin(schema.memberships, eq(schema.memberships.orgId, schema.organizations.id))
-    .leftJoin(schema.leads, eq(schema.leads.orgId, schema.organizations.id))
     .groupBy(schema.organizations.id, schema.organizations.name, schema.organizations.createdAt)
     .orderBy(sql`${schema.organizations.createdAt} DESC`)
     .limit(100);
@@ -31,6 +29,9 @@ export default async function AdminOrgsPage({
       orgId: schema.subscriptions.orgId,
       planName: schema.plans.name,
       status: schema.subscriptions.status,
+      basePrice: schema.plans.basePriceMonthly,
+      perSeat: schema.plans.perSeatPriceMonthly,
+      currency: schema.plans.currency,
     })
     .from(schema.subscriptions)
     .innerJoin(schema.plans, eq(schema.subscriptions.planId, schema.plans.id));
@@ -72,8 +73,8 @@ export default async function AdminOrgsPage({
             <tr className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft">
               <th className="px-4 py-3 font-semibold">Name</th>
               <th className="px-4 py-3 font-semibold">Members</th>
-              <th className="px-4 py-3 font-semibold">Leads</th>
               <th className="px-4 py-3 font-semibold">Plan</th>
+              <th className="px-4 py-3 font-semibold">Monthly</th>
               <th className="px-4 py-3 font-semibold">Status</th>
               <th className="px-4 py-3 font-semibold">Created</th>
               <th className="px-4 py-3"></th>
@@ -82,12 +83,17 @@ export default async function AdminOrgsPage({
           <tbody className="divide-y divide-dashed divide-rule">
             {filtered.map((org) => {
               const sub = subMap.get(org.id);
+              const monthly = sub
+                ? sub.basePrice + Math.max(0, org.memberCount - 1) * sub.perSeat
+                : 0;
               return (
                 <tr key={org.id} className="hover:bg-paper-2/30">
                   <td className="px-4 py-3 font-semibold">{org.name}</td>
                   <td className="px-4 py-3 font-mono text-ink-soft">{org.memberCount}</td>
-                  <td className="px-4 py-3 font-mono text-ink-soft">{org.leadCount}</td>
                   <td className="px-4 py-3">{sub?.planName ?? <span className="text-ink-soft">Free</span>}</td>
+                  <td className="px-4 py-3 font-mono font-semibold text-register">
+                    {sub ? `${sub.currency}${monthly.toLocaleString()}` : "—"}
+                  </td>
                   <td className="px-4 py-3">
                     {sub ? (
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
@@ -120,6 +126,9 @@ export default async function AdminOrgsPage({
       <div className="md:hidden divide-y divide-dashed divide-rule border border-rule rounded-md overflow-hidden">
         {filtered.map((org) => {
           const sub = subMap.get(org.id);
+          const monthly = sub
+            ? sub.basePrice + Math.max(0, org.memberCount - 1) * sub.perSeat
+            : 0;
           return (
             <Link key={org.id} href={`/admin/orgs/${org.id}`} className="block px-4 py-3 active:bg-paper-2/30">
               <div className="flex items-center justify-between mb-1">
@@ -134,10 +143,9 @@ export default async function AdminOrgsPage({
                   </span>
                 )}
               </div>
-              <div className="flex gap-3 text-xs text-ink-soft">
-                <span>{org.memberCount} members</span>
-                <span>{org.leadCount} leads</span>
-                <span>{sub?.planName ?? "Free"}</span>
+              <div className="flex justify-between text-xs text-ink-soft">
+                <span>{org.memberCount} members · {sub?.planName ?? "Free"}</span>
+                {sub && <span className="font-mono font-semibold text-register">{sub.currency}{monthly.toLocaleString()}/mo</span>}
               </div>
             </Link>
           );

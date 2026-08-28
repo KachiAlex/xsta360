@@ -6,10 +6,10 @@ import { createPlan, updatePlan, type SubFormState } from "@/app/actions/admin";
 interface PlanData {
   id: string;
   name: string;
-  priceMonthly: number;
-  priceYearly: number;
-  maxUsers: number;
-  maxLeads: number;
+  basePriceMonthly: number;
+  perSeatPriceMonthly: number;
+  trialDays: number;
+  currency: string;
   features: string;
   position: number;
 }
@@ -45,6 +45,60 @@ export function PlanForm({
         </div>
         <div>
           <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
+            Currency symbol
+          </label>
+          <input
+            type="text"
+            name="currency"
+            defaultValue={plan?.currency ?? "₦"}
+            maxLength={3}
+            className="w-full text-sm border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
+            Base price / mo
+          </label>
+          <input
+            type="number"
+            name="basePriceMonthly"
+            defaultValue={plan?.basePriceMonthly ?? 1000}
+            className="w-full text-sm border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
+          />
+          <p className="text-[11px] text-ink-soft mt-1">What the workspace admin pays</p>
+        </div>
+        <div>
+          <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
+            Per-seat price / mo
+          </label>
+          <input
+            type="number"
+            name="perSeatPriceMonthly"
+            defaultValue={plan?.perSeatPriceMonthly ?? 500}
+            className="w-full text-sm border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
+          />
+          <p className="text-[11px] text-ink-soft mt-1">Each additional member</p>
+        </div>
+        <div>
+          <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
+            Trial days
+          </label>
+          <input
+            type="number"
+            name="trialDays"
+            defaultValue={plan?.trialDays ?? 30}
+            className="w-full text-sm border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
+          />
+          <p className="text-[11px] text-ink-soft mt-1">0 = no free trial</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
             Position (sort order)
           </label>
           <input
@@ -54,66 +108,40 @@ export function PlanForm({
             className="w-full text-sm border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
           />
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div>
           <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
-            Monthly (₦)
+            Features (JSON)
           </label>
           <input
-            type="number"
-            name="priceMonthly"
-            defaultValue={plan?.priceMonthly ?? 0}
-            className="w-full text-sm border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
-            Yearly (₦)
-          </label>
-          <input
-            type="number"
-            name="priceYearly"
-            defaultValue={plan?.priceYearly ?? 0}
-            className="w-full text-sm border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
-            Max users (-1 = ∞)
-          </label>
-          <input
-            type="number"
-            name="maxUsers"
-            defaultValue={plan?.maxUsers ?? -1}
-            className="w-full text-sm border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
-            Max leads (-1 = ∞)
-          </label>
-          <input
-            type="number"
-            name="maxLeads"
-            defaultValue={plan?.maxLeads ?? -1}
-            className="w-full text-sm border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
+            type="text"
+            name="features"
+            defaultValue={plan?.features ?? "{}"}
+            placeholder='{"sequences": true}'
+            className="w-full text-sm font-mono border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
           />
         </div>
       </div>
 
-      <div>
-        <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
-          Features (JSON)
-        </label>
-        <textarea
-          name="features"
-          defaultValue={plan?.features ?? "{}"}
-          rows={3}
-          placeholder='{"sequences": true, "custom_fields": true}'
-          className="w-full text-sm font-mono border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
-        />
+      {/* Pricing preview */}
+      <div className="bg-paper-2 rounded p-3 text-sm">
+        <div className="font-mono text-[11px] uppercase tracking-wider text-ink-soft mb-1.5">
+          Billing preview
+        </div>
+        <div className="font-mono text-xs text-ink-soft">
+          <span id="preview-currency">{plan?.currency ?? "₦"}</span>
+          <span id="preview-base">{plan?.basePriceMonthly ?? 1000}</span>
+          {" (admin) + "}
+          <span id="preview-currency2">{plan?.currency ?? "₦"}</span>
+          <span id="preview-seat">{plan?.perSeatPriceMonthly ?? 500}</span>
+          {" × additional members"}
+        </div>
+        <div className="text-xs text-ink-soft mt-1">
+          e.g. 4 members = <span id="preview-currency3">{plan?.currency ?? "₦"}</span>
+          <span id="preview-total">
+            {(plan?.basePriceMonthly ?? 1000) + 3 * (plan?.perSeatPriceMonthly ?? 500)}
+          </span>
+          /mo
+        </div>
       </div>
 
       <div className="flex items-center gap-3">

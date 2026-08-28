@@ -47,52 +47,41 @@ async function seedAdmin() {
     console.log(`Created superadmin: ${email}`);
   }
 
-  // Seed default plans
-  console.log("Seeding default plans...");
+  // Seed default plan — hybrid per-seat pricing
+  console.log("Seeding default plan...");
 
-  const defaultPlans = [
-    {
-      name: "Starter",
-      priceMonthly: 5000,
-      priceYearly: 50000,
-      maxUsers: 3,
-      maxLeads: 500,
-      features: { sequences: false, custom_fields: true, api_access: false },
-      position: 0,
-    },
-    {
-      name: "Pro",
-      priceMonthly: 15000,
-      priceYearly: 150000,
-      maxUsers: 10,
-      maxLeads: 5000,
-      features: { sequences: true, custom_fields: true, api_access: true, reports: true },
-      position: 1,
-    },
-    {
-      name: "Enterprise",
-      priceMonthly: 50000,
-      priceYearly: 500000,
-      maxUsers: -1,
-      maxLeads: -1,
-      features: { sequences: true, custom_fields: true, api_access: true, reports: true, sso: true, dedicated_support: true },
-      position: 2,
-    },
-  ];
+  const defaultPlan = {
+    name: "Standard",
+    basePriceMonthly: 1000,    // ₦1000 for the workspace admin
+    perSeatPriceMonthly: 500,  // ₦500 per additional member
+    trialDays: 30,             // 1 month free trial
+    currency: "₦",
+    features: { sequences: true, custom_fields: true, reports: true },
+    position: 0,
+  };
 
-  for (const plan of defaultPlans) {
-    const [existingPlan] = await db
-      .select()
-      .from(schema.plans)
-      .where(eq(schema.plans.name, plan.name))
-      .limit(1);
+  const [existingPlan] = await db
+    .select()
+    .from(schema.plans)
+    .where(eq(schema.plans.name, defaultPlan.name))
+    .limit(1);
 
-    if (existingPlan) {
-      console.log(`Plan "${plan.name}" already exists — skipping`);
-    } else {
-      await db.insert(schema.plans).values(plan);
-      console.log(`Created plan: ${plan.name}`);
-    }
+  if (existingPlan) {
+    // Update existing plan to new pricing model
+    await db
+      .update(schema.plans)
+      .set({
+        basePriceMonthly: defaultPlan.basePriceMonthly,
+        perSeatPriceMonthly: defaultPlan.perSeatPriceMonthly,
+        trialDays: defaultPlan.trialDays,
+        currency: defaultPlan.currency,
+        features: defaultPlan.features,
+      })
+      .where(eq(schema.plans.id, existingPlan.id));
+    console.log(`Updated plan "${defaultPlan.name}" to hybrid pricing`);
+  } else {
+    await db.insert(schema.plans).values(defaultPlan);
+    console.log(`Created plan: ${defaultPlan.name} (₦1000 base + ₦500/seat, 30-day trial)`);
   }
 
   console.log("Done!");

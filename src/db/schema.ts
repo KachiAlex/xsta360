@@ -134,12 +134,15 @@ export const plans = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull().unique(),
-    // Display price (informational — actual billing is via Stripe or manual).
-    priceMonthly: integer("price_monthly").notNull().default(0),
-    priceYearly: integer("price_yearly").notNull().default(0),
-    // Usage limits (-1 = unlimited).
-    maxUsers: integer("max_users").notNull().default(-1),
-    maxLeads: integer("max_leads").notNull().default(-1),
+    // Hybrid per-seat pricing:
+    // basePriceMonthly = what the workspace admin pays (e.g. ₦1000)
+    // perSeatPriceMonthly = what each additional member costs (e.g. ₦500)
+    basePriceMonthly: integer("base_price_monthly").notNull().default(1000),
+    perSeatPriceMonthly: integer("per_seat_price_monthly").notNull().default(500),
+    // Free trial length in days (0 = no trial).
+    trialDays: integer("trial_days").notNull().default(30),
+    // Currency symbol for display (e.g. "₦", "$").
+    currency: text("currency").notNull().default("₦"),
     // Feature flags: { "sequences": true, "custom_fields": true, ... }
     features: jsonb("features").notNull().default({}),
     // Stripe price ID for future billing integration (nullable for manual billing).
