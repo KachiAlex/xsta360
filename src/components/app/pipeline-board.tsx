@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { changeStage } from "@/app/actions/leads";
 import type { PipelineColumn } from "@/lib/pipeline";
 
@@ -72,15 +73,16 @@ export function PipelineBoard({ initialColumns }: { initialColumns: PipelineColu
           </div>
           <div className="col-body p-3 flex flex-col gap-2.5 flex-1">
             {col.leads.map((lead) => (
-              <div
+              <Link
                 key={lead.id}
+                href={`/leads/${lead.id}`}
                 draggable
                 onDragStart={() => setDraggedId(lead.id)}
                 onDragEnd={() => {
                   setDraggedId(null);
                   setDragOverCol(null);
                 }}
-                className={`card bg-panel border border-rule rounded p-3 cursor-grab shadow-[0_1px_0_var(--color-rule)] active:cursor-grabbing ${
+                className={`card bg-panel border border-rule rounded p-3 cursor-grab shadow-[0_1px_0_var(--color-rule)] active:cursor-grabbing hover:border-ink hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-all ${
                   draggedId === lead.id ? "opacity-40" : ""
                 }`}
               >
@@ -93,7 +95,7 @@ export function PipelineBoard({ initialColumns }: { initialColumns: PipelineColu
                     {SOURCE_SHORT[lead.source] ?? lead.source}
                   </span>
                 </div>
-              </div>
+              </Link>
             ))}
             {col.leads.length === 0 && (
               <div className="text-center text-xs text-ink-soft py-6">Drop leads here</div>
