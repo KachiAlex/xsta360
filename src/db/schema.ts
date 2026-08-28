@@ -70,6 +70,16 @@ export const auditEventTypeEnum = pgEnum("audit_event_type", [
   "member_joined",
   "role_changed",
   "member_removed",
+  // Platform-level events (superadmin actions, orgId may be null)
+  "plan_created",
+  "plan_updated",
+  "plan_deleted",
+  "subscription_created",
+  "subscription_updated",
+  "subscription_canceled",
+  "user_suspended",
+  "user_reactivated",
+  "org_suspended",
 ]);
 export type AuditEventType = (typeof auditEventTypeEnum.enumValues)[number];
 
@@ -87,6 +97,14 @@ export type TodoStatus = (typeof todoStatusEnum.enumValues)[number];
 
 export const todoPriorityEnum = pgEnum("todo_priority", ["low", "medium", "high"]);
 export type TodoPriority = (typeof todoPriorityEnum.enumValues)[number];
+
+export const subscriptionStatusEnum = pgEnum("subscription_status", [
+  "active",
+  "trialing",
+  "past_due",
+  "canceled",
+]);
+export type SubscriptionStatus = (typeof subscriptionStatusEnum.enumValues)[number];
 
 // ---------------------------------------------------------------------------
 // Organizations & users
@@ -107,11 +125,69 @@ export const organizations = pgTable("organizations", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ---------------------------------------------------------------------------
+// Plans & subscriptions (platform-level, managed by superadmin)
+// ---------------------------------------------------------------------------
+
+export const plans = pgTable(
+  "plans",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull().unique(),
+    // Display price (informational — actual billing is via Stripe or manual).
+    priceMonthly: integer("price_monthly").notNull().default(0),
+    priceYearly: integer("price_yearly").notNull().default(0),
+    // Usage limits (-1 = unlimited).
+    maxUsers: integer("max_users").notNull().default(-1),
+    maxLeads: integer("max_leads").notNull().default(-1),
+    // Feature flags: { "sequences": true, "custom_fields": true, ... }
+    features: jsonb("features").notNull().default({}),
+    // Stripe price ID for future billing integration (nullable for manual billing).
+    stripePriceId: text("stripe_price_id"),
+    active: boolean("active").notNull().default(true),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    activeIdx: index("plans_active_idx").on(t.active),
+  }),
+);
+
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => plans.id, { onDelete: "restrict" }),
+    status: subscriptionStatusEnum("status").notNull().default("trialing"),
+    currentPeriodStart: timestamp("current_period_start", { withTimezone: true }),
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+    trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+    canceledAt: timestamp("canceled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: uniqueIndex("subscriptions_org_idx").on(t.orgId),
+    statusIdx: index("subscriptions_status_idx").on(t.status),
+  }),
+);
+
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   passwordHash: text("password_hash").notNull(),
+  // Platform-level superadmin flag — set via DB only, never via UI.
+  // Superadmins bypass org-scoping and access /admin/* routes.
+  isSuperadmin: boolean("is_superadmin").notNull().default(false),
+  // Suspended users cannot sign in (managed by superadmin).
+  suspendedAt: timestamp("suspended_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -510,9 +586,8 @@ export const auditEvents = pgTable(
   "audit_events",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    orgId: uuid("org_id")
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+    // Nullable for platform-level events (superadmin actions).
+    orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
     leadId: uuid("lead_id").references(() => leads.id, { onDelete: "cascade" }),
     actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
     type: auditEventTypeEnum("type").notNull(),

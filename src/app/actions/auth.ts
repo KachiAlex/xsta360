@@ -135,7 +135,12 @@ export async function signup(
       return [{ org, user }] as const;
     });
 
-    await createSession({ userId: created.user.id, orgId: created.org.id, role: "admin" });
+    await createSession({
+      userId: created.user.id,
+      orgId: created.org.id,
+      role: "admin",
+      isSuperadmin: false,
+    });
     redirect("/dashboard");
   } catch (err) {
     // redirect() throws a special error — re-throw it so Next.js handles it.
@@ -214,6 +219,7 @@ export async function signupAndJoin(
       userId: created.user.id,
       orgId: created.orgId,
       role: created.role,
+      isSuperadmin: false,
     });
     redirect("/dashboard");
   } catch (err) {
@@ -252,9 +258,26 @@ export async function signin(
       return { message: "Invalid email or password" };
     }
 
+    // Suspended users cannot sign in.
+    if (user.suspendedAt) {
+      return { message: "Your account has been suspended. Contact support." };
+    }
+
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
       return { message: "Invalid email or password" };
+    }
+
+    // Superadmins go straight to the admin panel — they don't need an org membership.
+    if (user.isSuperadmin) {
+      await createSession({
+        userId: user.id,
+        orgId: "00000000-0000-0000-0000-000000000000", // placeholder — superadmin has no org
+        role: "admin",
+        isSuperadmin: true,
+      });
+      const redirectTo = next && isInternalPath(next) ? next : "/admin";
+      redirect(redirectTo);
     }
 
     // Load the user's first org membership to seed the session.
@@ -268,7 +291,12 @@ export async function signin(
       return { message: "Your account is not part of any workspace yet." };
     }
 
-    await createSession({ userId: user.id, orgId: membership.orgId, role: membership.role });
+    await createSession({
+      userId: user.id,
+      orgId: membership.orgId,
+      role: membership.role,
+      isSuperadmin: false,
+    });
     const redirectTo = next && isInternalPath(next) ? next : "/dashboard";
     redirect(redirectTo);
   } catch (err) {

@@ -17,6 +17,8 @@ export interface SessionPayload {
   // Current org the user is operating in (a user may belong to several).
   orgId: string;
   role: "admin" | "manager" | "rep";
+  // Platform-level superadmin flag — bypasses org-scoping for /admin routes.
+  isSuperadmin: boolean;
   expiresAt: number; // ms epoch
 }
 
@@ -74,7 +76,12 @@ export async function createSession(
 export async function setOrg(orgId: string, role: SessionPayload["role"]) {
   const current = await getCurrentPayload();
   if (!current) return;
-  await createSession({ userId: current.userId, orgId, role });
+  await createSession({
+    userId: current.userId,
+    orgId,
+    role,
+    isSuperadmin: current.isSuperadmin,
+  });
 }
 
 export async function deleteSession() {
