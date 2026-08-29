@@ -69,8 +69,9 @@ function decodeWav(buffer: ArrayBuffer): Float32Array {
     const chunkSize = view.getUint32(offset + 4, true);
 
     if (chunkId === "fmt ") {
-      sampleRate = view.getUint32(offset + 8, true);
-      bitsPerSample = view.getUint16(offset + 14, true);
+      // fmt chunk layout: chunkId(4) + chunkSize(4) + audioFormat(2) + channels(2) + sampleRate(4) + byteRate(4) + blockAlign(2) + bitsPerSample(2)
+      sampleRate = view.getUint32(offset + 12, true);
+      bitsPerSample = view.getUint16(offset + 22, true);
     } else if (chunkId === "data") {
       dataOffset = offset + 8;
       dataLength = chunkSize;
