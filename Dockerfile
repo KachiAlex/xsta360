@@ -3,6 +3,7 @@ FROM node:22-slim AS deps
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml ./
+# Install with build scripts allowed (sharp needs native binary)
 RUN pnpm install --frozen-lockfile
 
 # ---- builder stage ----
@@ -19,9 +20,6 @@ ENV SESSION_SECRET=$SESSION_SECRET
 ENV APP_URL=$APP_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
-
-# Pre-download Whisper model so it's cached in the image (avoids cold-start download)
-RUN node -e "const{env}=require('@xenova/transformers');env.cacheDir='./node_modules/.cache/transformers';env.allowRemoteModels=true;require('@xenova/transformers').pipeline('automatic-speech-recognition','Xenova/whisper-tiny.en',{quantized:true}).then(()=>console.log('Whisper model cached')).catch(e=>console.error('Model preload failed:',e.message))"
 
 # ---- runner stage ----
 FROM node:22-slim AS runner

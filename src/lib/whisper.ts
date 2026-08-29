@@ -26,8 +26,8 @@ function getTranscriber(): Promise<any> {
       ({ pipeline, env }: any) => {
         // Allow remote models (download from Hugging Face Hub on first use).
         env.allowRemoteModels = true;
-        // Cache models to persist across restarts.
-        env.cacheDir = "./node_modules/.cache/transformers";
+        // Cache models in a writable directory (/tmp in Docker, or local cache).
+        env.cacheDir = "/tmp/transformers-cache";
 
         return pipeline("automatic-speech-recognition", "Xenova/whisper-tiny.en", {
           quantized: true,
