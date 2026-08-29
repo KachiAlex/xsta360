@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow cleartext traffic to the Xsta360 backend.
+         The VPS currently uses HTTP. This is needed to avoid SSL errors
+         until a valid SSL certificate is installed for the subdomain. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">xsta360.67-211-210-8.sslip.io</domain>
+    </domain-config>
+    <!-- Trust user-added CAs for the bare IP if an HTTPS cert is added. -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="user" />
+            <certificates src="system" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

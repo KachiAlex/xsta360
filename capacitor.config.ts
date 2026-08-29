@@ -3,10 +3,12 @@ import type { CapacitorConfig } from "@capacitor/cli";
 const config: CapacitorConfig = {
   appId: "com.xsta360.app",
   appName: "Xsta360",
-  // The local splash screen HTML is bundled in the app.
-  // It shows the animated logo for 3s, then redirects to the VPS server.
+  // Local splash screen / offline fallback bundled in the app.
   webDir: "out",
   server: {
+    // Load the live app directly inside the Capacitor webview.
+    // This keeps the user in the app instead of opening the system browser.
+    url: "http://xsta360.67-211-210-8.sslip.io/login",
     // Allow cleartext HTTP (the VPS uses HTTP, not HTTPS yet).
     cleartext: true,
   },
