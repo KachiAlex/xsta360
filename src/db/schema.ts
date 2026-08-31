@@ -229,6 +229,21 @@ export const memberships = pgTable(
   }),
 );
 
+// Password reset tokens.
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull(),
+  token: text("token").notNull().unique(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true })
+    .notNull()
+    .default(sql`now() + interval '1 hour'`),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  tokenIdx: index("password_reset_tokens_token_idx").on(t.token),
+  emailIdx: index("password_reset_tokens_email_idx").on(t.email),
+}));
+
 // Pending invitations to join an org.
 export const invitations = pgTable("invitations", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -44,7 +44,13 @@ function LoginForm() {
         </Button>
       </form>
 
-      <p className="text-sm text-ink-soft mt-6 text-center">
+      <p className="text-sm text-ink-soft mt-4 text-center">
+        <Link href="/forgot" className="text-ink font-semibold underline underline-offset-2">
+          Forgot password?
+        </Link>
+      </p>
+
+      <p className="text-sm text-ink-soft mt-4 text-center">
         No account yet?{" "}
         <Link href="/signup" className="text-ink font-semibold underline underline-offset-2">
           Start free

@@ -182,3 +182,53 @@ export async function sendLeadAssignedEmail(data: LeadAssignedEmailData): Promis
     throw new Error(`Resend API error ${res.status}: ${text}`);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Password reset
+// ---------------------------------------------------------------------------
+
+export interface PasswordResetEmailData {
+  to: string;
+  resetUrl: string;
+}
+
+export async function sendPasswordResetEmail(data: PasswordResetEmailData): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM ?? "Xsta360 <noreply@xsta360.app>";
+
+  const subject = "Reset your Xsta360 password";
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+      <h2 style="color: #1E2A22; font-family: 'IBM Plex Mono', monospace;">Reset your password</h2>
+      <p style="color: #4A5750; font-size: 15px;">
+        Click the button below to reset your Xsta360 password. This link expires in 1 hour.
+      </p>
+      <a href="${data.resetUrl}" style="display: inline-block; margin-top: 16px; padding: 10px 20px; background: #1E2A22; color: #F3F0E6; text-decoration: none; border-radius: 3px; font-weight: 600;">
+        Reset password
+      </a>
+      <p style="color: #4A5750; font-size: 13px; margin-top: 24px; word-break: break-all;">
+        Or paste this URL in your browser:<br>${data.resetUrl}
+      </p>
+      <p style="color: #9AA39A; font-size: 12px; margin-top: 32px;">— Xsta360 · Manage. Follow Up. Close.</p>
+    </div>
+  `;
+
+  if (!apiKey) {
+    console.log(`[email/dev] Password reset To: ${data.to} | URL: ${data.resetUrl}`);
+    return;
+  }
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from, to: data.to, subject, html }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Resend API error ${res.status}: ${text}`);
+  }
+}

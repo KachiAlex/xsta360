@@ -41,6 +41,19 @@ const SignupAndJoinSchema = z.object({
     .regex(/[0-9]/, "Must contain at least one number"),
 });
 
+const RequestResetSchema = z.object({
+  email: z.email("Please enter a valid email").trim().toLowerCase(),
+});
+
+const ResetPasswordSchema = z.object({
+  token: z.string().min(10, "Invalid reset link"),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[a-zA-Z]/, "Must contain at least one letter")
+    .regex(/[0-9]/, "Must contain at least one number"),
+});
+
 export type AuthFormState = {
   errors?: Record<string, string[]>;
   message?: string;
@@ -333,4 +346,115 @@ export async function signin(
 export async function signout() {
   await deleteSession();
   redirect("/login");
+}
+
+// ---------------------------------------------------------------------------
+// Request password reset
+// ---------------------------------------------------------------------------
+
+export async function requestPasswordReset(
+  _prev: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  const parsed = RequestResetSchema.safeParse({
+    email: formData.get("email"),
+  });
+  if (!parsed.success) {
+    return { errors: parseErrors(parsed.error) };
+  }
+
+  const { email } = parsed.data;
+
+  try {
+    const [user] = await db
+      .select({ id: schema.users.id, email: schema.users.email, name: schema.users.name })
+      .from(schema.users)
+      .where(eq(schema.users.email, email))
+      .limit(1);
+
+    if (user) {
+      const token = nanoid(32);
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 1);
+
+      await db.insert(schema.passwordResetTokens).values({
+        email: user.email,
+        token,
+        expiresAt,
+      });
+
+      const { sendPasswordResetEmail } = await import("@/lib/email");
+      const appUrl = process.env.APP_URL ?? "https://xsta360.67-211-210-8.sslip.io";
+      await sendPasswordResetEmail({
+        to: user.email,
+        resetUrl: `${appUrl}/reset/${token}`,
+      });
+    }
+
+    // Always return the same message to avoid email enumeration.
+    return { message: "If this email exists, a reset link has been sent." };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Something went wrong";
+    return { message: `Reset request failed: ${message}` };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reset password with token
+// ---------------------------------------------------------------------------
+
+export async function resetPassword(
+  _prev: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  const parsed = ResetPasswordSchema.safeParse({
+    token: formData.get("token"),
+    password: formData.get("password"),
+  });
+  if (!parsed.success) {
+    return { errors: parseErrors(parsed.error) };
+  }
+
+  const { token, password } = parsed.data;
+
+  try {
+    const [record] = await db
+      .select()
+      .from(schema.passwordResetTokens)
+      .where(eq(schema.passwordResetTokens.token, token))
+      .limit(1);
+
+    if (!record || record.usedAt || record.expiresAt < new Date()) {
+      return { message: "This reset link is invalid or has expired." };
+    }
+
+    const [user] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, record.email))
+      .limit(1);
+
+    if (!user) {
+      return { message: "This reset link is invalid or has expired." };
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(schema.users)
+        .set({ passwordHash, updatedAt: new Date() })
+        .where(eq(schema.users.id, user.id));
+      await tx
+        .update(schema.passwordResetTokens)
+        .set({ usedAt: new Date() })
+        .where(eq(schema.passwordResetTokens.id, record.id));
+    });
+
+    redirect("/login?reset=1");
+  } catch (err) {
+    if (isRedirectError(err)) throw err;
+    const message = err instanceof Error ? err.message : "Something went wrong";
+    return { message: `Password reset failed: ${message}` };
+  }
 }
