@@ -51,4 +51,7 @@ next-env.d.ts
 /android/app/release
 *.apk
 *.aab
+*.keystore
+*.jks
+*.aab
 /.idea/

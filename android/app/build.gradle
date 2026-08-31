@@ -16,8 +16,23 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            def props = new Properties()
+            def localPropsFile = rootProject.file('local.properties')
+            if (localPropsFile.exists()) {
+                props.load(new FileInputStream(localPropsFile))
+            }
+            storeFile file(props.getProperty('releaseStoreFile') ?: 'xsta360-release.keystore')
+            storePassword props.getProperty('releaseStorePassword') ?: ''
+            keyAlias props.getProperty('releaseKeyAlias') ?: 'xsta360'
+            keyPassword props.getProperty('releaseKeyPassword') ?: ''
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
