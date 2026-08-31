@@ -153,6 +153,12 @@ export function EditLeadModal({ lead, stages, members, currentUserId }: EditLead
             <p className="text-sm text-stamp bg-stamp/10 px-3 py-2 rounded" role="alert">{state.message}</p>
           )}
 
+          {state.errors && !state.message && (
+            <p className="text-sm text-stamp bg-stamp/10 px-3 py-2 rounded" role="alert">
+              {Object.values(state.errors).flat().join(", ")}
+            </p>
+          )}
+
           <div className="flex justify-end gap-2.5 pt-2">
             <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
               Cancel

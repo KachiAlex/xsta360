@@ -23,18 +23,18 @@ const SourceSchema = z.enum([
 
 const CreateLeadSchema = z.object({
   name: z.string().min(1, "Name is required").trim(),
-  company: z.string().trim().optional(),
-  email: z.string().trim().optional(),
-  phone: z.string().trim().optional(),
+  company: z.string().trim().nullish(),
+  email: z.string().trim().nullish(),
+  phone: z.string().trim().nullish(),
   source: SourceSchema,
-  campaign: z.string().trim().optional(),
-  notes: z.string().trim().optional(),
-  assigneeId: z.string().uuid().optional().or(z.literal("")),
-  stageId: z.string().uuid().optional().or(z.literal("")),
-  value: z.string().trim().optional().or(z.literal("")),
-  expectedCloseDate: z.string().trim().optional().or(z.literal("")),
-  customFields: z.string().trim().optional().or(z.literal("")),
-  forceCreate: z.string().optional().or(z.literal("")),
+  campaign: z.string().trim().nullish(),
+  notes: z.string().trim().nullish(),
+  assigneeId: z.string().uuid().nullish().or(z.literal("")),
+  stageId: z.string().uuid().nullish().or(z.literal("")),
+  value: z.string().trim().nullish().or(z.literal("")),
+  expectedCloseDate: z.string().trim().nullish().or(z.literal("")),
+  customFields: z.string().trim().nullish().or(z.literal("")),
+  forceCreate: z.string().nullish().or(z.literal("")),
 });
 
 const RemarkSchema = z.object({
@@ -134,10 +134,10 @@ export async function createLead(
   if (forceCreate !== "true" && (rest.email || rest.phone || rest.company)) {
     const { checkDuplicates } = await import("@/lib/duplicate");
     const dupes = await checkDuplicates(ctx.orgId, {
-      email: rest.email,
-      phone: rest.phone,
+      email: rest.email || undefined,
+      phone: rest.phone || undefined,
       name: rest.name,
-      company: rest.company,
+      company: rest.company || undefined,
     });
     if (dupes.length > 0) {
       const dupeList = dupes.map((d) =>
@@ -214,17 +214,17 @@ export async function createLead(
 const UpdateLeadSchema = z.object({
   leadId: z.string().uuid(),
   name: z.string().min(1, "Name is required").trim(),
-  company: z.string().trim().optional(),
-  email: z.string().trim().optional(),
-  phone: z.string().trim().optional(),
+  company: z.string().trim().nullish(),
+  email: z.string().trim().nullish(),
+  phone: z.string().trim().nullish(),
   source: SourceSchema,
-  campaign: z.string().trim().optional(),
-  notes: z.string().trim().optional(),
-  assigneeId: z.string().uuid().optional().or(z.literal("")),
-  stageId: z.string().uuid().optional().or(z.literal("")),
-  value: z.string().trim().optional().or(z.literal("")),
-  expectedCloseDate: z.string().trim().optional().or(z.literal("")),
-  customFields: z.string().trim().optional().or(z.literal("")),
+  campaign: z.string().trim().nullish(),
+  notes: z.string().trim().nullish(),
+  assigneeId: z.string().uuid().nullish().or(z.literal("")),
+  stageId: z.string().uuid().nullish().or(z.literal("")),
+  value: z.string().trim().nullish().or(z.literal("")),
+  expectedCloseDate: z.string().trim().nullish().or(z.literal("")),
+  customFields: z.string().trim().nullish().or(z.literal("")),
 });
 
 export async function updateLead(
