@@ -64,6 +64,20 @@ body {
   }
 }
 
+/* App main content needs padding for the fixed hamburger and bottom nav.
+   Account for the device safe area so content isn't hidden by notches. */
+.app-main {
+  padding-top: calc(3.5rem + env(safe-area-inset-top));
+  padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 768px) {
+  .app-main {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
 ::selection {
   background: var(--color-stamp);
   color: var(--color-paper);

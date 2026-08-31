@@ -38,13 +38,16 @@ export function Topbar({ children, searchPlaceholder = "Search leads...", action
   }, []);
 
   return (
-    <div className="topbar sticky top-0 z-10 bg-panel border-b border-rule">
+    <div
+      className="topbar sticky z-10 bg-panel border-b border-rule"
+      style={{ top: "env(safe-area-inset-top)" }}
+    >
       <div className="flex items-center justify-between px-3 sm:px-6 lg:px-8 py-2 sm:py-3.5 gap-2">
         {/* Left: logo (mobile) + view tabs */}
         {/* Mobile logo — sits next to the hamburger button */}
         <Link
           href="/"
-          className="md:hidden font-mono font-bold text-sm flex items-center gap-1.5 shrink-0 pl-11 min-h-[40px] hover:opacity-80 transition-opacity"
+          className="md:hidden font-mono font-bold text-sm flex items-center gap-1.5 shrink-0 pl-[52px] min-h-[44px] hover:opacity-80 transition-opacity"
         >
           <span className="w-2 h-2 rounded-full bg-stamp shadow-[0_0_0_3px_rgba(178,58,46,0.15)] shrink-0" />
           XSTA360

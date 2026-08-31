@@ -39,8 +39,9 @@ export function Sidebar({ orgName, userName, userInitials, role, todayCount }: S
       {/* Mobile toggle button — opens full menu for secondary nav items */}
       <button
         type="button"
-        className="md:hidden fixed top-2.5 left-2.5 z-50 bg-ink text-paper w-9 h-9 rounded-md font-mono text-sm flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+        className="md:hidden fixed left-2.5 z-50 bg-ink text-paper w-10 h-10 rounded-md font-mono text-sm flex items-center justify-center shadow-lg active:scale-95 transition-transform"
         onClick={() => setMobileOpen(!mobileOpen)}
+        style={{ top: "calc(0.625rem + env(safe-area-inset-top))" }}
         aria-label="Toggle menu"
       >
         {mobileOpen ? "✕" : "☰"}

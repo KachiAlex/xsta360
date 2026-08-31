@@ -20,7 +20,7 @@ export function BottomNav({ todayCount }: BottomNavProps) {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-ink text-paper border-t border-white/10 flex items-stretch justify-around"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-ink text-paper border-t border-white/10 flex items-stretch justify-around min-h-[56px]"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       {NAV.map((item) => {
@@ -30,14 +30,14 @@ export function BottomNav({ todayCount }: BottomNavProps) {
           <Link
             key={item.href}
             href={item.href}
-            className={`flex flex-col items-center justify-center gap-0.5 py-2 px-1 flex-1 min-h-[52px] relative transition-colors ${
+            className={`flex flex-col items-center justify-center gap-1 py-2 px-1 flex-1 min-h-[56px] relative transition-colors ${
               active ? "text-amber" : "text-[#9fae9f]"
             }`}
           >
-            <span className="text-lg leading-none">{item.icon}</span>
+            <span className="text-xl leading-none">{item.icon}</span>
             <span className="text-[10px] font-mono leading-none">{item.label}</span>
             {item.href === "/dashboard" && todayCount > 0 && (
-              <span className="absolute top-1 right-[calc(50%-16px)] bg-stamp text-paper text-[9px] font-mono font-bold min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center">
+              <span className="absolute top-1 right-[calc(50%-18px)] bg-stamp text-paper text-[9px] font-mono font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center">
                 {todayCount}
               </span>
             )}
