@@ -8,6 +8,7 @@ import { MobileFab } from "@/components/app/fab";
 import { Panel, PanelHead } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/app/empty-state";
+import { ExportLeadsButton } from "@/components/app/export-leads-button";
 
 const SOURCE_LABELS: Record<string, string> = {
   referral: "Referral",
@@ -35,10 +36,11 @@ export default async function LeadsPage(props: {
     <>
       <Topbar
         actions={
-          <div className="flex gap-2 items-center">
-            <Link href="/leads/import" className="text-sm font-semibold border border-ink rounded px-3 py-2 hover:bg-paper-2">
+          <div className="flex gap-2 items-center flex-wrap">
+            <Link href="/leads/import" className="text-sm font-semibold border border-ink rounded px-3 py-2 hover:bg-paper-2 min-h-[44px] flex items-center">
               Import CSV
             </Link>
+            <ExportLeadsButton />
             <AddLeadModal stages={stages} members={members} currentUserId={ctx.userId} />
           </div>
         }

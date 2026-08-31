@@ -132,3 +132,53 @@ export async function sendDigestEmail(data: DigestEmailData): Promise<void> {
     throw new Error(`Resend API error ${res.status}: ${text}`);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Lead assignment notification
+// ---------------------------------------------------------------------------
+
+export interface LeadAssignedEmailData {
+  to: string;
+  userName: string;
+  leadName: string;
+  leadCompany?: string | null;
+  appUrl: string;
+}
+
+export async function sendLeadAssignedEmail(data: LeadAssignedEmailData): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM ?? "Xsta360 <noreply@xsta360.app>";
+
+  const subject = `New lead assigned: ${data.leadName}`;
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+      <h2 style="color: #1E2A22; font-family: 'IBM Plex Mono', monospace;">A new lead has been assigned to you</h2>
+      <p style="color: #4A5750; font-size: 15px;">
+        Hi ${data.userName}, <strong>${data.leadName}</strong>${data.leadCompany ? ` from ${data.leadCompany}` : ""} was just assigned to you in Xsta360.
+      </p>
+      <a href="${data.appUrl}/leads" style="display: inline-block; margin-top: 16px; padding: 10px 20px; background: #1E2A22; color: #F3F0E6; text-decoration: none; border-radius: 3px; font-weight: 600;">
+        View leads
+      </a>
+      <p style="color: #9AA39A; font-size: 12px; margin-top: 32px;">— Xsta360 · Manage. Follow Up. Close.</p>
+    </div>
+  `;
+
+  if (!apiKey) {
+    console.log(`[email/dev] Lead assigned To: ${data.to} | Subject: ${subject}`);
+    return;
+  }
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from, to: data.to, subject, html }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Resend API error ${res.status}: ${text}`);
+  }
+}

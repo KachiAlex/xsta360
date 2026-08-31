@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { verifySession, can, type AuthContext } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
+import { sendLeadAssignedEmail } from "@/lib/email";
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -198,6 +199,8 @@ export async function createLead(
     meta: { source: lead.source, stage: stage?.name, value: value || null },
   });
 
+  await notifyAssignee(ctx, lead);
+
   revalidatePath("/dashboard");
   revalidatePath("/leads");
   revalidatePath("/pipeline");
@@ -299,11 +302,13 @@ export async function updateLead(
     closeDate = null;
   }
 
+  const newAssigneeId = assigneeId || null;
+
   await db
     .update(schema.leads)
     .set({
       ...rest,
-      assigneeId: assigneeId || null,
+      assigneeId: newAssigneeId,
       stageId: newStageId,
       value: value || null,
       expectedCloseDate: closeDate,
@@ -311,6 +316,10 @@ export async function updateLead(
       updatedAt: new Date(),
     })
     .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, ctx.orgId)));
+
+  if (newAssigneeId && newAssigneeId !== existing.assigneeId && newAssigneeId !== ctx.userId) {
+    await notifyAssigneeById(ctx, leadId, rest.name, newAssigneeId);
+  }
 
   await logEvent(ctx.orgId, "lead_updated", {
     leadId,
@@ -552,6 +561,63 @@ export async function completeReminder(
 }
 
 // ---------------------------------------------------------------------------
+// Export leads to CSV
+// ---------------------------------------------------------------------------
+
+function escapeCsv(value: string): string {
+  if (value.includes(",") || value.includes('"') || value.includes("\n") || value.includes("\r")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+export async function exportLeads(): Promise<{ csv: string; filename: string } | { error: string }> {
+  const ctx = await verifySession();
+  if (!ctx) return { error: "Not signed in" };
+
+  const { getLeads } = await import("@/lib/leads");
+  const leads = await getLeads(ctx.orgId);
+
+  const headers = [
+    "ID",
+    "Name",
+    "Company",
+    "Email",
+    "Phone",
+    "Source",
+    "Campaign",
+    "Stage",
+    "Value",
+    "Expected Close",
+    "Assignee",
+    "Score",
+    "Created",
+    "Updated",
+  ];
+
+  const rows = leads.map((l) => [
+    l.id,
+    l.name,
+    l.company ?? "",
+    l.email ?? "",
+    l.phone ?? "",
+    l.source,
+    l.campaign ?? "",
+    l.stageName ?? "",
+    l.value ?? "",
+    l.expectedCloseDate ? l.expectedCloseDate.toISOString().split("T")[0] : "",
+    l.assigneeName ?? "Unassigned",
+    String(l.score),
+    l.createdAt.toISOString(),
+    l.updatedAt.toISOString(),
+  ]);
+
+  const csv = [headers, ...rows].map((row) => row.map(escapeCsv).join(",")).join("\n");
+  const filename = `xsta360-leads-${new Date().toISOString().split("T")[0]}.csv`;
+  return { csv, filename };
+}
+
+// ---------------------------------------------------------------------------
 // Assign / reassign lead (admin/manager only)
 // ---------------------------------------------------------------------------
 
@@ -569,10 +635,16 @@ export async function assignLead(
   const lead = await loadOrgLead(ctx, leadId);
   if (!lead) return { message: "Lead not found" };
 
+  const newAssigneeId = assigneeId || null;
+
   await db
     .update(schema.leads)
-    .set({ assigneeId: assigneeId || null, updatedAt: new Date() })
+    .set({ assigneeId: newAssigneeId, updatedAt: new Date() })
     .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, ctx.orgId)));
+
+  if (newAssigneeId && newAssigneeId !== ctx.userId) {
+    await notifyAssigneeById(ctx, leadId, lead.name, newAssigneeId);
+  }
 
   await logEvent(ctx.orgId, "lead_assigned", {
     leadId,
@@ -585,4 +657,55 @@ export async function assignLead(
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/pipeline");
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Assignment notifications
+// ---------------------------------------------------------------------------
+
+async function notifyAssignee(
+  ctx: AuthContext,
+  lead: { id: string; name: string; company: string | null; assigneeId: string | null },
+) {
+  if (!lead.assigneeId || lead.assigneeId === ctx.userId) return;
+
+  const [user] = await db
+    .select({ name: schema.users.name, email: schema.users.email })
+    .from(schema.users)
+    .where(eq(schema.users.id, lead.assigneeId))
+    .limit(1);
+
+  if (!user?.email) return;
+
+  await sendLeadAssignedEmail({
+    to: user.email,
+    userName: user.name,
+    leadName: lead.name,
+    leadCompany: lead.company,
+    appUrl: process.env.APP_URL ?? "https://xsta360.67-211-210-8.sslip.io",
+  });
+}
+
+async function notifyAssigneeById(ctx: AuthContext, leadId: string, leadName: string, assigneeId: string) {
+  const [lead] = await db
+    .select({ company: schema.leads.company })
+    .from(schema.leads)
+    .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, ctx.orgId)))
+    .limit(1);
+
+  const [user] = await db
+    .select({ name: schema.users.name, email: schema.users.email })
+    .from(schema.users)
+    .where(eq(schema.users.id, assigneeId))
+    .limit(1);
+
+  if (!user?.email) return;
+
+  await sendLeadAssignedEmail({
+    to: user.email,
+    userName: user.name,
+    leadName,
+    leadCompany: lead?.company,
+    appUrl: process.env.APP_URL ?? "https://xsta360.67-211-210-8.sslip.io",
+  });
 }
