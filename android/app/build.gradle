@@ -1,5 +1,11 @@
 apply plugin: 'com.android.application'
 
+def localProps = new Properties()
+def localPropsFile = rootProject.file('local.properties')
+if (localPropsFile.exists()) {
+    localProps.load(new FileInputStream(localPropsFile))
+}
+
 android {
     namespace = "com.xsta360.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -10,6 +16,7 @@ android {
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField "String", "PLAY_STORE_LICENSE_KEY", "\"${localProps.getProperty('playStoreLicenseKey') ?: ''}\""
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
@@ -18,15 +25,10 @@ android {
     }
     signingConfigs {
         release {
-            def props = new Properties()
-            def localPropsFile = rootProject.file('local.properties')
-            if (localPropsFile.exists()) {
-                props.load(new FileInputStream(localPropsFile))
-            }
-            storeFile file(props.getProperty('releaseStoreFile') ?: 'xsta360-release.keystore')
-            storePassword props.getProperty('releaseStorePassword') ?: ''
-            keyAlias props.getProperty('releaseKeyAlias') ?: 'xsta360'
-            keyPassword props.getProperty('releaseKeyPassword') ?: ''
+            storeFile file(localProps.getProperty('releaseStoreFile') ?: 'xsta360-release.keystore')
+            storePassword localProps.getProperty('releaseStorePassword') ?: ''
+            keyAlias localProps.getProperty('releaseKeyAlias') ?: 'xsta360'
+            keyPassword localProps.getProperty('releaseKeyPassword') ?: ''
         }
     }
 
