@@ -11,9 +11,9 @@ const config: CapacitorConfig = {
     url: "https://xsta360.67-211-210-8.sslip.io/login",
   },
   android: {
-    allowMixedContent: true,
+    // captureInput keeps the virtual keyboard from covering focused fields.
     captureInput: true,
-    webContentsDebuggingEnabled: true,
+    webContentsDebuggingEnabled: false,
   },
   plugins: {
     SplashScreen: {

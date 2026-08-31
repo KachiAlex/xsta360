@@ -1,18 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Base system CAs are trusted. Let’s Encrypt certificate for
-         xsta360.67-211-210-8.sslip.io is now used; cleartext is no
-         longer needed. -->
+    <!-- Base config trusts system CAs and disallows cleartext.
+         Let’s Encrypt certificate is used for xsta360.67-211-210-8.sslip.io. -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
-    <!-- Debug builds can trust user-added CAs if needed. -->
-    <debug-overrides>
-        <trust-anchors>
-            <certificates src="user" />
-            <certificates src="system" />
-        </trust-anchors>
-    </debug-overrides>
 </network-security-config>

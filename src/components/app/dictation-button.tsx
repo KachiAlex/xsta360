@@ -91,7 +91,11 @@ export const DictationButton = forwardRef<DictationButtonHandle, DictationButton
         setIsRecording(true);
       } catch (err) {
         console.error("Microphone error:", err);
-        setError("Could not access microphone. Please grant permission.");
+        const message =
+          typeof err === "object" && err && "name" in err && err.name === "NotAllowedError"
+            ? "Microphone permission denied. Allow it in app settings."
+            : "Could not access microphone. Check app permissions.";
+        setError(message);
         setIsRecording(false);
       }
     }
