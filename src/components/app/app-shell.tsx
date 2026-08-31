@@ -4,6 +4,7 @@ import { eq, and, lte } from "drizzle-orm";
 import { Sidebar } from "./sidebar";
 import { BottomNav } from "./bottom-nav";
 import { Footer } from "./footer";
+import { LivePoller } from "./live-poller";
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -58,6 +59,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         <Footer />
       </div>
       <BottomNav todayCount={todaysReminders.length} />
+      <LivePoller />
     </div>
   );
 }
