@@ -10,7 +10,9 @@ interface CardPublicViewProps {
     slug: string;
     displayName: string;
     title: string | null;
+    role: string | null;
     company: string | null;
+    website: string | null;
     phone: string | null;
     whatsapp: string | null;
     email: string | null;
@@ -49,6 +51,10 @@ export function CardPublicView({ card }: CardPublicViewProps) {
   }, [card.slug]);
 
   const company = card.company || card.orgName;
+
+  const websiteUrl = card.website
+    ? (card.website.startsWith("http://") || card.website.startsWith("https://") ? card.website : `https://${card.website}`)
+    : null;
 
   function validate(field?: keyof typeof form): FormErrors {
     const next: FormErrors = {};
@@ -176,7 +182,11 @@ export function CardPublicView({ card }: CardPublicViewProps) {
 
           <div className="text-center mt-4 mb-6">
             <h1 className="text-2xl font-bold text-ink">{card.displayName}</h1>
-            {card.title && <p className="text-ink-soft font-medium">{card.title}</p>}
+            {(card.title || card.role) && (
+              <p className="text-ink-soft font-medium">
+                {[card.title, card.role].filter(Boolean).join(" · ")}
+              </p>
+            )}
             <p className="text-ink-soft/80 text-sm mt-1">{company}</p>
           </div>
 
@@ -207,6 +217,17 @@ export function CardPublicView({ card }: CardPublicViewProps) {
               >
                 <span>Email</span>
                 <span className="text-ink-soft text-sm truncate max-w-[200px]">{card.email}</span>
+              </a>
+            )}
+            {websiteUrl && (
+              <a
+                href={websiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-3 px-4 rounded-lg bg-paper-2 text-ink font-semibold hover:bg-paper transition-colors"
+              >
+                <span>Website</span>
+                <span className="text-ink-soft text-sm truncate max-w-[200px]">{card.website}</span>
               </a>
             )}
 

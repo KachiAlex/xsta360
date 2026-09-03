@@ -12,7 +12,9 @@ const ManageCardSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
   displayName: z.string().min(1, "Display name is required").trim(),
   title: z.string().trim().nullish().or(z.literal("")),
+  role: z.string().trim().nullish().or(z.literal("")),
   company: z.string().trim().nullish().or(z.literal("")),
+  website: z.string().url("Enter a valid URL").trim().nullish().or(z.literal("")),
   phone: z.string().trim().nullish().or(z.literal("")),
   whatsapp: z.string().trim().nullish().or(z.literal("")),
   email: z.string().email("Enter a valid email").trim().nullish().or(z.literal("")),
@@ -31,7 +33,9 @@ export async function getMyContactCard(): Promise<{
   slug?: string;
   displayName: string;
   title: string | null;
+  role: string | null;
   company: string | null;
+  website: string | null;
   phone: string | null;
   whatsapp: string | null;
   email: string | null;
@@ -74,7 +78,9 @@ export async function getMyContactCard(): Promise<{
     return {
       displayName: user?.name ?? "",
       title: null,
+      role: null,
       company: org?.name ?? null,
+      website: null,
       phone: null,
       whatsapp: null,
       email: user?.email ?? null,
@@ -94,7 +100,9 @@ export async function getMyContactCard(): Promise<{
     slug: card.slug,
     displayName: card.displayName,
     title: card.title,
+    role: card.role,
     company: card.company,
+    website: card.website,
     phone: card.phone,
     whatsapp: card.whatsapp,
     email: card.email,
@@ -118,7 +126,9 @@ export async function createOrUpdateContactCard(
     id: formData.get("id"),
     displayName: formData.get("displayName"),
     title: formData.get("title"),
+    role: formData.get("role"),
     company: formData.get("company"),
+    website: formData.get("website"),
     phone: formData.get("phone"),
     whatsapp: formData.get("whatsapp"),
     email: formData.get("email"),
@@ -186,6 +196,8 @@ export async function createOrUpdateContactCard(
         email: rest.email || null,
         company: rest.company || null,
         title: rest.title || null,
+        role: rest.role || null,
+        website: rest.website || null,
         phone: rest.phone || null,
         whatsapp: rest.whatsapp || null,
         socialLinks,
@@ -215,7 +227,9 @@ export async function createOrUpdateContactCard(
     slug,
     displayName: rest.displayName,
     title: rest.title || null,
+    role: rest.role || null,
     company: rest.company || null,
+    website: rest.website || null,
     phone: rest.phone || null,
     whatsapp: rest.whatsapp || null,
     email: rest.email || null,

@@ -56,14 +56,16 @@ function buildVCard(
   ];
 
   if (card!.title) lines.push(`TITLE:${card!.title}`);
+  if (card!.role) lines.push(`ROLE:${card!.role}`);
   if (card!.phone) lines.push(`TEL;TYPE=CELL:${card!.phone}`);
   if (card!.email) lines.push(`EMAIL:${card!.email}`);
 
   const cardUrl = `${process.env.APP_URL?.replace(/\/$/, "") ?? "https://xsta360.67-211-210-8.sslip.io"}/c/${card!.slug}`;
-  lines.push(`URL:${cardUrl}`);
+  const website = card!.website || cardUrl;
+  lines.push(`URL:${website}`);
 
   Object.entries(card!.socialLinks).forEach(([label, url]) => {
-    if (url) lines.push(`URL;${label}:${url}`);
+    if (url) lines.push(`URL;TYPE=${label}:${url}`);
   });
 
   lines.push("END:VCARD");

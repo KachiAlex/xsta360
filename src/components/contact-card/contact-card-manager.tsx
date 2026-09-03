@@ -18,7 +18,9 @@ interface ContactCardManagerProps {
     slug?: string;
     displayName: string;
     title: string | null;
+    role: string | null;
     company: string | null;
+    website: string | null;
     phone: string | null;
     whatsapp: string | null;
     email: string | null;
@@ -40,7 +42,9 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
 
   const [displayName, setDisplayName] = useState(card?.displayName ?? "");
   const [title, setTitle] = useState(card?.title ?? "");
+  const [role, setRole] = useState(card?.role ?? "");
   const [company, setCompany] = useState(card?.company ?? "");
+  const [website, setWebsite] = useState(card?.website ?? "");
   const [phone, setPhone] = useState(card?.phone ?? "");
   const [whatsapp, setWhatsapp] = useState(card?.whatsapp ?? "");
   const [email, setEmail] = useState(card?.email ?? "");
@@ -194,6 +198,21 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
           </div>
 
           <div>
+            <label htmlFor="role" className="block text-xs font-medium text-ink-soft mb-1">
+              Role
+            </label>
+            <input
+              id="role"
+              name="role"
+              type="text"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full rounded border border-rule bg-paper px-3 py-2 text-ink focus:outline-none focus:ring-2 focus:ring-ink"
+              placeholder="Account Executive"
+            />
+          </div>
+
+          <div>
             <label htmlFor="company" className="block text-xs font-medium text-ink-soft mb-1">
               Company
             </label>
@@ -206,6 +225,24 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
               className="w-full rounded border border-rule bg-paper px-3 py-2 text-ink focus:outline-none focus:ring-2 focus:ring-ink"
               placeholder="Kreatix Technologies"
             />
+          </div>
+
+          <div>
+            <label htmlFor="website" className="block text-xs font-medium text-ink-soft mb-1">
+              Website
+            </label>
+            <input
+              id="website"
+              name="website"
+              type="url"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              className="w-full rounded border border-rule bg-paper px-3 py-2 text-ink focus:outline-none focus:ring-2 focus:ring-ink"
+              placeholder="https://kreatix.com"
+            />
+            {state?.errors?.website && (
+              <p className="text-xs text-stamp mt-1">{state.errors.website[0]}</p>
+            )}
           </div>
 
           <div>

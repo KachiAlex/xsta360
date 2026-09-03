@@ -12,7 +12,9 @@ export interface PublicContactCard {
   slug: string;
   displayName: string;
   title: string | null;
+  role: string | null;
   company: string | null;
+  website: string | null;
   phone: string | null;
   whatsapp: string | null;
   email: string | null;
@@ -32,7 +34,9 @@ async function getContactCardBySlugUncached(slug: string): Promise<PublicContact
       slug: schema.contactCards.slug,
       displayName: schema.contactCards.displayName,
       title: schema.contactCards.title,
+      role: schema.contactCards.role,
       company: schema.contactCards.company,
+      website: schema.contactCards.website,
       phone: schema.contactCards.phone,
       whatsapp: schema.contactCards.whatsapp,
       email: schema.contactCards.email,
@@ -163,8 +167,8 @@ export async function submitCardLead(slug: string, payload: CardLeadPayload): Pr
         cardName: card.displayName,
         leadUrl,
         appUrl,
-      }).catch(() => {
-        // Don't fail the submission if the email fails.
+      }).catch((err) => {
+        console.error("[card-lead] Failed to send rescan email:", err);
       });
     }
 
@@ -210,8 +214,8 @@ export async function submitCardLead(slug: string, payload: CardLeadPayload): Pr
       cardName: card.displayName,
       leadUrl,
       appUrl,
-    }).catch(() => {
-      // Don't fail the submission if the email fails.
+    }).catch((err) => {
+      console.error("[card-lead] Failed to send new lead email:", err);
     });
   }
 
