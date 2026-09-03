@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { toString as qrToString } from "qrcode";
@@ -196,6 +196,7 @@ export async function createOrUpdateContactCard(
 
     revalidatePath("/contact-card");
     revalidatePath(`/c/${existing.slug}`);
+    updateTag("contact-card");
     return { ok: true };
   }
 
@@ -224,6 +225,8 @@ export async function createOrUpdateContactCard(
   });
 
   revalidatePath("/contact-card");
+  revalidatePath(`/c/${slug}`);
+  updateTag("contact-card");
   return { ok: true };
 }
 

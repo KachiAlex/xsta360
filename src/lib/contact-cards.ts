@@ -1,5 +1,6 @@
 import "server-only";
 import { and, eq, gte, sql } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
 import { db, schema } from "@/db";
 import { sendCardLeadEmail, sendCardRescanEmail } from "@/lib/email";
 
@@ -21,8 +22,7 @@ export interface PublicContactCard {
   isActive: boolean;
 }
 
-/** Load a contact card by slug for the public-facing page. */
-export async function getContactCardBySlug(slug: string): Promise<PublicContactCard | null> {
+async function getContactCardBySlugUncached(slug: string): Promise<PublicContactCard | null> {
   const [row] = await db
     .select({
       id: schema.contactCards.id,
@@ -54,6 +54,12 @@ export async function getContactCardBySlug(slug: string): Promise<PublicContactC
       }
     : null;
 }
+
+/** Load a contact card by slug for the public-facing page. Cached for 60s. */
+export const getContactCardBySlug = unstable_cache(getContactCardBySlugUncached, ["contact-card"], {
+  revalidate: 60,
+  tags: ["contact-card"],
+});
 
 /** Record a card view for analytics. */
 export async function recordCardView(contactCardId: string, deviceType?: string) {

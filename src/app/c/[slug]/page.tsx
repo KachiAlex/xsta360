@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { getContactCardBySlug } from "@/lib/contact-cards";
 import { CardPublicView } from "@/components/contact-card/card-public-view";
 
-export const dynamic = "force-dynamic";
+// ISR: public card pages are cached for 60 seconds and regenerated on demand.
+export const revalidate = 60;
 
 interface CardPageProps {
   params: Promise<{ slug: string }>;
