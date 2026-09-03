@@ -45,7 +45,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Environment variables
 
-See [`.env.example`](./.env.example). Required: `DATABASE_URL`, `SESSION_SECRET`. Optional: `RESEND_API_KEY`, `EMAIL_FROM`, `APP_URL`, `CRON_SECRET`.
+See [`.env.example`](./.env.example). Required: `DATABASE_URL`, `SESSION_SECRET`. Optional: `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `APP_URL`, `CRON_SECRET`.
 
 ## Architecture
 

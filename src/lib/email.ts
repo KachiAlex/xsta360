@@ -1,4 +1,33 @@
 import "server-only";
+import nodemailer from "nodemailer";
+
+const from = process.env.EMAIL_FROM ?? "Xsta360 <noreply@xsta360.app>";
+const smtpHost = process.env.SMTP_HOST ?? "smtp-relay.brevo.com";
+const smtpPort = Number(process.env.SMTP_PORT ?? "587");
+const smtpUser = process.env.SMTP_USER;
+const smtpPass = process.env.SMTP_PASS;
+
+const transport = nodemailer.createTransport({
+  host: smtpHost,
+  port: smtpPort,
+  secure: smtpPort === 465,
+  requireTLS: smtpPort === 587,
+  auth: smtpUser && smtpPass ? { user: smtpUser, pass: smtpPass } : undefined,
+});
+
+async function sendMail(to: string, subject: string, html: string): Promise<void> {
+  if (!smtpUser || !smtpPass) {
+    console.log(`[email/dev] To: ${to} | Subject: ${subject}`);
+    return;
+  }
+
+  await transport.sendMail({
+    from,
+    to,
+    subject,
+    html,
+  });
+}
 
 export interface CardLeadEmailData {
   to: string;
@@ -38,14 +67,11 @@ export interface ReminderEmailData {
 }
 
 /**
- * Send a follow-up reminder email. Uses Resend if RESEND_API_KEY is set;
+ * Send a follow-up reminder email. Uses Brevo SMTP if configured;
  * otherwise logs to console (dev mode). Returns true on success.
  * On failure, throws with the error message so the caller can record it.
  */
 export async function sendReminderEmail(data: ReminderEmailData): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "Xsta360 <noreply@xsta360.app>";
-
   const subject = `Follow-up reminder: ${data.leadName}`;
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
@@ -64,25 +90,7 @@ export async function sendReminderEmail(data: ReminderEmailData): Promise<void> 
     </div>
   `;
 
-  if (!apiKey) {
-    // Dev mode: log instead of sending.
-    console.log(`[email/dev] To: ${data.to} | Subject: ${subject}`);
-    return;
-  }
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to: data.to, subject, html }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Resend API error ${res.status}: ${text}`);
-  }
+  await sendMail(data.to, subject, html);
 }
 
 // ---------------------------------------------------------------------------
@@ -102,9 +110,6 @@ export interface DigestEmailData {
 }
 
 export async function sendDigestEmail(data: DigestEmailData): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "Xsta360 <noreply@xsta360.app>";
-
   const subject = `Your daily digest — ${data.overdueCount} overdue, ${data.dueTodayCount} due today`;
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
@@ -141,24 +146,7 @@ export async function sendDigestEmail(data: DigestEmailData): Promise<void> {
     </div>
   `;
 
-  if (!apiKey) {
-    console.log(`[email/dev] Digest To: ${data.to} | Subject: ${subject}`);
-    return;
-  }
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to: data.to, subject, html }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Resend API error ${res.status}: ${text}`);
-  }
+  await sendMail(data.to, subject, html);
 }
 
 // ---------------------------------------------------------------------------
@@ -166,9 +154,6 @@ export async function sendDigestEmail(data: DigestEmailData): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function sendCardLeadEmail(data: CardLeadEmailData): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "Xsta360 <noreply@xsta360.app>";
-
   const subject = `New lead from your contact card — ${data.leadName}`;
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
@@ -183,30 +168,10 @@ export async function sendCardLeadEmail(data: CardLeadEmailData): Promise<void> 
     </div>
   `;
 
-  if (!apiKey) {
-    console.log(`[email/dev] Card lead To: ${data.to} | Subject: ${subject}`);
-    return;
-  }
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to: data.to, subject, html }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Resend API error ${res.status}: ${text}`);
-  }
+  await sendMail(data.to, subject, html);
 }
 
 export async function sendCardRescanEmail(data: CardRescanEmailData): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "Xsta360 <noreply@xsta360.app>";
-
   const subject = `${data.leadName} re-scanned your contact card`;
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
@@ -221,30 +186,10 @@ export async function sendCardRescanEmail(data: CardRescanEmailData): Promise<vo
     </div>
   `;
 
-  if (!apiKey) {
-    console.log(`[email/dev] Card rescan To: ${data.to} | Subject: ${subject}`);
-    return;
-  }
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to: data.to, subject, html }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Resend API error ${res.status}: ${text}`);
-  }
+  await sendMail(data.to, subject, html);
 }
 
 export async function sendContactSavedEmail(data: ContactSavedEmailData): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "Xsta360 <noreply@xsta360.app>";
-
   const subject = `Someone saved your contact — ${data.cardName}`;
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
@@ -259,24 +204,7 @@ export async function sendContactSavedEmail(data: ContactSavedEmailData): Promis
     </div>
   `;
 
-  if (!apiKey) {
-    console.log(`[email/dev] Contact saved To: ${data.to} | Subject: ${subject}`);
-    return;
-  }
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to: data.to, subject, html }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Resend API error ${res.status}: ${text}`);
-  }
+  await sendMail(data.to, subject, html);
 }
 
 // ---------------------------------------------------------------------------
@@ -292,9 +220,6 @@ export interface LeadAssignedEmailData {
 }
 
 export async function sendLeadAssignedEmail(data: LeadAssignedEmailData): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "Xsta360 <noreply@xsta360.app>";
-
   const subject = `New lead assigned: ${data.leadName}`;
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
@@ -309,24 +234,7 @@ export async function sendLeadAssignedEmail(data: LeadAssignedEmailData): Promis
     </div>
   `;
 
-  if (!apiKey) {
-    console.log(`[email/dev] Lead assigned To: ${data.to} | Subject: ${subject}`);
-    return;
-  }
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to: data.to, subject, html }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Resend API error ${res.status}: ${text}`);
-  }
+  await sendMail(data.to, subject, html);
 }
 
 // ---------------------------------------------------------------------------
@@ -339,9 +247,6 @@ export interface PasswordResetEmailData {
 }
 
 export async function sendPasswordResetEmail(data: PasswordResetEmailData): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM ?? "Xsta360 <noreply@xsta360.app>";
-
   const subject = "Reset your Xsta360 password";
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
@@ -359,22 +264,5 @@ export async function sendPasswordResetEmail(data: PasswordResetEmailData): Prom
     </div>
   `;
 
-  if (!apiKey) {
-    console.log(`[email/dev] Password reset To: ${data.to} | URL: ${data.resetUrl}`);
-    return;
-  }
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to: data.to, subject, html }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Resend API error ${res.status}: ${text}`);
-  }
+  await sendMail(data.to, subject, html);
 }

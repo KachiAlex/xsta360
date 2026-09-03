@@ -38,8 +38,12 @@ Copy `.env.example` to `.env.local` and fill in:
 - `DATABASE_URL` — Postgres connection string
 - `SESSION_SECRET` — 32+ char random string (JWT signing)
 - `APP_URL` — public base URL
-- `RESEND_API_KEY` — optional; if unset, reminder emails log to console
 - `EMAIL_FROM` — from address for transactional email
+- `SMTP_HOST` — SMTP relay host (default: `smtp-relay.brevo.com`)
+- `SMTP_PORT` — SMTP relay port (default: `587`)
+- `SMTP_USER` — SMTP login
+- `SMTP_PASS` — SMTP password / API key
+- If `SMTP_USER` or `SMTP_PASS` are unset, emails log to console (dev mode)
 - `CRON_SECRET` — shared secret for the `/api/cron/reminders` and `/api/cron/billing` endpoints
 - `PAYSTACK_SECRET_KEY` — Paystack secret key (sk_test_... or sk_live_...)
 - `PAYSTACK_PUBLIC_KEY` — Paystack public key (pk_test_... or pk_live_...)
