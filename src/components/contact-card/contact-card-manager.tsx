@@ -45,6 +45,7 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
   const [whatsapp, setWhatsapp] = useState(card?.whatsapp ?? "");
   const [email, setEmail] = useState(card?.email ?? "");
   const [photoUrl, setPhotoUrl] = useState(card?.photoUrl ?? "");
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>(() =>
     Object.entries(card?.socialLinks ?? {}).map(([label, url]) => ({ label, url })),
   );
@@ -82,6 +83,34 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  }
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setPhotoError("Please select an image file.");
+      return;
+    }
+
+    const maxSize = 2 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setPhotoError("Image must be under 2MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPhotoUrl(reader.result as string);
+      setPhotoError(null);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleRemovePhoto() {
+    setPhotoUrl("");
+    setPhotoError(null);
   }
 
   function qrDataUrl(): string {
@@ -229,19 +258,40 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
         </div>
 
         <div>
-          <label htmlFor="photoUrl" className="block text-xs font-medium text-ink-soft mb-1">
-            Photo URL
-          </label>
-          <input
-            id="photoUrl"
-            name="photoUrl"
-            type="url"
-            value={photoUrl}
-            onChange={(e) => setPhotoUrl(e.target.value)}
-            className="w-full rounded border border-rule bg-paper px-3 py-2 text-ink focus:outline-none focus:ring-2 focus:ring-ink"
-            placeholder="https://... or a data URL"
-          />
-          <p className="text-xs text-ink-soft mt-1">Paste an image URL. Upload-to-storage coming soon.</p>
+          <label className="block text-xs font-medium text-ink-soft mb-2">Photo</label>
+          <input type="hidden" name="photoUrl" value={photoUrl} />
+          <div className="flex items-start gap-4">
+            {photoUrl ? (
+              <img
+                src={photoUrl}
+                alt="Card preview"
+                className="w-20 h-20 rounded-full border-2 border-white object-cover bg-paper-2 shadow"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-full border-2 border-white bg-paper-2 flex items-center justify-center text-ink-soft text-xs shadow">
+                No photo
+              </div>
+            )}
+            <div className="flex-1">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                className="block w-full text-sm text-ink file:mr-3 file:px-3 file:py-1.5 file:rounded file:border-0 file:bg-ink file:text-paper file:font-medium hover:file:bg-ink-soft"
+              />
+              {photoError && <p className="text-xs text-stamp mt-1">{photoError}</p>}
+              <p className="text-xs text-ink-soft mt-1">JPEG/PNG under 2MB. Stored with the card.</p>
+              {photoUrl && (
+                <button
+                  type="button"
+                  onClick={handleRemovePhoto}
+                  className="text-xs text-stamp hover:underline mt-2"
+                >
+                  Remove photo
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         <div>
