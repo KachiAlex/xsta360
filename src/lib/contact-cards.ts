@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { sendCardLeadEmail, sendCardRescanEmail } from "@/lib/email";
 
@@ -216,4 +216,40 @@ export class CardLeadError extends Error {
   ) {
     super(message);
   }
+}
+
+function startOfDay(d = new Date()): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+/** Daily stats for the current user's contact card. */
+export async function getMyCardStats(userId: string, orgId: string) {
+  const [card] = await db
+    .select({ id: schema.contactCards.id, slug: schema.contactCards.slug, displayName: schema.contactCards.displayName })
+    .from(schema.contactCards)
+    .where(and(eq(schema.contactCards.userId, userId), eq(schema.contactCards.orgId, orgId)))
+    .limit(1);
+
+  if (!card) return null;
+
+  const today = startOfDay();
+  const [{ viewCount }] = await db
+    .select({ viewCount: sql<number>`count(*)::int` })
+    .from(schema.cardViews)
+    .where(and(eq(schema.cardViews.contactCardId, card.id), gte(schema.cardViews.viewedAt, today)));
+
+  const [{ leadCount }] = await db
+    .select({ leadCount: sql<number>`count(*)::int` })
+    .from(schema.leads)
+    .where(and(eq(schema.leads.contactCardId, card.id), gte(schema.leads.createdAt, today)));
+
+  const appUrl = process.env.APP_URL?.replace(/\/$/, "") ?? "https://xsta360.67-211-210-8.sslip.io";
+  return {
+    ...card,
+    cardUrl: `${appUrl}/c/${card.slug}`,
+    viewCount,
+    leadCount,
+  };
 }

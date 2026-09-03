@@ -22,6 +22,7 @@ const NAV = [
   { href: "/sequences", label: "Sequences", icon: "↻", key: "sequences" },
   { href: "/reports", label: "Reports", icon: "▧", key: "reports" },
   { href: "/billing", label: "Billing", icon: "₦", key: "billing" },
+  { href: "/contact-card", label: "Contact Card", icon: "▣", key: "contact-card" },
   { href: "/settings", label: "Settings", icon: "⚙", key: "settings" },
 ];
 

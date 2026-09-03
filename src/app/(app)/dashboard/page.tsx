@@ -9,6 +9,7 @@ import { PulseCard } from "@/components/app/pulse-card";
 import { TaskWidget } from "@/components/app/task-widget";
 import { ReminderPanel } from "@/components/app/reminder-panel";
 import { EmptyState } from "@/components/app/empty-state";
+import { CardLeadBanner } from "@/components/contact-card/card-lead-banner";
 
 function formatDay(d: Date): string {
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -59,6 +60,7 @@ export default async function DashboardPage() {
 
       <div className="content flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-7 max-w-[1240px] w-full mx-auto">
         {addLeadFab}
+        <CardLeadBanner userId={ctx.userId} orgId={ctx.orgId} />
         {/* Stat strip */}
         <div className="stats grid grid-cols-2 sm:grid-cols-4 gap-px bg-rule border border-rule mb-4 sm:mb-7">
           <div className="stat bg-panel px-3 sm:px-[22px] py-3 sm:py-[18px]">
