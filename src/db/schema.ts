@@ -26,6 +26,7 @@ export const leadSourceEnum = pgEnum("lead_source", [
   "ad",
   "walk_in",
   "embedded_form",
+  "contact_card_scan",
   "other",
 ]);
 export type LeadSource = (typeof leadSourceEnum.enumValues)[number];
@@ -347,6 +348,10 @@ export const leads = pgTable(
     lostReasonId: uuid("lost_reason_id").references(() => lostReasons.id, {
       onDelete: "set null",
     }),
+    // Link back to the contact card that generated this lead, if any.
+    contactCardId: uuid("contact_card_id").references(() => contactCards.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -356,6 +361,7 @@ export const leads = pgTable(
     orgSourceIdx: index("leads_org_source_idx").on(t.orgId, t.source),
     orgUpdatedIdx: index("leads_org_updated_idx").on(t.orgId, t.updatedAt),
     orgCreatedIdx: index("leads_org_created_idx").on(t.orgId, t.createdAt),
+    contactCardIdx: index("leads_contact_card_idx").on(t.contactCardId),
   }),
 );
 
@@ -378,6 +384,56 @@ export const remarks = pgTable(
   (t) => ({
     leadCreatedIdx: index("remarks_lead_created_idx").on(t.leadId, t.createdAt),
     orgIdx: index("remarks_org_idx").on(t.orgId),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Contact cards (digital business cards with QR/public lead capture)
+// ---------------------------------------------------------------------------
+
+export const contactCards = pgTable(
+  "contact_cards",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull().unique(),
+    displayName: text("display_name").notNull(),
+    title: text("title"),
+    company: text("company"),
+    phone: text("phone"),
+    whatsapp: text("whatsapp"),
+    email: text("email"),
+    photoUrl: text("photo_url"),
+    socialLinks: jsonb("social_links").notNull().default({}),
+    qrCodeSvg: text("qr_code_svg"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("contact_cards_org_idx").on(t.orgId),
+    userIdx: index("contact_cards_user_idx").on(t.userId),
+    slugIdx: uniqueIndex("contact_cards_slug_idx").on(t.slug),
+  }),
+);
+
+export const cardViews = pgTable(
+  "card_views",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    contactCardId: uuid("contact_card_id")
+      .notNull()
+      .references(() => contactCards.id, { onDelete: "cascade" }),
+    viewedAt: timestamp("viewed_at", { withTimezone: true }).notNull().defaultNow(),
+    deviceType: text("device_type"),
+  },
+  (t) => ({
+    cardViewedIdx: index("card_views_card_viewed_idx").on(t.contactCardId, t.viewedAt),
   }),
 );
 
