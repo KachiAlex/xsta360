@@ -32,6 +32,7 @@ export function CardPublicView({ card }: CardPublicViewProps) {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "", company: "" });
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -133,6 +134,7 @@ export function CardPublicView({ card }: CardPublicViewProps) {
           <div className="mt-6">
             <a
               href={`/api/contact-cards/${encodeURIComponent(card.slug)}/vcf`}
+              download={`${card.slug}.vcf`}
               className="inline-block w-full py-3 px-4 rounded-lg bg-ink text-paper font-semibold hover:bg-ink-soft transition-colors"
             >
               Save {card.displayName.split(" ")[0]}'s Contact
@@ -208,11 +210,20 @@ export function CardPublicView({ card }: CardPublicViewProps) {
               </a>
             )}
 
-            <Link href={`/api/contact-cards/${encodeURIComponent(card.slug)}/vcf`}>
-              <Button className="w-full py-3 h-auto text-base font-semibold" size="lg">
-                Save Contact
-              </Button>
-            </Link>
+            <a
+              href={`/api/contact-cards/${encodeURIComponent(card.slug)}/vcf`}
+              download={`${card.slug}.vcf`}
+              onClick={() => {
+                setSaveMessage("vCard downloaded — open it to add this contact.");
+                setTimeout(() => setSaveMessage(null), 5000);
+              }}
+              className="inline-flex items-center justify-center font-semibold rounded-[3px] border-[1.5px] border-ink cursor-pointer transition-[transform,background,color] duration-150 focus-visible:outline-[3px] focus-visible:outline-amber focus-visible:outline-offset-2 bg-ink text-paper hover:bg-stamp-deep hover:border-stamp-deep hover:-translate-y-px text-[15px] px-[26px] py-3.5 min-h-[52px] md:min-h-0 w-full py-3 h-auto text-base font-semibold"
+            >
+              Save Contact
+            </a>
+            {saveMessage && (
+              <p className="text-center text-sm text-ink-soft">{saveMessage}</p>
+            )}
           </div>
 
           <div className="mt-6 pt-6 border-t border-rule">

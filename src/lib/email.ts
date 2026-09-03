@@ -20,6 +20,14 @@ export interface CardRescanEmailData {
   appUrl: string;
 }
 
+export interface ContactSavedEmailData {
+  to: string;
+  repName: string;
+  cardName: string;
+  cardUrl: string;
+  appUrl: string;
+}
+
 export interface ReminderEmailData {
   to: string;
   leadName: string;
@@ -215,6 +223,44 @@ export async function sendCardRescanEmail(data: CardRescanEmailData): Promise<vo
 
   if (!apiKey) {
     console.log(`[email/dev] Card rescan To: ${data.to} | Subject: ${subject}`);
+    return;
+  }
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from, to: data.to, subject, html }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Resend API error ${res.status}: ${text}`);
+  }
+}
+
+export async function sendContactSavedEmail(data: ContactSavedEmailData): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM ?? "Xsta360 <noreply@xsta360.app>";
+
+  const subject = `Someone saved your contact — ${data.cardName}`;
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+      <h2 style="color: #1E2A22; font-family: 'IBM Plex Mono', monospace;">Hi ${data.repName}, your contact was saved</h2>
+      <p style="color: #4A5750; font-size: 15px;">
+        Someone just saved your contact card (${data.cardName}) to their phone. You may hear from them soon.
+      </p>
+      <a href="${data.cardUrl}" style="display: inline-block; margin-top: 16px; padding: 10px 20px; background: #1E2A22; color: #F3F0E6; text-decoration: none; border-radius: 3px; font-weight: 600;">
+        View your card
+      </a>
+      <p style="color: #9AA39A; font-size: 12px; margin-top: 32px;">— Xsta360 · Manage. Follow Up. Close.</p>
+    </div>
+  `;
+
+  if (!apiKey) {
+    console.log(`[email/dev] Contact saved To: ${data.to} | Subject: ${subject}`);
     return;
   }
 

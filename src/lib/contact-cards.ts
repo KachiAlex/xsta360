@@ -7,6 +7,7 @@ export interface PublicContactCard {
   id: string;
   orgId: string;
   userId: string;
+  userEmail: string | null;
   slug: string;
   displayName: string;
   title: string | null;
@@ -27,6 +28,7 @@ export async function getContactCardBySlug(slug: string): Promise<PublicContactC
       id: schema.contactCards.id,
       orgId: schema.contactCards.orgId,
       userId: schema.contactCards.userId,
+      userEmail: schema.users.email,
       slug: schema.contactCards.slug,
       displayName: schema.contactCards.displayName,
       title: schema.contactCards.title,
@@ -41,6 +43,7 @@ export async function getContactCardBySlug(slug: string): Promise<PublicContactC
     })
     .from(schema.contactCards)
     .innerJoin(schema.organizations, eq(schema.contactCards.orgId, schema.organizations.id))
+    .innerJoin(schema.users, eq(schema.contactCards.userId, schema.users.id))
     .where(and(eq(schema.contactCards.slug, slug), eq(schema.contactCards.isActive, true)))
     .limit(1);
 
