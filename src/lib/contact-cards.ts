@@ -1,9 +1,12 @@
 import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { sendCardLeadEmail, sendCardRescanEmail } from "@/lib/email";
 
 export interface PublicContactCard {
   id: string;
+  orgId: string;
+  userId: string;
   slug: string;
   displayName: string;
   title: string | null;
@@ -22,6 +25,8 @@ export async function getContactCardBySlug(slug: string): Promise<PublicContactC
   const [row] = await db
     .select({
       id: schema.contactCards.id,
+      orgId: schema.contactCards.orgId,
+      userId: schema.contactCards.userId,
       slug: schema.contactCards.slug,
       displayName: schema.contactCards.displayName,
       title: schema.contactCards.title,
@@ -68,4 +73,147 @@ export async function getContactCardStats(contactCardId: string) {
     .where(eq(schema.leads.contactCardId, contactCardId));
 
   return { viewCount, leadCount };
+}
+
+export interface CardLeadPayload {
+  name: string;
+  email: string;
+  phone: string;
+  company?: string | null;
+}
+
+export interface CardLeadResult {
+  ok: true;
+  type: "new" | "rescan";
+  leadId: string;
+}
+
+/** Submit a lead from a public contact card form. Handles dedupe by email within the org. */
+export async function submitCardLead(slug: string, payload: CardLeadPayload): Promise<CardLeadResult> {
+  const card = await getContactCardBySlug(slug);
+  if (!card) {
+    throw new CardLeadError("Card not found", 404);
+  }
+
+  const normalizedEmail = payload.email.trim().toLowerCase();
+  const normalizedPhone = payload.phone.trim();
+
+  // Find the card owner and their email.
+  const [owner] = await db
+    .select({ id: schema.users.id, email: schema.users.email, name: schema.users.name })
+    .from(schema.users)
+    .where(eq(schema.users.id, card.userId))
+    .limit(1);
+
+  if (!owner) {
+    throw new CardLeadError("Card owner not found", 500);
+  }
+
+  // Look for an existing lead in the same org with a matching email (case-insensitive).
+  const [existing] = await db
+    .select({
+      id: schema.leads.id,
+      name: schema.leads.name,
+      assigneeId: schema.leads.assigneeId,
+      phone: schema.leads.phone,
+      company: schema.leads.company,
+    })
+    .from(schema.leads)
+    .where(
+      and(
+        eq(schema.leads.orgId, card.orgId),
+        sql`LOWER(${schema.leads.email}) = ${normalizedEmail}`,
+      ),
+    )
+    .limit(1);
+
+  const appUrl = process.env.APP_URL ?? "https://xsta360.67-211-210-8.sslip.io";
+
+  if (existing) {
+    // Re-scan: add a remark and update activity timestamp.
+    const remarkText = `Re-scanned ${card.displayName}'s contact card`;
+    await db.insert(schema.remarks).values({
+      leadId: existing.id,
+      orgId: card.orgId,
+      authorId: card.userId,
+      body: remarkText,
+    });
+
+    await db
+      .update(schema.leads)
+      .set({ updatedAt: new Date() })
+      .where(eq(schema.leads.id, existing.id));
+
+    if (owner.email) {
+      const leadUrl = `${appUrl}/leads/${existing.id}`;
+      await sendCardRescanEmail({
+        to: owner.email,
+        repName: owner.name || card.displayName,
+        leadName: existing.name,
+        leadCompany: existing.company,
+        cardName: card.displayName,
+        leadUrl,
+        appUrl,
+      }).catch(() => {
+        // Don't fail the submission if the email fails.
+      });
+    }
+
+    return { ok: true, type: "rescan", leadId: existing.id };
+  }
+
+  // New lead: land in the first open pipeline stage.
+  const [firstOpenStage] = await db
+    .select({ id: schema.pipelineStages.id, name: schema.pipelineStages.name })
+    .from(schema.pipelineStages)
+    .where(
+      and(
+        eq(schema.pipelineStages.orgId, card.orgId),
+        eq(schema.pipelineStages.kind, "open"),
+      ),
+    )
+    .orderBy(schema.pipelineStages.position)
+    .limit(1);
+
+  const [newLead] = await db
+    .insert(schema.leads)
+    .values({
+      orgId: card.orgId,
+      name: payload.name.trim(),
+      email: normalizedEmail,
+      phone: normalizedPhone,
+      company: payload.company?.trim() || null,
+      source: "contact_card_scan",
+      stageId: firstOpenStage?.id ?? null,
+      assigneeId: card.userId,
+      createdById: card.userId,
+      contactCardId: card.id,
+    })
+    .returning();
+
+  if (owner.email) {
+    const leadUrl = `${appUrl}/leads/${newLead.id}`;
+    await sendCardLeadEmail({
+      to: owner.email,
+      repName: owner.name || card.displayName,
+      leadName: newLead.name,
+      leadCompany: newLead.company,
+      cardName: card.displayName,
+      leadUrl,
+      appUrl,
+    }).catch(() => {
+      // Don't fail the submission if the email fails.
+    });
+  }
+
+  return { ok: true, type: "new", leadId: newLead.id };
+}
+
+export class CardLeadError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+  }
 }

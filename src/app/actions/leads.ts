@@ -18,6 +18,7 @@ const SourceSchema = z.enum([
   "ad",
   "walk_in",
   "embedded_form",
+  "contact_card_scan",
   "other",
 ]);
 
