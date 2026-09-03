@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useActionState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { createOrUpdateContactCard, type ContactCardFormState } from "@/app/actions/contact-cards";
@@ -31,6 +32,7 @@ interface ContactCardManagerProps {
 }
 
 export function ContactCardManager({ card }: ContactCardManagerProps) {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState<ContactCardFormState, FormData>(
     createOrUpdateContactCard,
     {},
@@ -51,10 +53,11 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    if (state?.ok && formRef.current) {
-      // Optional: show a toast or leave the page showing saved state.
+    if (state?.ok) {
+      // Refresh server data so the public link, QR code, and stats appear.
+      router.refresh();
     }
-  }, [state]);
+  }, [state, router]);
 
   const cardUrl = card?.cardUrl ?? "";
   const qrSvg = card?.qrCodeSvg ?? "";
