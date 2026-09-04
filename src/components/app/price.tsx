@@ -1,3 +1,5 @@
+"use client";
+
 import { normalizeCurrency } from "@/lib/currency";
 
 export function Price({
