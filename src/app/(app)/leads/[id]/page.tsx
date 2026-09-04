@@ -4,11 +4,13 @@ import { requireAuth } from "@/lib/dal";
 import { getOrgStages, getOrgMembers } from "@/lib/queries";
 import { getLeadDetail, getLeadHistory, getLeadReminders } from "@/lib/lead-detail";
 import { getOrgSequences, getLeadEnrollments } from "@/lib/sequence-queries";
+import { getLeadDocuments } from "@/lib/document-queries";
 import { Topbar } from "@/components/app/topbar";
 import { LogRemarkModal } from "@/components/app/log-remark-modal";
 import { EditLeadModal } from "@/components/app/edit-lead-modal";
 import { StageSelect } from "@/components/app/stage-select";
 import { LeadSequences } from "@/components/app/lead-sequences";
+import { DocumentListClient } from "@/components/app/document-list-client";
 import { Panel, PanelHead } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { reminderCalendarUrl } from "@/lib/calendar";
@@ -56,11 +58,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
   if (!lead) notFound();
 
-  const [history, reminders, sequences, enrollments] = await Promise.all([
+  const [history, reminders, sequences, enrollments, leadDocs] = await Promise.all([
     getLeadHistory(ctx.orgId, id),
     getLeadReminders(ctx.orgId, id),
     getOrgSequences(ctx.orgId),
     getLeadEnrollments(ctx.orgId, id),
+    getLeadDocuments(ctx.orgId, id),
   ]);
 
   return (
@@ -265,6 +268,23 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 />
               </Panel>
             )}
+
+            {/* Documents panel */}
+            <Panel>
+              <PanelHead title="Documents" sub="Files attached to this lead" />
+              <DocumentListClient
+                leadId={id}
+                initialDocuments={leadDocs.map((d) => ({
+                  id: d.id,
+                  fileName: d.fileName,
+                  mimeType: d.mimeType,
+                  sizeBytes: d.sizeBytes,
+                  publicUrl: d.publicUrl,
+                  createdAt: d.createdAt.toISOString(),
+                  uploaderName: d.uploaderName,
+                }))}
+              />
+            </Panel>
           </div>
         </div>
       </div>

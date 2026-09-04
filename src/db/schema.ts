@@ -713,6 +713,36 @@ export const notifications = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// Documents (uploaded to Cloudflare R2, tracked in Postgres)
+// ---------------------------------------------------------------------------
+
+export const documents = pgTable(
+  "documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    // Optional: link to a lead. Null = org-level library document.
+    leadId: uuid("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+    uploadedBy: uuid("uploaded_by").references(() => users.id, { onDelete: "set null" }),
+    // Original file name from the user's device.
+    fileName: text("file_name").notNull(),
+    // R2 object key: orgs/{orgId}/{docId}/{fileName}
+    r2Key: text("r2_key").notNull(),
+    // MIME type from upload.
+    mimeType: text("mime_type").notNull().default("application/octet-stream"),
+    // File size in bytes.
+    sizeBytes: integer("size_bytes").notNull().default(0),
+    // Public URL (r2.dev or custom domain) if the bucket is public.
+    publicUrl: text("public_url"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("documents_org_idx").on(t.orgId),
+    leadIdx: index("documents_lead_idx").on(t.leadId),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // Audit / event log (success metrics + lead history)
 // ---------------------------------------------------------------------------
 
