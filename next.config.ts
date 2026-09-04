@@ -31,6 +31,8 @@ const nextConfig: NextConfig = {
     "onnxruntime-node",
     "sharp",
   ],
+  // Don't expose the Next.js version in responses.
+  poweredByHeader: false,
   async headers() {
     return [
       {
