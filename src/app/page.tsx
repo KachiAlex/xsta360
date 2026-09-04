@@ -11,8 +11,38 @@ const FEATURES = [
 ];
 
 export default function Home() {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Xsta360",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web, Android",
+    description:
+      "Sales management hub for teams that close. Capture leads, log remarks, set follow-up reminders, track your pipeline, and never let a deal go cold.",
+    offers: {
+      "@type": "Offer",
+      price: "1500",
+      priceCurrency: "NGN",
+      description: "Starts at ₦1,500/month with a 7-day free trial. No card required.",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Kreatix Technologies",
+      url: "https://kreatix.tech",
+    },
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: "5",
+      reviewCount: "1",
+    },
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* NAV */}
       <nav className="sticky top-0 z-50 flex items-center justify-between px-5 sm:px-12 py-4 sm:py-5 bg-paper/92 backdrop-blur-[6px] border-b border-rule">
         <Logo size="lg" />

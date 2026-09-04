@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#1e2a22"/>
+  <!-- Subtle ledger lines -->
+  <g opacity="0.06" stroke="#f3f0e6" stroke-width="1">
+    <line x1="0" y1="157" x2="1200" y2="157"/>
+    <line x1="0" y1="315" x2="1200" y2="315"/>
+    <line x1="0" y1="472" x2="1200" y2="472"/>
+  </g>
+  <!-- Amber dot accent -->
+  <circle cx="80" cy="80" r="14" fill="#d98a2b"/>
+  <!-- Logo text -->
+  <text x="80" y="260" font-family="'Courier New', monospace" font-size="72" font-weight="700" fill="#f3f0e6" letter-spacing="4">XSTA360</text>
+  <!-- Tagline -->
+  <text x="80" y="340" font-family="'Courier New', monospace" font-size="56" font-weight="700" fill="#f3f0e6" letter-spacing="2">Manage.</text>
+  <text x="80" y="410" font-family="'Courier New', monospace" font-size="56" font-weight="700" fill="#9aa39a" letter-spacing="2">Follow Up.</text>
+  <text x="80" y="480" font-family="'Courier New', monospace" font-size="56" font-weight="700" fill="#2f6b4f" letter-spacing="2">Close.</text>
+  <!-- Bottom tagline -->
+  <text x="80" y="570" font-family="'Inter', sans-serif" font-size="22" fill="#9aa39a">Sales management for teams that close deals — not lose them to silence.</text>
+  <!-- Stamp accent -->
+  <rect x="940" y="240" width="180" height="60" rx="4" fill="none" stroke="#2f6b4f" stroke-width="3" transform="rotate(-8 1030 270)"/>
+  <text x="1030" y="280" font-family="'Courier New', monospace" font-size="22" font-weight="700" fill="#2f6b4f" text-anchor="middle" transform="rotate(-8 1030 270)">FOLLOWED UP</text>
+</svg>

@@ -1,7 +1,12 @@
 import { requireSuperadmin } from "@/lib/dal";
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
+import type { Metadata } from "next";
 import { AdminShell } from "@/components/admin/admin-shell";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function AdminLayout({
   children,

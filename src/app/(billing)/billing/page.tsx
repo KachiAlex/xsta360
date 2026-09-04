@@ -1,8 +1,16 @@
 import { requireAuth, getOrgBilling, getPlanMaxMembers } from "@/lib/dal";
 import { db, schema } from "@/db";
 import { eq, asc } from "drizzle-orm";
+import type { Metadata } from "next";
 import { PaystackCheckout } from "@/components/app/paystack-checkout";
 import { PlanPicker, type PlanOption } from "@/components/app/plan-picker";
+
+export const metadata: Metadata = {
+  title: "Billing & plans",
+  description: "Manage your Xsta360 subscription, payment method, and plan.",
+  robots: { index: false, follow: false },
+  alternates: { canonical: "/billing" },
+};
 
 const FEATURE_LABELS: Record<string, string> = {
   reports: "Reports & analytics",
