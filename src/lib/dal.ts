@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { getCurrentPayload, type SessionPayload } from "@/lib/session";
+import { normalizeCurrency } from "@/lib/currency";
 import type { Role } from "@/db/schema";
 
 export interface AuthContext {
@@ -213,7 +214,7 @@ export async function getOrgPlan(orgId: string): Promise<OrgPlan> {
       basePriceMonthly: sub.basePriceMonthly,
       perSeatPriceMonthly: sub.perSeatPriceMonthly,
       trialDays: sub.trialDays,
-      currency: sub.currency,
+      currency: normalizeCurrency(sub.currency),
       features: sub.features as Record<string, unknown>,
       trialEndsAt: sub.trialEndsAt,
     };
