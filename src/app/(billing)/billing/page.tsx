@@ -83,7 +83,7 @@ export default async function BillingPage() {
   const isPastDue = billing.plan.status === "past_due";
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8">
+    <div className="content flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-7 max-w-[1240px] w-full mx-auto space-y-6">
       <div>
         <h1 className="font-mono text-xl sm:text-2xl m-0 mb-1">Billing & Subscription</h1>
         <p className="text-sm text-ink-soft m-0">Manage your workspace plan and payment method.</p>
