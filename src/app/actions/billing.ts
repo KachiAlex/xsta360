@@ -12,6 +12,22 @@ import {
   generateReference,
 } from "@/lib/paystack";
 
+/** Revalidate all app pages so plan/status changes reflect immediately. */
+function revalidateAppPaths() {
+  revalidatePath("/billing");
+  revalidatePath("/dashboard");
+  revalidatePath("/leads");
+  revalidatePath("/pipeline");
+  revalidatePath("/reports");
+  revalidatePath("/settings");
+  revalidatePath("/team");
+  revalidatePath("/tasks");
+  revalidatePath("/sequences");
+  revalidatePath("/follow-ups");
+  revalidatePath("/contact-card");
+  revalidatePath("/", "layout");
+}
+
 export type BillingFormState = {
   message?: string;
   error?: boolean;
@@ -92,7 +108,7 @@ export async function changePlan(
       },
     });
 
-    revalidatePath("/billing");
+    revalidateAppPaths();
     return {
       message: `Switched to the ${plan.name} plan. The new rate of ₦${newMonthly.toLocaleString()}/mo applies at your next billing date.`,
     };
@@ -145,7 +161,7 @@ export async function changePlan(
           },
         });
 
-        revalidatePath("/billing");
+        revalidateAppPaths();
         return {
           message: `Upgraded to the ${plan.name} plan. ₦${newMonthly.toLocaleString()} charged successfully.`,
         };
@@ -168,7 +184,7 @@ export async function changePlan(
   // We'll pass the new planId in the metadata so /api/billing/verify
   // can apply the plan change after successful payment.
   // The client will call /api/billing/init with { planId } to get the URL.
-  revalidatePath("/billing");
+  revalidateAppPaths();
   return {
     message: `Upgrading to ${plan.name} requires payment. Redirecting to checkout...`,
     redirectUrl: `/billing?upgrade=${planId}`,

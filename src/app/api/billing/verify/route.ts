@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
 import { verifySession, getOrgBilling } from "@/lib/dal";
@@ -135,7 +136,23 @@ export async function POST(request: Request) {
       },
     });
 
-    // Receipt email to the paying admin.
+    // Revalidate all app pages so the new plan/status reflects immediately.
+    revalidatePath("/billing");
+    revalidatePath("/dashboard");
+    revalidatePath("/leads");
+    revalidatePath("/pipeline");
+    revalidatePath("/reports");
+    revalidatePath("/settings");
+    revalidatePath("/team");
+    revalidatePath("/tasks");
+    revalidatePath("/sequences");
+    revalidatePath("/follow-ups");
+    revalidatePath("/contact-card");
+    revalidatePath("/", "layout");
+
+    // Fetch the updated plan name for the receipt email (may have changed
+    // if this was a plan-upgrade checkout).
+    const updatedBilling = await getOrgBilling(ctx.orgId);
     const [payer] = await db
       .select({ email: schema.users.email, name: schema.users.name })
       .from(schema.users)
@@ -157,9 +174,9 @@ export async function POST(request: Request) {
         to: payer.email,
         userName: payer.name,
         orgName: org?.name ?? "your workspace",
-        planName: billing.plan.planName,
+        planName: updatedBilling.plan.planName,
         amount: txn.amount / 100, // kobo → naira
-        currency: billing.plan.currency,
+        currency: updatedBilling.plan.currency,
         reference,
         memberCount: billing.memberCount,
         nextBillingDate: subNow?.currentPeriodEnd ?? now,
