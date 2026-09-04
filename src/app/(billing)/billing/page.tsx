@@ -36,6 +36,7 @@ export default async function BillingPage() {
       currentPeriodEnd: schema.subscriptions.currentPeriodEnd,
       lastPaymentAt: schema.subscriptions.lastPaymentAt,
       paystackAuthorizationCode: schema.subscriptions.paystackAuthorizationCode,
+      graceEndsAt: schema.subscriptions.graceEndsAt,
     })
     .from(schema.subscriptions)
     .where(eq(schema.subscriptions.orgId, ctx.orgId))
@@ -119,7 +120,9 @@ export default async function BillingPage() {
             <div>
               <div className="font-semibold text-sm text-stamp">Payment overdue</div>
               <div className="text-xs text-stamp mt-0.5">
-                Your last payment failed. Please pay to reactivate your subscription.
+                {sub?.graceEndsAt && sub.graceEndsAt > new Date()
+                  ? `Your last payment failed. Access continues until ${sub.graceEndsAt.toLocaleDateString("en-US", { month: "long", day: "numeric" })} — please update your payment method.`
+                  : "Your last payment failed. Please pay to reactivate your subscription."}
               </div>
             </div>
           </div>
@@ -168,6 +171,9 @@ export default async function BillingPage() {
           </div>
           <div className="p-4">
             <PlanPicker plans={planOptions} currentPlanId={billing.plan.planId} />
+            <p className="text-xs text-ink-soft mt-3 m-0">
+              Plan changes apply to your next charge — your current paid period is unaffected.
+            </p>
           </div>
         </div>
       )}

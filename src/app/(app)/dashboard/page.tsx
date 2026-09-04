@@ -1,7 +1,11 @@
-import { requireAuth } from "@/lib/dal";
+import { requireAuth, getOrgBilling } from "@/lib/dal";
+import { db, schema } from "@/db";
+import { eq, count } from "drizzle-orm";
 import { getOrgStages, getOrgMembers } from "@/lib/queries";
 import { getPulseLeads, getDashboardStats, getUpcomingReminders } from "@/lib/dashboard";
 import { getTaskSummary } from "@/lib/tasks";
+import { TrialCardNudge } from "@/components/app/trial-card-nudge";
+import { OnboardingChecklist } from "@/components/app/onboarding-checklist";
 import { Topbar, ViewTab } from "@/components/app/topbar";
 import { AddLeadModal } from "@/components/app/add-lead-modal";
 import { MobileFab } from "@/components/app/fab";
@@ -24,13 +28,31 @@ const BUCKET_META = [
 
 export default async function DashboardPage() {
   const ctx = await requireAuth();
-  const [stages, members, pulse, stats, taskSummary, upcomingReminders] = await Promise.all([
+  const [stages, members, pulse, stats, taskSummary, upcomingReminders, billing, subRow, leadCountRow, reminderCountRow, cardRow] = await Promise.all([
     getOrgStages(ctx.orgId),
     getOrgMembers(ctx.orgId),
     getPulseLeads(ctx.orgId, ctx.userId),
     getDashboardStats(ctx.orgId, ctx.userId),
     getTaskSummary(ctx.orgId, ctx.userId),
     getUpcomingReminders(ctx.orgId, ctx.userId),
+    getOrgBilling(ctx.orgId),
+    db
+      .select({ auth: schema.subscriptions.paystackAuthorizationCode })
+      .from(schema.subscriptions)
+      .where(eq(schema.subscriptions.orgId, ctx.orgId))
+      .limit(1),
+    db
+      .select({ value: count() })
+      .from(schema.leads)
+      .where(eq(schema.leads.orgId, ctx.orgId)),
+    db
+      .select({ value: count() })
+      .from(schema.reminders)
+      .where(eq(schema.reminders.orgId, ctx.orgId)),
+    db
+      .select({ value: count() })
+      .from(schema.contactCards)
+      .where(eq(schema.contactCards.userId, ctx.userId)),
   ]);
 
   const totalCount =
@@ -60,6 +82,35 @@ export default async function DashboardPage() {
 
       <div className="content flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-7 max-w-[1240px] w-full mx-auto">
         {addLeadFab}
+        {ctx.role === "admin" &&
+          billing.plan.status === "trialing" &&
+          !subRow[0]?.auth &&
+          billing.daysLeftInTrial !== null &&
+          billing.daysLeftInTrial >= 0 && (
+            <TrialCardNudge daysLeft={billing.daysLeftInTrial} />
+          )}
+        <OnboardingChecklist
+          steps={[
+            {
+              key: "lead",
+              label: "Add your first lead",
+              href: "/leads",
+              done: (leadCountRow[0]?.value ?? 0) > 0,
+            },
+            {
+              key: "followup",
+              label: "Set a follow-up reminder",
+              href: "/follow-ups",
+              done: (reminderCountRow[0]?.value ?? 0) > 0,
+            },
+            {
+              key: "card",
+              label: "Create your contact card",
+              href: "/contact-card",
+              done: (cardRow[0]?.value ?? 0) > 0,
+            },
+          ]}
+        />
         <CardLeadBanner userId={ctx.userId} orgId={ctx.orgId} />
         {/* Stat strip */}
         <div className="stats grid grid-cols-2 sm:grid-cols-4 gap-px bg-rule border border-rule mb-4 sm:mb-7">

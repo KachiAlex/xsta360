@@ -2,6 +2,7 @@ import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { logEvent } from "@/lib/audit";
+import { rateLimit, clientKey } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,15 @@ const EmbedSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  // Rate limit: 20 submissions per IP per minute.
+  const rl = rateLimit(clientKey(request, "embed"), 20, 60_000);
+  if (!rl.allowed) {
+    return Response.json(
+      { ok: false, error: "Too many submissions. Try again later." },
+      { status: 429, headers: { "Access-Control-Allow-Origin": "*", "Retry-After": String(rl.retryAfterSeconds) } },
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();

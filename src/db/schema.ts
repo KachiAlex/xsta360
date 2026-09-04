@@ -180,6 +180,11 @@ export const subscriptions = pgTable(
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
     trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
     canceledAt: timestamp("canceled_at", { withTimezone: true }),
+    // Grace period for past_due subs — app access is blocked once this passes.
+    // Set when a recurring charge fails; null means block immediately.
+    graceEndsAt: timestamp("grace_ends_at", { withTimezone: true }),
+    // Last time a "trial ending soon" email was sent (dedup for cron).
+    trialNoticeAt: timestamp("trial_notice_at", { withTimezone: true }),
     // Paystack payment integration
     paystackCustomerCode: text("paystack_customer_code"),
     paystackAuthorizationCode: text("paystack_authorization_code"),

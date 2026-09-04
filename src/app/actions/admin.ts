@@ -217,6 +217,100 @@ export async function manageSubscription(
   }
 }
 
+/**
+ * Extend a trialing subscription's trial by N days.
+ * Only valid while the subscription is still trialing.
+ */
+export async function extendTrial(
+  _prev: SubFormState,
+  formData: FormData,
+): Promise<SubFormState> {
+  const ctx = await requireSuperadmin();
+  const orgId = formData.get("orgId") as string;
+  const subId = formData.get("subId") as string;
+  const days = parseInt(String(formData.get("days") ?? "7"), 10);
+
+  if (!orgId || !subId) return { message: "Missing IDs", error: true };
+  if (!Number.isFinite(days) || days < 1 || days > 90) {
+    return { message: "Days must be between 1 and 90", error: true };
+  }
+
+  try {
+    const [sub] = await db
+      .select()
+      .from(schema.subscriptions)
+      .where(eq(schema.subscriptions.id, subId))
+      .limit(1);
+    if (!sub) return { message: "Subscription not found", error: true };
+    if (sub.status !== "trialing") {
+      return { message: "Can only extend a trialing subscription", error: true };
+    }
+
+    const base = sub.trialEndsAt && sub.trialEndsAt > new Date() ? sub.trialEndsAt : new Date();
+    const newEnd = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
+
+    await db
+      .update(schema.subscriptions)
+      .set({ trialEndsAt: newEnd, currentPeriodEnd: newEnd, updatedAt: new Date() })
+      .where(eq(schema.subscriptions.id, subId));
+
+    await logEvent(null, "subscription_updated", {
+      actorId: ctx.userId,
+      meta: { orgId, action: "trial_extended", days, newEnd },
+    });
+
+    revalidatePath(`/admin/orgs/${orgId}`);
+    return { message: `Trial extended by ${days} day${days !== 1 ? "s" : ""}` };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return { message: `Failed: ${msg}`, error: true };
+  }
+}
+
+/**
+ * Manually mark a subscription as paid/active (e.g. for offline payments).
+ * Sets currentPeriodEnd one month out and clears any grace window.
+ */
+export async function markSubscriptionPaid(
+  _prev: SubFormState,
+  formData: FormData,
+): Promise<SubFormState> {
+  const ctx = await requireSuperadmin();
+  const orgId = formData.get("orgId") as string;
+  const subId = formData.get("subId") as string;
+
+  if (!orgId || !subId) return { message: "Missing IDs", error: true };
+
+  try {
+    const now = new Date();
+    const periodEnd = new Date(now);
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+    await db
+      .update(schema.subscriptions)
+      .set({
+        status: "active",
+        currentPeriodStart: now,
+        currentPeriodEnd: periodEnd,
+        lastPaymentAt: now,
+        graceEndsAt: null,
+        updatedAt: now,
+      })
+      .where(eq(schema.subscriptions.id, subId));
+
+    await logEvent(null, "subscription_updated", {
+      actorId: ctx.userId,
+      meta: { orgId, action: "marked_paid_manually" },
+    });
+
+    revalidatePath(`/admin/orgs/${orgId}`);
+    return { message: "Marked as paid — subscription active for 1 month" };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return { message: `Failed: ${msg}`, error: true };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Suspend / reactivate org
 // ---------------------------------------------------------------------------

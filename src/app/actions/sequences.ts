@@ -4,7 +4,16 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { verifySession } from "@/lib/dal";
+import { verifySession, getOrgPlan, planHasFeature } from "@/lib/dal";
+
+/** Returns an error state if the org's plan doesn't include sequences. */
+async function requireSequences(orgId: string): Promise<{ message: string } | null> {
+  const plan = await getOrgPlan(orgId);
+  if (!planHasFeature(plan, "sequences")) {
+    return { message: `Sequences aren't included on the ${plan.planName} plan. Upgrade to use them.` };
+  }
+  return null;
+}
 import { logEvent } from "@/lib/audit";
 import { enrollLeadInSequence } from "@/lib/sequences";
 
@@ -38,6 +47,8 @@ export async function createSequence(
 ): Promise<SequenceFormState> {
   const ctx = await verifySession();
   if (!ctx) return { message: "Not signed in" };
+  const gate = await requireSequences(ctx.orgId);
+  if (gate) return gate;
 
   const parsed = CreateSequenceSchema.safeParse({
     name: formData.get("name"),
@@ -89,6 +100,8 @@ export async function toggleSequenceActive(
 ): Promise<SequenceFormState> {
   const ctx = await verifySession();
   if (!ctx) return { message: "Not signed in" };
+  const gate = await requireSequences(ctx.orgId);
+  if (gate) return gate;
 
   const id = String(formData.get("id"));
   const [seq] = await db
@@ -114,6 +127,8 @@ export async function addSequenceStep(
 ): Promise<SequenceFormState> {
   const ctx = await verifySession();
   if (!ctx) return { message: "Not signed in" };
+  const gate = await requireSequences(ctx.orgId);
+  if (gate) return gate;
 
   const parsed = CreateStepSchema.safeParse({
     sequenceId: formData.get("sequenceId"),
@@ -185,6 +200,8 @@ export async function enrollLead(
 ): Promise<SequenceFormState> {
   const ctx = await verifySession();
   if (!ctx) return { message: "Not signed in" };
+  const gate = await requireSequences(ctx.orgId);
+  if (gate) return gate;
 
   const parsed = EnrollSchema.safeParse({
     sequenceId: formData.get("sequenceId"),

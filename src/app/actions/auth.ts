@@ -9,6 +9,8 @@ import { db, schema } from "@/db";
 import { createSession, deleteSession } from "@/lib/session";
 import { logEvent } from "@/lib/audit";
 import { nanoid } from "nanoid";
+import { headers } from "next/headers";
+import { rateLimit } from "@/lib/rate-limit";
 
 // ---------------------------------------------------------------------------
 // Validation schemas
@@ -99,6 +101,14 @@ export async function signup(
   _prev: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  // Rate limit: 5 signups per IP per hour.
+  const h = await headers();
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rl = rateLimit(`signup:${ip}`, 5, 60 * 60 * 1000);
+  if (!rl.allowed) {
+    return { errors: { _: ["Too many signup attempts. Try again later."] } };
+  }
+
   const parsed = SignupSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),

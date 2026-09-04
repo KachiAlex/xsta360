@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
 import { verifySession, getOrgBilling } from "@/lib/dal";
 import { verifyTransaction } from "@/lib/paystack";
+import { sendReceiptEmail } from "@/lib/email";
 import { logEvent } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
@@ -127,6 +128,38 @@ export async function POST(request: Request) {
         authorizationCode: txn.authorization?.authorization_code,
       },
     });
+
+    // Receipt email to the paying admin.
+    const [payer] = await db
+      .select({ email: schema.users.email, name: schema.users.name })
+      .from(schema.users)
+      .where(eq(schema.users.id, ctx.userId))
+      .limit(1);
+    const [org] = await db
+      .select({ name: schema.organizations.name })
+      .from(schema.organizations)
+      .where(eq(schema.organizations.id, ctx.orgId))
+      .limit(1);
+    const [subNow] = await db
+      .select({ currentPeriodEnd: schema.subscriptions.currentPeriodEnd })
+      .from(schema.subscriptions)
+      .where(eq(schema.subscriptions.orgId, ctx.orgId))
+      .limit(1);
+
+    if (payer) {
+      await sendReceiptEmail({
+        to: payer.email,
+        userName: payer.name,
+        orgName: org?.name ?? "your workspace",
+        planName: billing.plan.planName,
+        amount: txn.amount / 100, // kobo → naira
+        currency: billing.plan.currency,
+        reference,
+        memberCount: billing.memberCount,
+        nextBillingDate: subNow?.currentPeriodEnd ?? now,
+        appUrl: process.env.APP_URL ?? "http://localhost:3000",
+      }).catch((e) => console.error("Receipt email failed:", e));
+    }
 
     return NextResponse.json({
       success: true,

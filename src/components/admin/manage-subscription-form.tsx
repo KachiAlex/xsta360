@@ -1,7 +1,12 @@
 "use client";
 
 import { useActionState } from "react";
-import { manageSubscription, type SubFormState } from "@/app/actions/admin";
+import {
+  manageSubscription,
+  extendTrial,
+  markSubscriptionPaid,
+  type SubFormState,
+} from "@/app/actions/admin";
 
 export function ManageSubscriptionForm({
   orgId,
@@ -20,8 +25,19 @@ export function ManageSubscriptionForm({
     manageSubscription,
     {},
   );
+  const [extState, extAction, extPending] = useActionState<SubFormState, FormData>(
+    extendTrial,
+    {},
+  );
+  const [paidState, paidAction, paidPending] = useActionState<SubFormState, FormData>(
+    markSubscriptionPaid,
+    {},
+  );
+
+  const isTrialing = currentStatus === "trialing";
 
   return (
+    <div className="space-y-3">
     <form action={action} className="space-y-3">
       <input type="hidden" name="orgId" value={orgId} />
       <input type="hidden" name="subId" value={currentSubId ?? ""} />
@@ -72,5 +88,57 @@ export function ManageSubscriptionForm({
         </p>
       )}
     </form>
+
+    {/* Quick actions for an existing subscription */}
+    {currentSubId && (
+      <div className="flex flex-wrap gap-2 pt-1">
+        {isTrialing && (
+          <form action={extAction} className="flex items-center gap-2">
+            <input type="hidden" name="orgId" value={orgId} />
+            <input type="hidden" name="subId" value={currentSubId} />
+            <select
+              name="days"
+              defaultValue="7"
+              className="text-xs border border-rule bg-panel rounded px-2 py-1.5"
+            >
+              <option value="3">+3 days</option>
+              <option value="7">+7 days</option>
+              <option value="14">+14 days</option>
+              <option value="30">+30 days</option>
+            </select>
+            <button
+              type="submit"
+              disabled={extPending}
+              className="text-xs font-semibold border border-rule rounded px-3 py-1.5 hover:bg-paper-2 disabled:opacity-50"
+            >
+              {extPending ? "Extending…" : "Extend trial"}
+            </button>
+          </form>
+        )}
+        <form action={paidAction}>
+          <input type="hidden" name="orgId" value={orgId} />
+          <input type="hidden" name="subId" value={currentSubId} />
+          <button
+            type="submit"
+            disabled={paidPending}
+            className="text-xs font-semibold border border-rule rounded px-3 py-1.5 hover:bg-paper-2 disabled:opacity-50"
+          >
+            {paidPending ? "Saving…" : "Mark as paid"}
+          </button>
+        </form>
+      </div>
+    )}
+
+    {extState.message && (
+      <p className={`text-sm px-3 py-2 rounded ${extState.error ? "bg-stamp/10 text-stamp" : "bg-register/10 text-register"}`}>
+        {extState.message}
+      </p>
+    )}
+    {paidState.message && (
+      <p className={`text-sm px-3 py-2 rounded ${paidState.error ? "bg-stamp/10 text-stamp" : "bg-register/10 text-register"}`}>
+        {paidState.message}
+      </p>
+    )}
+    </div>
   );
 }

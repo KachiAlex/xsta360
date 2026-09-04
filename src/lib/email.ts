@@ -266,3 +266,113 @@ export async function sendPasswordResetEmail(data: PasswordResetEmailData): Prom
 
   await sendMail(data.to, subject, html);
 }
+
+// ---------------------------------------------------------------------------
+// Billing emails — trial reminders, dunning, receipts
+// ---------------------------------------------------------------------------
+
+export interface TrialEndingEmailData {
+  to: string;
+  userName: string;
+  orgName: string;
+  daysLeft: number;
+  amount: number;
+  currency: string;
+  appUrl: string;
+}
+
+/** Remind the workspace admin that the trial is ending soon. */
+export async function sendTrialEndingEmail(data: TrialEndingEmailData): Promise<void> {
+  const subject = `Your Xsta360 trial ends in ${data.daysLeft} day${data.daysLeft !== 1 ? "s" : ""}`;
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+      <h2 style="color: #1E2A22; font-family: 'IBM Plex Mono', monospace;">Your trial ends in ${data.daysLeft} day${data.daysLeft !== 1 ? "s" : ""}</h2>
+      <p style="color: #4A5750; font-size: 15px;">
+        Hi ${data.userName}, the free trial for <strong>${data.orgName}</strong> ends soon.
+        Add a payment method now to keep your leads, pipeline, and reminders running without interruption.
+      </p>
+      <p style="color: #4A5750; font-size: 14px;">
+        Your plan after the trial: <strong>${data.currency}${data.amount.toLocaleString()}/month</strong>.
+      </p>
+      <a href="${data.appUrl}/billing" style="display: inline-block; margin-top: 16px; padding: 10px 20px; background: #1E2A22; color: #F3F0E6; text-decoration: none; border-radius: 3px; font-weight: 600;">
+        Add payment method
+      </a>
+      <p style="color: #9AA39A; font-size: 12px; margin-top: 32px;">— Xsta360 · Manage. Follow Up. Close.</p>
+    </div>
+  `;
+
+  await sendMail(data.to, subject, html);
+}
+
+export interface PaymentFailedEmailData {
+  to: string;
+  userName: string;
+  orgName: string;
+  amount: number;
+  currency: string;
+  graceDays: number;
+  appUrl: string;
+}
+
+/** Dunning email when a recurring charge fails — gives a grace period. */
+export async function sendPaymentFailedEmail(data: PaymentFailedEmailData): Promise<void> {
+  const subject = "Payment failed — action needed to keep Xsta360 access";
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+      <h2 style="color: #B23A2E; font-family: 'IBM Plex Mono', monospace;">Payment failed</h2>
+      <p style="color: #4A5750; font-size: 15px;">
+        Hi ${data.userName}, we couldn't charge the card on file for <strong>${data.orgName}</strong>
+        (${data.currency}${data.amount.toLocaleString()}).
+      </p>
+      <p style="color: #4A5750; font-size: 15px;">
+        Your workspace keeps access for <strong>${data.graceDays} more days</strong> while we retry.
+        Update your payment method to avoid losing access.
+      </p>
+      <a href="${data.appUrl}/billing" style="display: inline-block; margin-top: 16px; padding: 10px 20px; background: #1E2A22; color: #F3F0E6; text-decoration: none; border-radius: 3px; font-weight: 600;">
+        Update payment method
+      </a>
+      <p style="color: #9AA39A; font-size: 12px; margin-top: 32px;">— Xsta360 · Manage. Follow Up. Close.</p>
+    </div>
+  `;
+
+  await sendMail(data.to, subject, html);
+}
+
+export interface ReceiptEmailData {
+  to: string;
+  userName: string;
+  orgName: string;
+  planName: string;
+  amount: number;
+  currency: string;
+  reference: string;
+  memberCount: number;
+  nextBillingDate: Date;
+  appUrl: string;
+}
+
+/** Receipt after a successful charge. */
+export async function sendReceiptEmail(data: ReceiptEmailData): Promise<void> {
+  const subject = `Payment received — ${data.currency}${data.amount.toLocaleString()} for ${data.orgName}`;
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+      <h2 style="color: #2F7D5B; font-family: 'IBM Plex Mono', monospace;">Payment received</h2>
+      <p style="color: #4A5750; font-size: 15px;">
+        Hi ${data.userName}, thanks! We've received your payment for <strong>${data.orgName}</strong>.
+      </p>
+      <table style="width: 100%; font-size: 14px; color: #4A5750; margin: 16px 0; border-collapse: collapse;">
+        <tr><td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9;">Plan</td><td style="text-align: right; padding: 8px 0; border-bottom: 1px solid #E3DEC9;"><strong>${data.planName}</strong></td></tr>
+        <tr><td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9;">Members</td><td style="text-align: right; padding: 8px 0; border-bottom: 1px solid #E3DEC9;">${data.memberCount}</td></tr>
+        <tr><td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9;">Amount</td><td style="text-align: right; padding: 8px 0; border-bottom: 1px solid #E3DEC9;"><strong>${data.currency}${data.amount.toLocaleString()}</strong></td></tr>
+        <tr><td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9;">Reference</td><td style="text-align: right; padding: 8px 0; border-bottom: 1px solid #E3DEC9; font-family: monospace; font-size: 12px;">${data.reference}</td></tr>
+        <tr><td style="padding: 8px 0;">Next billing</td><td style="text-align: right; padding: 8px 0;">${data.nextBillingDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</td></tr>
+      </table>
+      <a href="${data.appUrl}/billing" style="display: inline-block; margin-top: 8px; padding: 10px 20px; background: #1E2A22; color: #F3F0E6; text-decoration: none; border-radius: 3px; font-weight: 600;">
+        View billing
+      </a>
+      <p style="color: #9AA39A; font-size: 12px; margin-top: 32px;">— Xsta360 · Manage. Follow Up. Close.</p>
+    </div>
+  `;
+
+  await sendMail(data.to, subject, html);
+}

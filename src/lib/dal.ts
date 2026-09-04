@@ -144,14 +144,20 @@ export async function isSubscriptionBlocked(orgId: string): Promise<boolean> {
     .select({
       status: schema.subscriptions.status,
       trialEndsAt: schema.subscriptions.trialEndsAt,
+      graceEndsAt: schema.subscriptions.graceEndsAt,
     })
     .from(schema.subscriptions)
     .where(eq(schema.subscriptions.orgId, orgId))
     .limit(1);
 
   if (!sub) return false;
-  if (sub.status === "past_due" || sub.status === "canceled") return true;
-  if (sub.status === "trialing" && sub.trialEndsAt && sub.trialEndsAt < new Date()) return true;
+  const now = new Date();
+  if (sub.status === "canceled") return true;
+  // past_due has a grace window — access continues until graceEndsAt passes.
+  if (sub.status === "past_due") {
+    return !sub.graceEndsAt || sub.graceEndsAt <= now;
+  }
+  if (sub.status === "trialing" && sub.trialEndsAt && sub.trialEndsAt < now) return true;
   return false;
 }
 
