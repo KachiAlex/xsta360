@@ -1,5 +1,6 @@
-import { requireAuth, isSubscriptionBlocked } from "@/lib/dal";
+import { requireAuth, isSubscriptionBlocked, getOrgBilling } from "@/lib/dal";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { db, schema } from "@/db";
 import { eq, and, lte } from "drizzle-orm";
 import { Sidebar } from "./sidebar";
@@ -57,6 +58,13 @@ export async function AppShell({
       ),
     );
 
+  // Trial countdown banner — all members see days left; admins get the pay link.
+  const billing = await getOrgBilling(ctx.orgId);
+  const showTrialBanner =
+    billing.plan.status === "trialing" &&
+    billing.daysLeftInTrial !== null &&
+    billing.daysLeftInTrial >= 0;
+
   const name = user?.name ?? "User";
 
   return (
@@ -69,6 +77,28 @@ export async function AppShell({
         todayCount={todaysReminders.length}
       />
       <div className="app-main flex-1 flex flex-col min-w-0">
+        {showTrialBanner && (
+          <div className="bg-amber/10 border-b border-amber/20 px-4 py-2 text-center">
+            <span className="text-xs text-[#9c6014]">
+              Free trial —{" "}
+              <span className="font-semibold">
+                {billing.daysLeftInTrial} day{billing.daysLeftInTrial !== 1 ? "s" : ""} left
+              </span>
+              .{" "}
+              {ctx.role === "admin" ? (
+                <>
+                  <Link href="/billing" className="underline font-semibold hover:text-ink">
+                    Add a payment method
+                  </Link>{" "}
+                  to keep access after{" "}
+                  {billing.trialEndsAt?.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
+                </>
+              ) : (
+                <>Ask your workspace admin to add a payment method to keep access.</>
+              )}
+            </span>
+          </div>
+        )}
         <div className="flex-1">{children}</div>
         <Footer />
       </div>
