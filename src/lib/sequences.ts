@@ -2,8 +2,9 @@ import "server-only";
 import { and, asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { logEvent } from "@/lib/audit";
-import { sendWhatsAppMessage, formatLeadMessage } from "@/lib/whatsapp";
+import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { sendMail } from "@/lib/email";
+import { replacePlaceholders, buildEmailHtml, formatWhatsAppMessage } from "@/lib/message-format";
 
 /**
  * Enroll a lead in a sequence. Creates the enrollment record.
@@ -141,6 +142,27 @@ export async function processSequenceSteps(): Promise<{
       .where(eq(schema.organizations.id, enrollment.orgId))
       .limit(1);
 
+    // Load the assignee (rep) for placeholder substitution.
+    let repName: string | null = null;
+    if (lead.assigneeId) {
+      const [rep] = await db
+        .select({ name: schema.users.name })
+        .from(schema.users)
+        .where(eq(schema.users.id, lead.assigneeId))
+        .limit(1);
+      repName = rep?.name ?? null;
+    }
+
+    const orgName = org?.name ?? "Xsta360";
+    const msgCtx = {
+      leadName: lead.name,
+      leadCompany: lead.company,
+      leadPhone: lead.phone,
+      leadEmail: lead.email,
+      repName,
+      orgName,
+    };
+
     const action = nextStep.action || "reminder";
     const reminderNote = nextStep.subject
       ? `${nextStep.subject}: ${nextStep.body}`
@@ -151,13 +173,15 @@ export async function processSequenceSteps(): Promise<{
         // Send email directly to the lead.
         if (lead.email) {
           try {
+            const personalizedBody = replacePlaceholders(nextStep.body, msgCtx);
+            const personalizedSubject = replacePlaceholders(
+              nextStep.subject || `Message from ${orgName}`,
+              msgCtx,
+            );
             await sendMail(
               lead.email,
-              nextStep.subject || `Message from ${org?.name ?? "Xsta360"}`,
-              `<div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-                <p style="font-size: 15px; color: #1E2A22; white-space: pre-wrap;">${nextStep.body}</p>
-                <p style="color: #4A5750; font-size: 13px; margin-top: 24px;">— ${org?.name ?? "Xsta360"}</p>
-              </div>`,
+              personalizedSubject,
+              buildEmailHtml(personalizedBody, orgName),
             );
             emailsSent++;
           } catch (err) {
@@ -184,7 +208,8 @@ export async function processSequenceSteps(): Promise<{
           | { enabled?: boolean; phoneNumberId?: string; apiKey?: string }
           | undefined;
         if (whatsappConfig?.enabled && whatsappConfig.phoneNumberId && whatsappConfig.apiKey && lead.phone) {
-          const msg = formatLeadMessage(nextStep.body, org?.name ?? "Xsta360");
+          const personalizedBody = replacePlaceholders(nextStep.body, msgCtx);
+          const msg = formatWhatsAppMessage(personalizedBody, orgName);
           const result = await sendWhatsAppMessage(whatsappConfig, lead.phone, msg);
           if (result.success) {
             whatsappSent++;

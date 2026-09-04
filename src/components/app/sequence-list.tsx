@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label, Input, Textarea, Select } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
+import { PlaceholderHelp } from "@/components/app/placeholder-help";
 
 interface Step {
   id: string;
@@ -195,8 +196,11 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
           </div>
           <div>
             <Label>Content</Label>
-            <Textarea name="body" rows={2} placeholder="e.g. Call to check if they've reviewed the proposal" />
+            <Textarea name="body" rows={3} placeholder="Hi {{first_name}}, this is {{rep_name}} from {{org_name}}. Following up on our conversation..." />
             {stepState.errors?.body && <p className="text-xs text-stamp mt-1">{stepState.errors.body[0]}</p>}
+            <div className="mt-1.5">
+              <PlaceholderHelp />
+            </div>
           </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={() => setShowStepForm(false)}>Cancel</Button>
