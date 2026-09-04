@@ -19,6 +19,7 @@ const NAV = [
   { href: "/tasks", label: "To-Dos & Notes", icon: "✓", key: "tasks" },
   { href: "/pipeline", label: "Pipeline", icon: "▦", key: "pipeline" },
   { href: "/leads", label: "Leads", icon: "▥", key: "leads" },
+  { href: "/categories", label: "Categories", icon: "🏷", key: "categories" },
   { href: "/sequences", label: "Sequences", icon: "↻", key: "sequences" },
   { href: "/documents", label: "Documents", icon: "📎", key: "documents" },
   { href: "/reports", label: "Reports", icon: "▧", key: "reports" },

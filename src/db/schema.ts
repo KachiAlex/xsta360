@@ -88,6 +88,11 @@ export const auditEventTypeEnum = pgEnum("audit_event_type", [
   "org_settings_updated",
   "reminder_deleted",
   "invite_revoked",
+  "category_created",
+  "category_updated",
+  "category_deleted",
+  "lead_category_assigned",
+  "lead_category_removed",
 ]);
 export type AuditEventType = (typeof auditEventTypeEnum.enumValues)[number];
 
@@ -739,6 +744,55 @@ export const documents = pgTable(
   (t) => ({
     orgIdx: index("documents_org_idx").on(t.orgId),
     leadIdx: index("documents_lead_idx").on(t.leadId),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Lead categories (workflow tracks with auto-sequence, follow-up, assignment)
+// ---------------------------------------------------------------------------
+
+export const leadCategories = pgTable(
+  "lead_categories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    // Visual identity: color hex (e.g. "#B23A2E") and emoji icon.
+    color: text("color").notNull().default("#4A5750"),
+    icon: text("icon").notNull().default("🏷️"),
+    // Workflow automation: when a lead joins this category, auto-enroll in this sequence.
+    linkedSequenceId: uuid("linked_sequence_id").references(() => sequences.id, { onDelete: "set null" }),
+    // Auto-assign leads in this category to this user (null = keep current assignee).
+    defaultAssigneeId: uuid("default_assignee_id").references(() => users.id, { onDelete: "set null" }),
+    // Default follow-up cadence in days (null = no auto follow-up).
+    followUpCadenceDays: integer("follow_up_cadence_days"),
+    active: boolean("active").notNull().default(true),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("lead_categories_org_idx").on(t.orgId),
+  }),
+);
+
+// Many-to-many: leads can be in multiple categories, categories have many leads.
+export const leadCategoryAssignments = pgTable(
+  "lead_category_assignments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    categoryId: uuid("category_id").notNull().references(() => leadCategories.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    assignedBy: uuid("assigned_by").references(() => users.id, { onDelete: "set null" }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    leadIdx: index("lead_category_assignments_lead_idx").on(t.leadId),
+    categoryIdx: index("lead_category_assignments_category_idx").on(t.categoryId),
+    // Prevent duplicate assignments.
+    uniqLeadCategory: uniqueIndex("lead_category_assignments_uniq").on(t.leadId, t.categoryId),
   }),
 );
 
