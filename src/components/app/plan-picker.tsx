@@ -62,12 +62,15 @@ export function PlanPicker({
                   + <Price amount={p.perSeatPriceMonthly} currency={p.currency} />/extra member
                 </span>
               </div>
-              <ul className="text-xs text-ink-soft space-y-1">
-                <li>
-                  {p.maxMembers === null ? "Unlimited members" : `Up to ${p.maxMembers} members`}
+              <ul className="text-xs space-y-1">
+                <li className="text-ink-soft">
+                  {p.maxMembers === null ? "✓ Unlimited members" : `✓ Up to ${p.maxMembers} members`}
                 </li>
                 {p.features.map((f) => (
-                  <li key={f.key} className={f.included ? "" : "opacity-50 line-through"}>
+                  <li
+                    key={f.key}
+                    className={f.included ? "text-ink" : "text-ink-soft/50 line-through"}
+                  >
                     {f.included ? "✓ " : "× "}{f.label}
                   </li>
                 ))}
@@ -126,14 +129,17 @@ export function PlanPicker({
 
             <div>
               <h4 className="text-xs font-mono uppercase tracking-wider mb-2">Plan features</h4>
-              <ul className="text-sm text-ink-soft space-y-1">
-                <li>
+              <ul className="text-sm space-y-1">
+                <li className="text-ink-soft">
                   {selectedPlan.maxMembers === null
                     ? "✓ Unlimited members"
                     : `✓ Up to ${selectedPlan.maxMembers} members`}
                 </li>
                 {selectedPlan.features.map((f) => (
-                  <li key={f.key} className={f.included ? "" : "opacity-50 line-through"}>
+                  <li
+                    key={f.key}
+                    className={f.included ? "text-ink" : "text-ink-soft/50 line-through"}
+                  >
                     {f.included ? "✓ " : "× "}{f.label}
                   </li>
                 ))}
