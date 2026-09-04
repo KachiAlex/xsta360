@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, sql, count } from "drizzle-orm";
+import { and, eq, inArray, sql, count } from "drizzle-orm";
 import { db, schema } from "@/db";
 
 export interface SourceStat {
@@ -36,7 +36,7 @@ export async function getSourceReport(orgId: string): Promise<SourceStat[]> {
         .where(
           and(
             eq(schema.leads.orgId, orgId),
-            sql`${schema.leads.stageId} = ANY(${sql.raw(`ARRAY['${wonIds.join("','")}']::uuid[]`)})`,
+            inArray(schema.leads.stageId, wonIds),
           ),
         )
         .groupBy(schema.leads.source)
@@ -48,7 +48,7 @@ export async function getSourceReport(orgId: string): Promise<SourceStat[]> {
         .where(
           and(
             eq(schema.leads.orgId, orgId),
-            sql`${schema.leads.stageId} = ANY(${sql.raw(`ARRAY['${lostIds.join("','")}']::uuid[]`)})`,
+            inArray(schema.leads.stageId, lostIds),
           ),
         )
         .groupBy(schema.leads.source)
@@ -125,7 +125,7 @@ export async function getRepReport(orgId: string): Promise<RepStat[]> {
             and(
               eq(schema.leads.orgId, orgId),
               eq(schema.leads.assigneeId, m.userId),
-              sql`${schema.leads.stageId} = ANY(${sql.raw(`ARRAY['${wonIds.join("','")}']::uuid[]`)})`,
+              inArray(schema.leads.stageId, wonIds),
             ),
           ))[0].count
       : 0;
@@ -138,7 +138,7 @@ export async function getRepReport(orgId: string): Promise<RepStat[]> {
             and(
               eq(schema.leads.orgId, orgId),
               eq(schema.leads.assigneeId, m.userId),
-              sql`${schema.leads.stageId} = ANY(${sql.raw(`ARRAY['${lostIds.join("','")}']::uuid[]`)})`,
+              inArray(schema.leads.stageId, lostIds),
             ),
           ))[0].count
       : 0;

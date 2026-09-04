@@ -8,8 +8,10 @@ services:
       POSTGRES_DB: xsta360
     volumes:
       - pgdata:/var/lib/postgresql/data
+    # Only expose to localhost for admin/backup access.
+    # The app container reaches the DB over the internal Docker network.
     ports:
-      - "0.0.0.0:5436:5432"
+      - "127.0.0.1:5436:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U xsta360 -d xsta360"]
       interval: 5s

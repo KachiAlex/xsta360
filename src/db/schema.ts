@@ -211,6 +211,9 @@ export const users = pgTable("users", {
   isSuperadmin: boolean("is_superadmin").notNull().default(false),
   // Suspended users cannot sign in (managed by superadmin).
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+  // Incremented to invalidate existing JWT sessions (e.g. on password change
+  // or suspension). The JWT embeds this value; mismatch → session rejected.
+  tokenVersion: integer("token_version").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -19,6 +19,8 @@ export interface SessionPayload {
   role: "admin" | "manager" | "rep";
   // Platform-level superadmin flag — bypasses org-scoping for /admin routes.
   isSuperadmin: boolean;
+  // Incremented on password change / suspension to invalidate old sessions.
+  tokenVersion: number;
   expiresAt: number; // ms epoch
 }
 
@@ -81,6 +83,7 @@ export async function setOrg(orgId: string, role: SessionPayload["role"]) {
     orgId,
     role,
     isSuperadmin: current.isSuperadmin,
+    tokenVersion: current.tokenVersion,
   });
 }
 

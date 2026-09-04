@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { createSession, deleteSession } from "@/lib/session";
 import { logEvent } from "@/lib/audit";
@@ -183,6 +183,7 @@ export async function signup(
       orgId: created.org.id,
       role: "admin",
       isSuperadmin: false,
+      tokenVersion: 0,
     });
     redirect("/dashboard");
   } catch (err) {
@@ -263,6 +264,7 @@ export async function signupAndJoin(
       orgId: created.orgId,
       role: created.role,
       isSuperadmin: false,
+      tokenVersion: 0,
     });
     redirect("/dashboard");
   } catch (err) {
@@ -280,6 +282,14 @@ export async function signin(
   _prev: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  // Rate limit: 10 login attempts per IP per 15 minutes.
+  const h = await headers();
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rl = rateLimit(`signin:${ip}`, 10, 15 * 60 * 1000);
+  if (!rl.allowed) {
+    return { message: "Too many login attempts. Try again in a few minutes." };
+  }
+
   const parsed = SigninSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
@@ -318,6 +328,7 @@ export async function signin(
         orgId: "00000000-0000-0000-0000-000000000000", // placeholder — superadmin has no org
         role: "admin",
         isSuperadmin: true,
+        tokenVersion: user.tokenVersion,
       });
       const redirectTo = next && isInternalPath(next) ? next : "/admin";
       redirect(redirectTo);
@@ -339,6 +350,7 @@ export async function signin(
       orgId: membership.orgId,
       role: membership.role,
       isSuperadmin: false,
+      tokenVersion: user.tokenVersion,
     });
     const redirectTo = next && isInternalPath(next) ? next : "/dashboard";
     redirect(redirectTo);
@@ -366,6 +378,14 @@ export async function requestPasswordReset(
   _prev: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  // Rate limit: 5 reset requests per IP per hour.
+  const h = await headers();
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rl = rateLimit(`reset:${ip}`, 5, 60 * 60 * 1000);
+  if (!rl.allowed) {
+    return { message: "Too many reset requests. Try again later." };
+  }
+
   const parsed = RequestResetSchema.safeParse({
     email: formData.get("email"),
   });
@@ -453,7 +473,7 @@ export async function resetPassword(
     await db.transaction(async (tx) => {
       await tx
         .update(schema.users)
-        .set({ passwordHash, updatedAt: new Date() })
+        .set({ passwordHash, tokenVersion: sql`${schema.users.tokenVersion} + 1`, updatedAt: new Date() })
         .where(eq(schema.users.id, user.id));
       await tx
         .update(schema.passwordResetTokens)

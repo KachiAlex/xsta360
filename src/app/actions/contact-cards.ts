@@ -18,7 +18,17 @@ const ManageCardSchema = z.object({
   phone: z.string().trim().nullish().or(z.literal("")),
   whatsapp: z.string().trim().nullish().or(z.literal("")),
   email: z.string().email("Enter a valid email").trim().nullish().or(z.literal("")),
-  photoUrl: z.string().trim().nullish().or(z.literal("")),
+  // Only allow https: URLs or data: URIs (for inline uploaded images).
+  // Prevents SSRF via arbitrary http:// or file:// URLs.
+  photoUrl: z
+    .string()
+    .trim()
+    .nullish()
+    .or(z.literal(""))
+    .refine(
+      (val) => !val || val.startsWith("https://") || val.startsWith("data:image/"),
+      "Photo URL must be https: or a data: image URI",
+    ),
   socialLinks: z.string().trim().optional().or(z.literal("")),
 });
 

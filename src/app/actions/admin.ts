@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { eq, and, isNotNull, isNull } from "drizzle-orm";
+import { eq, and, isNotNull, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireSuperadmin } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
@@ -333,7 +333,7 @@ export async function suspendOrg(
     for (const m of members) {
       await db
         .update(schema.users)
-        .set({ suspendedAt: new Date(), updatedAt: new Date() })
+        .set({ suspendedAt: new Date(), tokenVersion: sql`${schema.users.tokenVersion} + 1`, updatedAt: new Date() })
         .where(
           and(
             eq(schema.users.id, m.userId),
@@ -369,7 +369,7 @@ export async function suspendUser(
   try {
     await db
       .update(schema.users)
-      .set({ suspendedAt: new Date(), updatedAt: new Date() })
+      .set({ suspendedAt: new Date(), tokenVersion: sql`${schema.users.tokenVersion} + 1`, updatedAt: new Date() })
       .where(eq(schema.users.id, userId));
 
     await logEvent(null, "user_suspended", {

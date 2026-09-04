@@ -25,11 +25,13 @@ export async function verifySession(): Promise<AuthContext | null> {
   // Superadmins don't have a membership row — verify directly from DB.
   if (payload.isSuperadmin) {
     const [user] = await db
-      .select({ id: schema.users.id, isSuperadmin: schema.users.isSuperadmin, suspendedAt: schema.users.suspendedAt })
+      .select({ id: schema.users.id, isSuperadmin: schema.users.isSuperadmin, suspendedAt: schema.users.suspendedAt, tokenVersion: schema.users.tokenVersion })
       .from(schema.users)
       .where(eq(schema.users.id, payload.userId))
       .limit(1);
     if (!user || !user.isSuperadmin || user.suspendedAt) return null;
+    // Reject if token version is stale (password changed or suspended since).
+    if (user.tokenVersion !== payload.tokenVersion) return null;
     return {
       session: payload,
       userId: payload.userId,
@@ -45,6 +47,7 @@ export async function verifySession(): Promise<AuthContext | null> {
       id: schema.memberships.id,
       role: schema.memberships.role,
       suspendedAt: schema.users.suspendedAt,
+      tokenVersion: schema.users.tokenVersion,
     })
     .from(schema.memberships)
     .innerJoin(schema.users, eq(schema.memberships.userId, schema.users.id))
@@ -60,6 +63,9 @@ export async function verifySession(): Promise<AuthContext | null> {
 
   // Suspended users cannot access the app.
   if (membership.suspendedAt) return null;
+
+  // Reject if token version is stale (password changed or suspended since).
+  if (membership.tokenVersion !== payload.tokenVersion) return null;
 
   // Keep the session role in sync with the DB in case it changed.
   if (membership.role !== payload.role) {
