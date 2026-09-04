@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { PaystackCheckout } from "@/components/app/paystack-checkout";
 import { PlanPicker, type PlanOption } from "@/components/app/plan-picker";
 import { Price } from "@/components/app/price";
+import { normalizeCurrency } from "@/lib/currency";
 
 export const metadata: Metadata = {
   title: "Billing & plans",
@@ -65,7 +66,7 @@ export default async function BillingPage() {
       name: p.name,
       basePriceMonthly: p.basePriceMonthly,
       perSeatPriceMonthly: p.perSeatPriceMonthly,
-      currency: p.currency,
+      currency: normalizeCurrency(p.currency),
       maxMembers: typeof feats.max_members === "number" ? feats.max_members : null,
       features: FEATURE_ORDER.map((key) => ({
         key,
