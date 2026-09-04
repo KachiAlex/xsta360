@@ -140,7 +140,7 @@ export async function submitCardLead(slug: string, payload: CardLeadPayload): Pr
     )
     .limit(1);
 
-  const appUrl = process.env.APP_URL ?? "https://xsta360.67-211-210-8.sslip.io";
+  const appUrl = process.env.APP_URL ?? "https://xsta360.com.ng";
 
   if (existing) {
     // Re-scan: add a remark and update activity timestamp.
@@ -258,7 +258,7 @@ export async function getMyCardStats(userId: string, orgId: string) {
     .from(schema.leads)
     .where(and(eq(schema.leads.contactCardId, card.id), gte(schema.leads.createdAt, today)));
 
-  const appUrl = process.env.APP_URL?.replace(/\/$/, "") ?? "https://xsta360.67-211-210-8.sslip.io";
+  const appUrl = process.env.APP_URL?.replace(/\/$/, "") ?? "https://xsta360.com.ng";
   return {
     ...card,
     cardUrl: `${appUrl}/c/${card.slug}`,

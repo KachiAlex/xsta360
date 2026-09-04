@@ -16,7 +16,7 @@ export async function GET(
   }
 
   const vcard = buildVCard(card);
-  const appUrl = process.env.APP_URL?.replace(/\/$/, "") ?? "https://xsta360.67-211-210-8.sslip.io";
+  const appUrl = process.env.APP_URL?.replace(/\/$/, "") ?? "https://xsta360.com.ng";
 
   // Notify the card owner that someone saved their contact.
   if (card.userEmail) {
@@ -60,7 +60,7 @@ function buildVCard(
   if (card!.phone) lines.push(`TEL;TYPE=CELL:${card!.phone}`);
   if (card!.email) lines.push(`EMAIL:${card!.email}`);
 
-  const cardUrl = `${process.env.APP_URL?.replace(/\/$/, "") ?? "https://xsta360.67-211-210-8.sslip.io"}/c/${card!.slug}`;
+  const cardUrl = `${process.env.APP_URL?.replace(/\/$/, "") ?? "https://xsta360.com.ng"}/c/${card!.slug}`;
   const website = card!.website || cardUrl;
   lines.push(`URL:${website}`);
 

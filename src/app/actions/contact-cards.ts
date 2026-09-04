@@ -278,5 +278,5 @@ function slugify(name: string): string {
 }
 
 function getAppUrl(): string {
-  return process.env.APP_URL?.replace(/\/$/, "") ?? "https://xsta360.67-211-210-8.sslip.io";
+  return process.env.APP_URL?.replace(/\/$/, "") ?? "https://xsta360.com.ng";
 }

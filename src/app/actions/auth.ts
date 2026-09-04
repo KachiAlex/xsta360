@@ -414,7 +414,7 @@ export async function requestPasswordReset(
       });
 
       const { sendPasswordResetEmail } = await import("@/lib/email");
-      const appUrl = process.env.APP_URL ?? "https://xsta360.67-211-210-8.sslip.io";
+      const appUrl = process.env.APP_URL ?? "https://xsta360.com.ng";
       await sendPasswordResetEmail({
         to: user.email,
         resetUrl: `${appUrl}/reset/${token}`,

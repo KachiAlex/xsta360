@@ -684,7 +684,7 @@ async function notifyAssignee(
     userName: user.name,
     leadName: lead.name,
     leadCompany: lead.company,
-    appUrl: process.env.APP_URL ?? "https://xsta360.67-211-210-8.sslip.io",
+    appUrl: process.env.APP_URL ?? "https://xsta360.com.ng",
   }).catch((e) => console.error("Lead assigned email failed:", e));
 
   await createNotification({
@@ -717,7 +717,7 @@ async function notifyAssigneeById(ctx: AuthContext, leadId: string, leadName: st
     userName: user.name,
     leadName,
     leadCompany: lead?.company,
-    appUrl: process.env.APP_URL ?? "https://xsta360.67-211-210-8.sslip.io",
+    appUrl: process.env.APP_URL ?? "https://xsta360.com.ng",
   }).catch((e) => console.error("Lead assigned email failed:", e));
 
   await createNotification({
