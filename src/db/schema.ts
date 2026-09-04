@@ -683,6 +683,32 @@ export const sequenceEnrollments = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// In-app notifications (bell icon in topbar)
+// ---------------------------------------------------------------------------
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    // Target user — null means broadcast to all org members.
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    // Notification type for icon/color and filtering.
+    type: text("type").notNull(), // lead_assigned, payment_success, payment_failed, trial_ending, card_lead, card_saved
+    title: text("title").notNull(),
+    body: text("body"),
+    // Optional link to navigate to when clicked.
+    link: text("link"),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgUserReadIdx: index("notifications_org_user_read_idx").on(t.orgId, t.userId, t.readAt),
+    orgUserCreatedIdx: index("notifications_org_user_created_idx").on(t.orgId, t.userId, t.createdAt),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // Audit / event log (success metrics + lead history)
 // ---------------------------------------------------------------------------
 

@@ -5,6 +5,7 @@ import { count } from "drizzle-orm";
 import { chargeAuthorization, nairaToKobo, generateReference } from "@/lib/paystack";
 import { sendTrialEndingEmail, sendPaymentFailedEmail, sendReceiptEmail } from "@/lib/email";
 import { logEvent } from "@/lib/audit";
+import { broadcastToOrg } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -132,6 +133,15 @@ export async function GET(request: Request) {
         .set({ trialNoticeAt: now })
         .where(eq(schema.subscriptions.id, sub.id));
       remindersSent++;
+
+      // In-app notification about trial ending.
+      await broadcastToOrg({
+        orgId: sub.orgId,
+        type: "trial_ending",
+        title: `Trial ending in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`,
+        body: `Your ${sub.planName} trial ends soon. Add a payment method to keep your subscription active.`,
+        link: "/billing",
+      }).catch((e) => console.error("Trial ending notification failed:", e));
     } catch (err) {
       console.error(`Trial reminder email failed for org ${sub.orgId}:`, err);
     }

@@ -5,6 +5,15 @@ import { db, schema } from "@/db";
 import { getCurrentPayload, type SessionPayload } from "@/lib/session";
 import { normalizeCurrency } from "@/lib/currency";
 import type { Role } from "@/db/schema";
+export {
+  createNotification,
+  broadcastToOrg,
+  getUserNotifications,
+  getUnreadCount,
+  markAsRead,
+  markAllAsRead,
+} from "@/lib/notifications";
+export type { NotificationType } from "@/lib/notifications";
 
 export interface AuthContext {
   session: SessionPayload;

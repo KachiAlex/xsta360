@@ -6,6 +6,7 @@ import { verifySession, getOrgBilling } from "@/lib/dal";
 import { verifyTransaction } from "@/lib/paystack";
 import { sendReceiptEmail } from "@/lib/email";
 import { logEvent } from "@/lib/audit";
+import { broadcastToOrg } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -153,6 +154,16 @@ export async function POST(request: Request) {
     // Fetch the updated plan name for the receipt email (may have changed
     // if this was a plan-upgrade checkout).
     const updatedBilling = await getOrgBilling(ctx.orgId);
+
+    // In-app notification: payment success / plan upgrade.
+    await broadcastToOrg({
+      orgId: ctx.orgId,
+      type: "payment_success",
+      title: isPlanUpgrade ? `Upgraded to ${updatedBilling.plan.planName}` : "Payment received",
+      body: `${updatedBilling.plan.planName} subscription — ₦${(txn.amount / 100).toLocaleString()} charged successfully.`,
+      link: "/billing",
+    }).catch((e) => console.error("Notification failed:", e));
+
     const [payer] = await db
       .select({ email: schema.users.email, name: schema.users.name })
       .from(schema.users)

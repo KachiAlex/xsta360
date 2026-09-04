@@ -418,7 +418,7 @@ export async function requestPasswordReset(
       await sendPasswordResetEmail({
         to: user.email,
         resetUrl: `${appUrl}/reset/${token}`,
-      });
+      }).catch((e) => console.error("Password reset email failed:", e));
     }
 
     // Always return the same message to avoid email enumeration.

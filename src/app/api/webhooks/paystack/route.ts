@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
 import { logEvent } from "@/lib/audit";
+import { sendReceiptEmail, sendPaymentFailedEmail } from "@/lib/email";
+import { getOrgBilling } from "@/lib/dal";
+import { broadcastToOrg } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -16,17 +20,29 @@ function addMonths(date: Date, months: number): Date {
   return d;
 }
 
+/** Get the first admin user for an org — used for sending emails. */
+async function getOrgAdmin(orgId: string) {
+  const [admin] = await db
+    .select({
+      userId: schema.users.id,
+      email: schema.users.email,
+      name: schema.users.name,
+    })
+    .from(schema.memberships)
+    .innerJoin(schema.users, eq(schema.memberships.userId, schema.users.id))
+    .where(eq(schema.memberships.orgId, orgId))
+    .limit(1);
+  return admin;
+}
+
 /**
  * POST /api/webhooks/paystack
  * Handles Paystack webhook events for subscription billing.
  *
  * Events handled:
- * - charge.success  → mark subscription active, save auth code
- * - charge.failed   → mark subscription past_due
+ * - charge.success  → mark subscription active, save auth code, send receipt
+ * - charge.failed   → mark subscription past_due, send dunning email
  * - subscription.disable → mark subscription canceled
- *
- * Paystack sends events with a signature header: x-paystack-signature
- * which is the HMAC of the payload with the secret key.
  */
 export async function POST(request: Request) {
   const secret = process.env.PAYSTACK_SECRET_KEY;
@@ -79,15 +95,23 @@ export async function POST(request: Request) {
       case "charge.success": {
         const customer = data.customer as Record<string, unknown>;
         const authorization = data.authorization as Record<string, unknown>;
-        const amount = data.amount as number;
+        const amount = data.amount as number; // in kobo
         const now = new Date();
-        const periodEnd = addMonths(now, 1);
 
         const [sub] = await db
           .select()
           .from(schema.subscriptions)
           .where(eq(schema.subscriptions.orgId, orgId))
           .limit(1);
+
+        // Dedup: skip if this reference was already processed.
+        if (sub && sub.lastPaymentReference === reference) {
+          return NextResponse.json({ received: true, deduped: true });
+        }
+
+        // Check if this is a plan-upgrade checkout.
+        const txnPlanId = metadata.planId as string | undefined;
+        const isPlanUpgrade = metadata.isPlanUpgrade === true;
 
         if (sub) {
           // Extend from max(now, existingPeriodEnd) to not lose early payments.
@@ -100,6 +124,8 @@ export async function POST(request: Request) {
             .update(schema.subscriptions)
             .set({
               status: "active",
+              // Apply plan change if this was an upgrade checkout.
+              ...(isPlanUpgrade && txnPlanId ? { planId: txnPlanId } : {}),
               paystackCustomerCode: customer?.customer_code as string,
               paystackAuthorizationCode: authorization?.authorization_code as string,
               paystackCustomerEmail: customer?.email as string,
@@ -117,6 +143,44 @@ export async function POST(request: Request) {
           actorId: undefined,
           meta: { action: "charge_success", reference, amount },
         });
+
+        // Revalidate app pages so new plan/status reflects.
+        revalidatePath("/billing");
+        revalidatePath("/dashboard");
+        revalidatePath("/", "layout");
+
+        // Send receipt email to the org admin.
+        const billing = await getOrgBilling(orgId);
+        const admin = await getOrgAdmin(orgId);
+        const [org] = await db
+          .select({ name: schema.organizations.name })
+          .from(schema.organizations)
+          .where(eq(schema.organizations.id, orgId))
+          .limit(1);
+
+        // In-app notification to all org members.
+        await broadcastToOrg({
+          orgId,
+          type: "payment_success",
+          title: "Payment received",
+          body: `${billing.plan.planName} subscription — ₦${(amount / 100).toLocaleString()} charged successfully.`,
+          link: "/billing",
+        }).catch((e) => console.error("Notification failed:", e));
+
+        if (admin) {
+          await sendReceiptEmail({
+            to: admin.email,
+            userName: admin.name,
+            orgName: org?.name ?? "your workspace",
+            planName: billing.plan.planName,
+            amount: amount / 100, // kobo → naira
+            currency: billing.plan.currency,
+            reference,
+            memberCount: billing.memberCount,
+            nextBillingDate: sub?.currentPeriodEnd ?? addMonths(now, 1),
+            appUrl: process.env.APP_URL ?? "http://localhost:3000",
+          }).catch((e) => console.error("Webhook receipt email failed:", e));
+        }
         break;
       }
 
@@ -128,10 +192,12 @@ export async function POST(request: Request) {
           .limit(1);
 
         if (sub) {
+          const graceEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
           await db
             .update(schema.subscriptions)
             .set({
               status: "past_due",
+              graceEndsAt,
               updatedAt: new Date(),
             })
             .where(eq(schema.subscriptions.id, sub.id));
@@ -141,6 +207,36 @@ export async function POST(request: Request) {
           actorId: undefined,
           meta: { action: "charge_failed", reference },
         });
+
+        // In-app notification to all org members.
+        await broadcastToOrg({
+          orgId,
+          type: "payment_failed",
+          title: "Payment failed",
+          body: `We couldn't charge your card. Please update your payment method to avoid service interruption.`,
+          link: "/billing",
+        }).catch((e) => console.error("Notification failed:", e));
+
+        // Send dunning email to the org admin.
+        const billing = await getOrgBilling(orgId);
+        const admin = await getOrgAdmin(orgId);
+        const [org] = await db
+          .select({ name: schema.organizations.name })
+          .from(schema.organizations)
+          .where(eq(schema.organizations.id, orgId))
+          .limit(1);
+
+        if (admin) {
+          await sendPaymentFailedEmail({
+            to: admin.email,
+            userName: admin.name,
+            orgName: org?.name ?? "your workspace",
+            amount: billing.monthlyAmount,
+            currency: billing.plan.currency,
+            graceDays: 3,
+            appUrl: process.env.APP_URL ?? "http://localhost:3000",
+          }).catch((e) => console.error("Webhook dunning email failed:", e));
+        }
         break;
       }
 

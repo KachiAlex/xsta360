@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { NotificationBell } from "./notification-bell";
 
 export interface TopbarProps {
   /** Optional leading content (e.g. view tabs). */
@@ -78,6 +79,7 @@ export function Topbar({ children, searchPlaceholder = "Search leads...", action
           </button>
           {/* Desktop actions only — mobile uses FAB */}
           <div className="hidden sm:flex items-center gap-2">{actions}</div>
+          <NotificationBell />
         </div>
       </div>
 

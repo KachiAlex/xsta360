@@ -7,6 +7,7 @@ import { db, schema } from "@/db";
 import { verifySession, can, type AuthContext } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
 import { sendLeadAssignedEmail } from "@/lib/email";
+import { createNotification } from "@/lib/notifications";
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -684,7 +685,16 @@ async function notifyAssignee(
     leadName: lead.name,
     leadCompany: lead.company,
     appUrl: process.env.APP_URL ?? "https://xsta360.67-211-210-8.sslip.io",
-  });
+  }).catch((e) => console.error("Lead assigned email failed:", e));
+
+  await createNotification({
+    orgId: ctx.orgId,
+    userId: lead.assigneeId,
+    type: "lead_assigned",
+    title: "New lead assigned to you",
+    body: `${lead.name}${lead.company ? ` — ${lead.company}` : ""}`,
+    link: `/leads/${lead.id}`,
+  }).catch((e) => console.error("Lead assigned notification failed:", e));
 }
 
 async function notifyAssigneeById(ctx: AuthContext, leadId: string, leadName: string, assigneeId: string) {
@@ -708,5 +718,14 @@ async function notifyAssigneeById(ctx: AuthContext, leadId: string, leadName: st
     leadName,
     leadCompany: lead?.company,
     appUrl: process.env.APP_URL ?? "https://xsta360.67-211-210-8.sslip.io",
-  });
+  }).catch((e) => console.error("Lead assigned email failed:", e));
+
+  await createNotification({
+    orgId: ctx.orgId,
+    userId: assigneeId,
+    type: "lead_assigned",
+    title: "New lead assigned to you",
+    body: `${leadName}${lead?.company ? ` — ${lead.company}` : ""}`,
+    link: `/leads`,
+  }).catch((e) => console.error("Lead assigned notification failed:", e));
 }
