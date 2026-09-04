@@ -1,4 +1,5 @@
-import { requireAuth } from "@/lib/dal";
+import { requireAuth, isSubscriptionBlocked } from "@/lib/dal";
+import { redirect } from "next/navigation";
 import { db, schema } from "@/db";
 import { eq, and, lte } from "drizzle-orm";
 import { Sidebar } from "./sidebar";
@@ -12,8 +13,21 @@ function initials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-export async function AppShell({ children }: { children: React.ReactNode }) {
+export async function AppShell({
+  children,
+  enforceSubscription = true,
+}: {
+  children: React.ReactNode;
+  enforceSubscription?: boolean;
+}) {
   const ctx = await requireAuth();
+
+  // Expired trial / lapsed payment: lock the app until billing is resolved.
+  // The /billing route lives in its own route group that passes
+  // enforceSubscription={false} so users can still reach the payment page.
+  if (enforceSubscription && !ctx.isSuperadmin && (await isSubscriptionBlocked(ctx.orgId))) {
+    redirect("/billing");
+  }
 
   const [user] = await db
     .select({ name: schema.users.name })

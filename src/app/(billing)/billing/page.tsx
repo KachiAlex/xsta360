@@ -1,7 +1,17 @@
-import { requireAuth, getOrgBilling } from "@/lib/dal";
+import { requireAuth, getOrgBilling, getPlanMaxMembers } from "@/lib/dal";
 import { db, schema } from "@/db";
-import { eq, count } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { PaystackCheckout } from "@/components/app/paystack-checkout";
+import { PlanPicker, type PlanOption } from "@/components/app/plan-picker";
+
+const FEATURE_LABELS: Record<string, string> = {
+  reports: "Reports & analytics",
+  sequences: "Sequences",
+  api_access: "API access",
+  sso: "SSO",
+  dedicated_support: "Dedicated support",
+};
+const FEATURE_ORDER = ["reports", "sequences", "api_access", "sso", "dedicated_support"];
 
 export default async function BillingPage() {
   const ctx = await requireAuth();
@@ -30,6 +40,30 @@ export default async function BillingPage() {
     .from(schema.subscriptions)
     .where(eq(schema.subscriptions.orgId, ctx.orgId))
     .limit(1);
+
+  // All active plans for the picker.
+  const allPlans = await db
+    .select()
+    .from(schema.plans)
+    .where(eq(schema.plans.active, true))
+    .orderBy(asc(schema.plans.position));
+
+  const planOptions: PlanOption[] = allPlans.map((p) => {
+    const feats = (p.features ?? {}) as Record<string, unknown>;
+    return {
+      id: p.id,
+      name: p.name,
+      basePriceMonthly: p.basePriceMonthly,
+      perSeatPriceMonthly: p.perSeatPriceMonthly,
+      currency: p.currency,
+      maxMembers: typeof feats.max_members === "number" ? feats.max_members : null,
+      features: FEATURE_ORDER.map((key) => ({
+        key,
+        label: FEATURE_LABELS[key],
+        included: feats[key] === true,
+      })),
+    };
+  });
 
   const isAdmin = ctx.role === "admin";
   const hasPaymentMethod = !!sub?.paystackAuthorizationCode;
@@ -114,8 +148,29 @@ export default async function BillingPage() {
             <span className="text-ink-soft">Free trial period</span>
             <span className="font-mono">{billing.plan.trialDays} days</span>
           </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-ink-soft">Member limit</span>
+            <span className="font-mono">
+              {(() => {
+                const max = getPlanMaxMembers(billing.plan);
+                return max === null ? "Unlimited" : `${billing.memberCount} / ${max}`;
+              })()}
+            </span>
+          </div>
         </div>
       </div>
+
+      {/* Plan picker — admins can upgrade/downgrade */}
+      {isAdmin && planOptions.length > 1 && (
+        <div className="bg-panel border border-rule rounded-md">
+          <div className="px-4 py-3 border-b border-rule">
+            <h2 className="font-mono text-sm uppercase tracking-wider m-0">Change plan</h2>
+          </div>
+          <div className="p-4">
+            <PlanPicker plans={planOptions} currentPlanId={billing.plan.planId} />
+          </div>
+        </div>
+      )}
 
       {/* Billing breakdown */}
       <div className="bg-panel border border-rule rounded-md">
@@ -185,7 +240,7 @@ export default async function BillingPage() {
             {hasPaymentMethod ? (
               <div className="text-sm text-ink-soft">
                 <p className="m-0 mb-2">
-                  ✓ You have a saved payment method. We'll automatically charge
+                  ✓ You have a saved payment method. We&rsquo;ll automatically charge
                   {" "}<span className="font-mono font-semibold text-ink">{billing.plan.currency}{billing.monthlyAmount.toLocaleString()}</span>
                   {" "}on your next billing date.
                 </p>
@@ -199,7 +254,7 @@ export default async function BillingPage() {
               <div className="text-sm text-ink-soft">
                 <p className="m-0">
                   Add a payment method via Paystack to activate your subscription.
-                  You'll be charged{" "}
+                  You&rsquo;ll be charged{" "}
                   <span className="font-mono font-semibold text-ink">{billing.plan.currency}{billing.monthlyAmount.toLocaleString()}</span>
                   {" "}now, and automatically billed each month.
                 </p>

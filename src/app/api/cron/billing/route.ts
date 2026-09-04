@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/db";
-import { eq, and, lte } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { count } from "drizzle-orm";
 import { chargeAuthorization, nairaToKobo, generateReference } from "@/lib/paystack";
 import { logEvent } from "@/lib/audit";
@@ -46,6 +46,106 @@ export async function GET(request: Request) {
 
   const now = new Date();
   const results: { orgId: string; status: string; amount?: number; error?: string }[] = [];
+
+  // First: convert expired trials. A trialing sub past trialEndsAt with a
+  // saved card gets its first charge; without one it becomes past_due.
+  const expiredTrials = await db
+    .select({
+      id: schema.subscriptions.id,
+      orgId: schema.subscriptions.orgId,
+      planId: schema.subscriptions.planId,
+      status: schema.subscriptions.status,
+      authCode: schema.subscriptions.paystackAuthorizationCode,
+      email: schema.subscriptions.paystackCustomerEmail,
+      periodEnd: schema.subscriptions.currentPeriodEnd,
+      trialEndsAt: schema.subscriptions.trialEndsAt,
+      basePrice: schema.plans.basePriceMonthly,
+      perSeat: schema.plans.perSeatPriceMonthly,
+      currency: schema.plans.currency,
+    })
+    .from(schema.subscriptions)
+    .innerJoin(schema.plans, eq(schema.subscriptions.planId, schema.plans.id))
+    .where(eq(schema.subscriptions.status, "trialing"));
+
+  const trialsDue = expiredTrials.filter((s) => s.trialEndsAt && s.trialEndsAt <= now);
+
+  for (const sub of trialsDue) {
+    if (!sub.authCode || !sub.email) {
+      // No card on file — trial ends, subscription goes past_due.
+      await db
+        .update(schema.subscriptions)
+        .set({ status: "past_due", updatedAt: now })
+        .where(eq(schema.subscriptions.id, sub.id));
+
+      await logEvent(sub.orgId, "subscription_updated", {
+        meta: { action: "trial_expired_no_payment" },
+      });
+      results.push({ orgId: sub.orgId, status: "trial_expired" });
+      continue;
+    }
+
+    // Card on file — charge for the first paid period.
+    try {
+      const [memberRow] = await db
+        .select({ value: count() })
+        .from(schema.memberships)
+        .where(eq(schema.memberships.orgId, sub.orgId));
+      const memberCount = memberRow?.value ?? 1;
+      const amountNaira = sub.basePrice + Math.max(0, memberCount - 1) * sub.perSeat;
+
+      const reference = generateReference("xsta_trial");
+      const chargeResult = await chargeAuthorization({
+        authorizationCode: sub.authCode,
+        email: sub.email,
+        amount: nairaToKobo(amountNaira),
+        reference,
+        metadata: {
+          orgId: sub.orgId,
+          planId: sub.planId,
+          memberCount,
+          billingType: "trial_conversion",
+        },
+      });
+
+      if (chargeResult.status === "success") {
+        await db
+          .update(schema.subscriptions)
+          .set({
+            status: "active",
+            lastPaymentAt: now,
+            lastPaymentAmount: chargeResult.amount,
+            lastPaymentReference: reference,
+            currentPeriodStart: now,
+            currentPeriodEnd: addMonths(now, 1),
+            updatedAt: now,
+          })
+          .where(eq(schema.subscriptions.id, sub.id));
+
+        await logEvent(sub.orgId, "subscription_updated", {
+          meta: { action: "trial_converted", reference, amount: amountNaira },
+        });
+        results.push({ orgId: sub.orgId, status: "trial_charged", amount: amountNaira });
+      } else {
+        await db
+          .update(schema.subscriptions)
+          .set({ status: "past_due", updatedAt: now })
+          .where(eq(schema.subscriptions.id, sub.id));
+
+        await logEvent(sub.orgId, "subscription_updated", {
+          meta: { action: "trial_charge_failed", reference, status: chargeResult.status },
+        });
+        results.push({ orgId: sub.orgId, status: "failed", error: chargeResult.gateway_response });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      console.error(`Trial conversion error for org ${sub.orgId}:`, msg);
+      await db
+        .update(schema.subscriptions)
+        .set({ status: "past_due", updatedAt: now })
+        .where(eq(schema.subscriptions.id, sub.id));
+      results.push({ orgId: sub.orgId, status: "error", error: msg });
+    }
+  }
 
   // Find subscriptions due for renewal.
   const dueSubs = await db
@@ -152,6 +252,7 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
+    trialsProcessed: trialsDue.length,
     processed: chargeable.length,
     results,
     timestamp: now.toISOString(),

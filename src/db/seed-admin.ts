@@ -47,41 +47,110 @@ async function seedAdmin() {
     console.log(`Created superadmin: ${email}`);
   }
 
-  // Seed default plan — hybrid per-seat pricing
-  console.log("Seeding default plan...");
+  // Seed default plans — hybrid per-seat pricing, 7-day trial on all tiers.
+  // Signup assigns the lowest-position active plan (Starter).
+  console.log("Seeding default plans...");
 
-  const defaultPlan = {
-    name: "Standard",
-    basePriceMonthly: 1000,    // ₦1000 for the workspace admin
-    perSeatPriceMonthly: 500,  // ₦500 per additional member
-    trialDays: 30,             // 1 month free trial
-    currency: "₦",
-    features: { sequences: true, custom_fields: true, reports: true },
-    position: 0,
-  };
+  const defaultPlans = [
+    {
+      name: "Starter",
+      basePriceMonthly: 1500,   // ₦1,500 for the workspace admin
+      perSeatPriceMonthly: 500, // ₦500 per additional member
+      trialDays: 7,
+      currency: "₦",
+      features: {
+        contact_card: true,
+        custom_fields: true,
+        reports: false,
+        sequences: false,
+        api_access: false,
+        sso: false,
+        dedicated_support: false,
+        max_members: 3,
+      },
+      position: 0,
+    },
+    {
+      name: "Standard",
+      basePriceMonthly: 3000,
+      perSeatPriceMonthly: 1000,
+      trialDays: 7,
+      currency: "₦",
+      features: {
+        contact_card: true,
+        custom_fields: true,
+        reports: true,
+        sequences: true,
+        api_access: false,
+        sso: false,
+        dedicated_support: false,
+        max_members: 10,
+      },
+      position: 1,
+    },
+    {
+      name: "Pro",
+      basePriceMonthly: 6000,
+      perSeatPriceMonthly: 1500,
+      trialDays: 7,
+      currency: "₦",
+      features: {
+        contact_card: true,
+        custom_fields: true,
+        reports: true,
+        sequences: true,
+        api_access: true,
+        sso: false,
+        dedicated_support: false,
+        max_members: 25,
+      },
+      position: 2,
+    },
+    {
+      name: "Enterprise",
+      basePriceMonthly: 15000,
+      perSeatPriceMonthly: 2000,
+      trialDays: 7,
+      currency: "₦",
+      features: {
+        contact_card: true,
+        custom_fields: true,
+        reports: true,
+        sequences: true,
+        api_access: true,
+        sso: true,
+        dedicated_support: true,
+        max_members: null, // unlimited
+      },
+      position: 3,
+    },
+  ];
 
-  const [existingPlan] = await db
-    .select()
-    .from(schema.plans)
-    .where(eq(schema.plans.name, defaultPlan.name))
-    .limit(1);
+  for (const plan of defaultPlans) {
+    const [existingPlan] = await db
+      .select()
+      .from(schema.plans)
+      .where(eq(schema.plans.name, plan.name))
+      .limit(1);
 
-  if (existingPlan) {
-    // Update existing plan to new pricing model
-    await db
-      .update(schema.plans)
-      .set({
-        basePriceMonthly: defaultPlan.basePriceMonthly,
-        perSeatPriceMonthly: defaultPlan.perSeatPriceMonthly,
-        trialDays: defaultPlan.trialDays,
-        currency: defaultPlan.currency,
-        features: defaultPlan.features,
-      })
-      .where(eq(schema.plans.id, existingPlan.id));
-    console.log(`Updated plan "${defaultPlan.name}" to hybrid pricing`);
-  } else {
-    await db.insert(schema.plans).values(defaultPlan);
-    console.log(`Created plan: ${defaultPlan.name} (₦1000 base + ₦500/seat, 30-day trial)`);
+    if (existingPlan) {
+      await db
+        .update(schema.plans)
+        .set({
+          basePriceMonthly: plan.basePriceMonthly,
+          perSeatPriceMonthly: plan.perSeatPriceMonthly,
+          trialDays: plan.trialDays,
+          currency: plan.currency,
+          features: plan.features,
+          position: plan.position,
+          active: true,
+        })
+        .where(eq(schema.plans.id, existingPlan.id));
+      console.log(`Updated plan "${plan.name}"`);
+    } else {
+      await db.insert(schema.plans).values(plan);
+      console.log(`Created plan: ${plan.name}`);
+    }
   }
 
   console.log("Done!");

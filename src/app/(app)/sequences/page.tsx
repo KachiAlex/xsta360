@@ -1,4 +1,5 @@
-import { requireAuth } from "@/lib/dal";
+import { requireAuth, getOrgPlan, planHasFeature } from "@/lib/dal";
+import { UpgradePrompt } from "@/components/app/upgrade-prompt";
 import { getOrgSequences } from "@/lib/sequence-queries";
 import { Topbar } from "@/components/app/topbar";
 import { Panel, PanelHead } from "@/components/ui/panel";
@@ -6,6 +7,10 @@ import { SequenceList } from "@/components/app/sequence-list";
 
 export default async function SequencesPage() {
   const ctx = await requireAuth();
+  const plan = await getOrgPlan(ctx.orgId);
+  if (!planHasFeature(plan, "sequences")) {
+    return <UpgradePrompt feature="sequences" plan={plan} />;
+  }
   const sequences = await getOrgSequences(ctx.orgId);
 
   return (

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { and, count, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { verifySession, can } from "@/lib/dal";
+import { verifySession, can, getOrgBilling, getPlanMaxMembers } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
 import { setOrg } from "@/lib/session";
 import { nanoid } from "nanoid";
@@ -50,6 +50,15 @@ export async function inviteMember(
   const ctx = await verifySession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "manage_team")) return { message: "Only admins can invite members" };
+
+  // Plan seat limit — inviting beyond max_members requires an upgrade.
+  const billing = await getOrgBilling(ctx.orgId);
+  const maxMembers = getPlanMaxMembers(billing.plan);
+  if (maxMembers !== null && billing.memberCount >= maxMembers) {
+    return {
+      message: `Your ${billing.plan.planName} plan allows up to ${maxMembers} member${maxMembers !== 1 ? "s" : ""}. Upgrade your plan on the Billing page to add more.`,
+    };
+  }
 
   const parsed = InviteSchema.safeParse({
     email: formData.get("email"),
@@ -150,6 +159,13 @@ export async function acceptInvite(
 
   if (existing) {
     return { message: "You are already a member of this workspace" };
+  }
+
+  // Enforce the inviting org's plan seat limit.
+  const inviteBilling = await getOrgBilling(invite.orgId);
+  const inviteMax = getPlanMaxMembers(inviteBilling.plan);
+  if (inviteMax !== null && inviteBilling.memberCount >= inviteMax) {
+    return { message: "This workspace is at its plan's member limit. Ask the admin to upgrade." };
   }
 
   await db.transaction(async (tx) => {

@@ -135,6 +135,43 @@ import type { SubscriptionStatus } from "@/db/schema";
 import { count as countFn } from "drizzle-orm";
 
 /**
+ * Whether the org's subscription blocks access to the app.
+ * Blocked when: past_due, canceled, or trialing past trialEndsAt.
+ * No subscription row (pre-billing orgs) is allowed through.
+ */
+export async function isSubscriptionBlocked(orgId: string): Promise<boolean> {
+  const [sub] = await db
+    .select({
+      status: schema.subscriptions.status,
+      trialEndsAt: schema.subscriptions.trialEndsAt,
+    })
+    .from(schema.subscriptions)
+    .where(eq(schema.subscriptions.orgId, orgId))
+    .limit(1);
+
+  if (!sub) return false;
+  if (sub.status === "past_due" || sub.status === "canceled") return true;
+  if (sub.status === "trialing" && sub.trialEndsAt && sub.trialEndsAt < new Date()) return true;
+  return false;
+}
+
+/** Max members allowed by the plan's features.max_members flag (null = unlimited). */
+export function getPlanMaxMembers(plan: OrgPlan): number | null {
+  const v = (plan.features as Record<string, unknown>)?.max_members;
+  return typeof v === "number" ? v : null;
+}
+
+/**
+ * Check a feature flag on the plan (e.g. "reports", "sequences").
+ * Locked only when the flag is explicitly `false` — orgs without a
+ * subscription (pre-billing) or plans that don't declare the flag
+ * keep access.
+ */
+export function planHasFeature(plan: OrgPlan, key: string): boolean {
+  return (plan.features as Record<string, unknown>)?.[key] !== false;
+}
+
+/**
  * Load the plan + subscription for an org. Returns a default "free" plan
  * if no subscription exists (so the app works without billing setup).
  */

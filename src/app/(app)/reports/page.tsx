@@ -1,4 +1,5 @@
-import { requireAuth } from "@/lib/dal";
+import { requireAuth, getOrgPlan, planHasFeature } from "@/lib/dal";
+import { UpgradePrompt } from "@/components/app/upgrade-prompt";
 import { getSourceReport, getRepReport } from "@/lib/reports";
 import { getPipelineForecast, formatCurrency } from "@/lib/forecast";
 import { Topbar } from "@/components/app/topbar";
@@ -17,6 +18,10 @@ const SOURCE_LABELS: Record<string, string> = {
 
 export default async function ReportsPage() {
   const ctx = await requireAuth();
+  const plan = await getOrgPlan(ctx.orgId);
+  if (!planHasFeature(plan, "reports")) {
+    return <UpgradePrompt feature="reports" plan={plan} />;
+  }
   const [sourceReport, repReport, forecast] = await Promise.all([
     getSourceReport(ctx.orgId),
     getRepReport(ctx.orgId),
