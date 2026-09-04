@@ -60,6 +60,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Transaction does not belong to this organization" }, { status: 403 });
     }
 
+    // Check if this is a plan-upgrade checkout.
+    const txnPlanId = (txn.metadata as Record<string, unknown>)?.planId as string | undefined;
+    const isPlanUpgrade = (txn.metadata as Record<string, unknown>)?.isPlanUpgrade === true;
+
     const billing = await getOrgBilling(ctx.orgId);
 
     // Save authorization code + customer code for recurring billing.
@@ -82,6 +86,8 @@ export async function POST(request: Request) {
         .update(schema.subscriptions)
         .set({
           status: "active",
+          // Apply plan change if this was an upgrade checkout.
+          ...(isPlanUpgrade && txnPlanId ? { planId: txnPlanId } : {}),
           paystackCustomerCode: txn.customer.customer_code,
           paystackAuthorizationCode: txn.authorization?.authorization_code ?? null,
           paystackCustomerEmail: txn.customer.email,

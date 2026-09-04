@@ -200,7 +200,7 @@ export default async function BillingPage() {
             <h2 className="font-mono text-sm uppercase tracking-wider m-0">Change plan</h2>
           </div>
           <div className="p-4">
-            <PlanPicker plans={planOptions} currentPlanId={billing.plan.planId} memberCount={billing.memberCount} />
+            <PlanPicker plans={planOptions} currentPlanId={billing.plan.planId} memberCount={billing.memberCount} hasSavedCard={hasPaymentMethod} />
             <p className="text-xs text-ink-soft mt-3 m-0">
               Plan changes apply to your next charge — your current paid period is unaffected.
             </p>

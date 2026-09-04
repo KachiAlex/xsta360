@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 function BillingContent() {
   const searchParams = useSearchParams();
   const reference = searchParams.get("reference");
+  const upgradePlanId = searchParams.get("upgrade");
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
@@ -34,6 +35,32 @@ function BillingContent() {
         .finally(() => setVerifying(false));
     }
   }, [reference]);
+
+  // If we have an upgrade=planId param, auto-redirect to Paystack checkout for the upgrade.
+  useEffect(() => {
+    if (upgradePlanId && !reference) {
+      setLoading(true);
+      setMessage({ type: "info", text: "Redirecting to Paystack for plan upgrade..." });
+      fetch("/api/billing/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: upgradePlanId }),
+      })
+        .then(async (res) => {
+          const data = await res.json();
+          if (res.ok && data.authorization_url) {
+            window.location.href = data.authorization_url;
+          } else {
+            setMessage({ type: "error", text: data.error || "Failed to initialize upgrade payment." });
+            setLoading(false);
+          }
+        })
+        .catch(() => {
+          setMessage({ type: "error", text: "Something went wrong. Please try again." });
+          setLoading(false);
+        });
+    }
+  }, [upgradePlanId, reference]);
 
   async function handlePay() {
     setLoading(true);

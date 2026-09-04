@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { verifySession } from "@/lib/dal";
 import { getOrgBilling } from "@/lib/dal";
 import { initializeTransaction, nairaToKobo, generateReference } from "@/lib/paystack";
@@ -13,7 +13,11 @@ export const dynamic = "force-dynamic";
  * Initializes a Paystack transaction for the workspace's monthly bill.
  * Called by the billing page when the workspace admin clicks "Pay now".
  *
- * Body: { amount?: number }  // optional override; defaults to computed monthly
+ * Body: { amount?: number, planId?: string }
+ *   - amount: optional override; defaults to computed monthly
+ *   - planId: when set, this is a plan-upgrade checkout — compute the new
+ *     plan's monthly amount and pass planId in metadata so /api/billing/verify
+ *     can apply the plan change after payment.
  */
 export async function POST(request: Request) {
   try {
@@ -41,7 +45,30 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const amountNaira = typeof body.amount === "number" && body.amount > 0 ? body.amount : billing.monthlyAmount;
+
+    // If planId is provided, this is a plan upgrade — compute the new amount.
+    let amountNaira = billing.monthlyAmount;
+    let targetPlanId = billing.plan.planId;
+    let targetPlanName = billing.plan.planName;
+
+    if (typeof body.planId === "string" && body.planId.length > 0) {
+      const [newPlan] = await db
+        .select()
+        .from(schema.plans)
+        .where(and(eq(schema.plans.id, body.planId), eq(schema.plans.active, true)))
+        .limit(1);
+
+      if (!newPlan) {
+        return NextResponse.json({ error: "Target plan not found" }, { status: 404 });
+      }
+
+      targetPlanId = newPlan.id;
+      targetPlanName = newPlan.name;
+      const additionalSeats = Math.max(0, billing.memberCount - 1);
+      amountNaira = newPlan.basePriceMonthly + additionalSeats * newPlan.perSeatPriceMonthly;
+    } else if (typeof body.amount === "number" && body.amount > 0) {
+      amountNaira = body.amount;
+    }
 
     if (amountNaira <= 0) {
       return NextResponse.json({ error: "Amount must be greater than 0" }, { status: 400 });
@@ -57,11 +84,12 @@ export async function POST(request: Request) {
       callback_url: `${appUrl}/billing?reference=${reference}`,
       metadata: {
         orgId: ctx.orgId,
-        planId: billing.plan.planId,
+        planId: targetPlanId,
         memberCount: billing.memberCount,
+        isPlanUpgrade: typeof body.planId === "string",
         custom_fields: [
           { display_name: "Organization", variable_name: "organization", value: ctx.orgId },
-          { display_name: "Plan", variable_name: "plan", value: billing.plan.planName },
+          { display_name: "Plan", variable_name: "plan", value: targetPlanName },
           { display_name: "Members", variable_name: "members", value: String(billing.memberCount) },
         ],
       },

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useActionState } from "react";
+import { useRouter } from "next/navigation";
 import { changePlan, type BillingFormState } from "@/app/actions/billing";
 import { Price } from "@/components/app/price";
 import { Modal } from "@/components/ui/modal";
@@ -20,24 +21,50 @@ export function PlanPicker({
   plans,
   currentPlanId,
   memberCount,
+  hasSavedCard,
 }: {
   plans: PlanOption[];
   currentPlanId: string;
   memberCount: number;
+  hasSavedCard: boolean;
 }) {
   const [state, formAction, pending] = useActionState<BillingFormState, FormData>(
     changePlan,
     {},
   );
   const [selectedPlan, setSelectedPlan] = useState<PlanOption | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
+  const router = useRouter();
 
   const additionalMembers = Math.max(0, memberCount - 1);
+
+  // Handle redirect / checkout responses from the server action.
+  useEffect(() => {
+    if (state.redirectUrl) {
+      setRedirecting(true);
+      router.push(state.redirectUrl);
+    }
+  }, [state.redirectUrl, router]);
+
+  // Close modal on success message (downgrade or saved-card charge).
+  useEffect(() => {
+    if (state.message && !state.error && !state.redirectUrl) {
+      setSelectedPlan(null);
+    }
+  }, [state.message, state.error, state.redirectUrl]);
 
   return (
     <>
       <div className="grid gap-3 sm:grid-cols-2">
         {plans.map((p) => {
           const isCurrent = p.id === currentPlanId;
+          const newMonthly = p.basePriceMonthly + additionalMembers * p.perSeatPriceMonthly;
+          const currentPlan = plans.find((x) => x.id === currentPlanId);
+          const currentMonthly = currentPlan
+            ? currentPlan.basePriceMonthly + additionalMembers * currentPlan.perSeatPriceMonthly
+            : 0;
+          const isUpgrade = newMonthly > currentMonthly;
+
           return (
             <div
               key={p.id}
@@ -82,7 +109,7 @@ export function PlanPicker({
                   disabled={pending}
                   className="w-full text-sm font-semibold bg-ink text-paper px-3 py-2 rounded hover:opacity-90 disabled:opacity-50"
                 >
-                  Switch to {p.name}
+                  {isUpgrade ? `Upgrade to ${p.name}` : `Switch to ${p.name}`}
                 </button>
               )}
             </div>
@@ -91,7 +118,7 @@ export function PlanPicker({
       </div>
 
       {state.message && (
-        <p className={`sm:col-span-2 text-sm mt-3 ${state.error ? "text-stamp" : "text-register"}`}>
+        <p className={`text-sm mt-3 ${state.error ? "text-stamp" : "text-register"}`}>
           {state.message}
         </p>
       )}
@@ -146,9 +173,31 @@ export function PlanPicker({
               </ul>
             </div>
 
-            <p className="text-xs text-ink-soft">
-              Plan changes apply to your next charge. After confirming, update your payment method below if you haven&rsquo;t added one yet.
-            </p>
+            {(() => {
+              const currentPlan = plans.find((x) => x.id === currentPlanId);
+              const currentMonthly = currentPlan
+                ? currentPlan.basePriceMonthly + additionalMembers * currentPlan.perSeatPriceMonthly
+                : 0;
+              const newMonthly = selectedPlan.basePriceMonthly + additionalMembers * selectedPlan.perSeatPriceMonthly;
+              const isUpgrade = newMonthly > currentMonthly;
+
+              if (isUpgrade) {
+                return (
+                  <div className="bg-amber/10 border border-amber/20 rounded-md px-3 py-2.5 text-xs text-[#9c6014]">
+                    {hasSavedCard ? (
+                      <>This is an upgrade. We&rsquo;ll charge <strong><Price amount={newMonthly} currency={selectedPlan.currency} /></strong> to your saved card now.</>
+                    ) : (
+                      <>This is an upgrade. You&rsquo;ll be redirected to Paystack to pay <strong><Price amount={newMonthly} currency={selectedPlan.currency} /></strong> now.</>
+                    )}
+                  </div>
+                );
+              }
+              return (
+                <p className="text-xs text-ink-soft">
+                  This is a downgrade. The new rate of <Price amount={newMonthly} currency={selectedPlan.currency} />/mo applies at your next billing date — no charge now.
+                </p>
+              );
+            })()}
 
             <form action={formAction} className="pt-2">
               <input type="hidden" name="planId" value={selectedPlan.id} />
@@ -162,10 +211,10 @@ export function PlanPicker({
                 </button>
                 <button
                   type="submit"
-                  disabled={pending}
+                  disabled={pending || redirecting}
                   className="flex-1 px-4 py-2 text-sm font-semibold bg-ink text-paper rounded hover:opacity-90 disabled:opacity-50"
                 >
-                  {pending ? "Switching…" : `Confirm switch`}
+                  {pending || redirecting ? "Processing…" : "Confirm"}
                 </button>
               </div>
             </form>
