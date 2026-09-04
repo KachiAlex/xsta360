@@ -495,6 +495,10 @@ export const reminders = pgTable(
     status: reminderStatusEnum("status").notNull().default("pending"),
     // Last error message when delivery failed (surfaced in-app per PRD edge case).
     lastError: text("last_error"),
+    // Origin: null = manual, or the sequence step that spawned this reminder.
+    sequenceStepId: uuid("sequence_step_id").references(() => sequenceSteps.id, { onDelete: "set null" }),
+    // Channel hint from the sequence step: "reminder" | "email" | "whatsapp".
+    channel: text("channel"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

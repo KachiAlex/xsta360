@@ -230,7 +230,7 @@ export async function enrollLead(
 
   revalidatePath("/sequences");
   revalidatePath(`/leads/${parsed.data.leadId}`);
-  return { ok: true };
+  return { ok: true, message: "Enrolled in sequence" };
 }
 
 export async function unenrollLead(
@@ -240,7 +240,7 @@ export async function unenrollLead(
   const ctx = await verifySession();
   if (!ctx) return { message: "Not signed in" };
 
-  const enrollmentId = String(formData.get("id"));
+  const enrollmentId = String(formData.get("enrollmentId") ?? formData.get("id"));
   await db
     .update(schema.sequenceEnrollments)
     .set({ status: "cancelled", updatedAt: new Date() })
@@ -252,5 +252,5 @@ export async function unenrollLead(
     );
 
   revalidatePath("/sequences");
-  return { ok: true };
+  return { ok: true, message: "Unenrolled from sequence" };
 }

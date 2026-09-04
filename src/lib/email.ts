@@ -15,7 +15,7 @@ const transport = nodemailer.createTransport({
   auth: smtpUser && smtpPass ? { user: smtpUser, pass: smtpPass } : undefined,
 });
 
-async function sendMail(to: string, subject: string, html: string): Promise<void> {
+export async function sendMail(to: string, subject: string, html: string): Promise<void> {
   if (!smtpUser || !smtpPass) {
     console.log(`[email/dev] To: ${to} | Subject: ${subject}`);
     return;

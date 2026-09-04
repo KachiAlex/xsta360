@@ -24,6 +24,10 @@ export async function GET(request: Request) {
   const appUrl = process.env.APP_URL ?? "http://localhost:3000";
   const now = new Date();
 
+  // Process sequence steps FIRST, so newly-created reminders (e.g. delayDays: 0)
+  // are picked up in the same cron run, not the next one.
+  const seqResult = await processSequenceSteps();
+
   // Find pending reminders due now or earlier that haven't been sent.
   const due = await db
     .select({
@@ -118,9 +122,6 @@ export async function GET(request: Request) {
     }
   }
 
-  // Process sequence steps.
-  const seqResult = await processSequenceSteps();
-
   // Recompute lead scores for all orgs with due reminders.
   const orgIds = [...new Set(due.map((r) => r.orgId))];
   let scoresUpdated = 0;
@@ -134,6 +135,9 @@ export async function GET(request: Request) {
     whatsappSent,
     checked: due.length,
     sequenceSteps: seqResult.processed,
+    sequenceEmails: seqResult.emailsSent,
+    sequenceWhatsapp: seqResult.whatsappSent,
+    sequenceReminders: seqResult.remindersCreated,
     scoresUpdated,
   });
 }

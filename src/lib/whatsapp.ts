@@ -91,3 +91,13 @@ Action: ${reminderNote}
 
 Open Xsta360 to log this activity.`;
 }
+
+/**
+ * Format a message sent directly to a lead from a sequence step.
+ * Professional outreach format — no internal references.
+ */
+export function formatLeadMessage(body: string, orgName: string): string {
+  return `${body}
+
+— ${orgName}`;
+}

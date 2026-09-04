@@ -3,10 +3,12 @@ import { notFound } from "next/navigation";
 import { requireAuth } from "@/lib/dal";
 import { getOrgStages, getOrgMembers } from "@/lib/queries";
 import { getLeadDetail, getLeadHistory, getLeadReminders } from "@/lib/lead-detail";
+import { getOrgSequences, getLeadEnrollments } from "@/lib/sequence-queries";
 import { Topbar } from "@/components/app/topbar";
 import { LogRemarkModal } from "@/components/app/log-remark-modal";
 import { EditLeadModal } from "@/components/app/edit-lead-modal";
 import { StageSelect } from "@/components/app/stage-select";
+import { LeadSequences } from "@/components/app/lead-sequences";
 import { Panel, PanelHead } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { reminderCalendarUrl } from "@/lib/calendar";
@@ -54,9 +56,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
   if (!lead) notFound();
 
-  const [history, reminders] = await Promise.all([
+  const [history, reminders, sequences, enrollments] = await Promise.all([
     getLeadHistory(ctx.orgId, id),
     getLeadReminders(ctx.orgId, id),
+    getOrgSequences(ctx.orgId),
+    getLeadEnrollments(ctx.orgId, id),
   ]);
 
   return (
@@ -234,6 +238,33 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </ul>
               )}
             </Panel>
+
+            {/* Sequences panel */}
+            {sequences.length > 0 && (
+              <Panel>
+                <PanelHead title="Sequences" sub="Automated drip campaigns" />
+                <LeadSequences
+                  leadId={id}
+                  sequences={sequences.map((s) => ({
+                    id: s.id,
+                    name: s.name,
+                    description: s.description,
+                    active: s.active,
+                    stepCount: s.steps.length,
+                  }))}
+                  enrollments={enrollments.map((e) => ({
+                    enrollmentId: e.enrollmentId,
+                    sequenceId: e.sequenceId,
+                    sequenceName: e.sequenceName,
+                    status: e.status,
+                    currentStep: e.currentStep,
+                    totalSteps: e.totalSteps,
+                    enrolledAt: e.enrolledAt.toISOString(),
+                    completedAt: e.completedAt?.toISOString() ?? null,
+                  }))}
+                />
+              </Panel>
+            )}
           </div>
         </div>
       </div>

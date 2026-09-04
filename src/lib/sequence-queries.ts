@@ -68,3 +68,62 @@ export async function getOrgSequences(orgId: string): Promise<SequenceWithSteps[
     enrollmentCount: enrollmentCounts.get(seq.id) ?? 0,
   }));
 }
+
+export interface LeadEnrollment {
+  enrollmentId: string;
+  sequenceId: string;
+  sequenceName: string;
+  status: string;
+  currentStep: number;
+  totalSteps: number;
+  enrolledAt: Date;
+  completedAt: Date | null;
+}
+
+/**
+ * Get all sequence enrollments for a specific lead.
+ */
+export async function getLeadEnrollments(orgId: string, leadId: string): Promise<LeadEnrollment[]> {
+  const enrollments = await db
+    .select({
+      enrollmentId: schema.sequenceEnrollments.id,
+      sequenceId: schema.sequenceEnrollments.sequenceId,
+      sequenceName: schema.sequences.name,
+      status: schema.sequenceEnrollments.status,
+      currentStep: schema.sequenceEnrollments.currentStep,
+      enrolledAt: schema.sequenceEnrollments.enrolledAt,
+      completedAt: schema.sequenceEnrollments.completedAt,
+    })
+    .from(schema.sequenceEnrollments)
+    .leftJoin(schema.sequences, eq(schema.sequenceEnrollments.sequenceId, schema.sequences.id))
+    .where(
+      and(
+        eq(schema.sequenceEnrollments.orgId, orgId),
+        eq(schema.sequenceEnrollments.leadId, leadId),
+      ),
+    )
+    .orderBy(asc(schema.sequenceEnrollments.enrolledAt));
+
+  // Fetch step counts per sequence.
+  const stepCounts = new Map<string, number>();
+  for (const e of enrollments) {
+    if (!stepCounts.has(e.sequenceId)) {
+      const steps = await db
+        .select({ id: schema.sequenceSteps.id })
+        .from(schema.sequenceSteps)
+        .where(eq(schema.sequenceSteps.sequenceId, e.sequenceId));
+      stepCounts.set(e.sequenceId, steps.length);
+    }
+  }
+
+  return enrollments.map((e) => ({
+    enrollmentId: e.enrollmentId,
+    sequenceId: e.sequenceId,
+    sequenceName: e.sequenceName ?? "Unknown",
+    status: e.status,
+    currentStep: e.currentStep,
+    totalSteps: stepCounts.get(e.sequenceId) ?? 0,
+    enrolledAt: e.enrolledAt,
+    completedAt: e.completedAt,
+  }));
+}
