@@ -148,7 +148,7 @@ export const plans = pgTable(
     basePriceMonthly: integer("base_price_monthly").notNull().default(1000),
     perSeatPriceMonthly: integer("per_seat_price_monthly").notNull().default(500),
     // Free trial length in days (0 = no trial).
-    trialDays: integer("trial_days").notNull().default(30),
+    trialDays: integer("trial_days").notNull().default(7),
     // Currency symbol for display (e.g. "₦", "$").
     currency: text("currency").notNull().default("₦"),
     // Feature flags: { "sequences": true, "custom_fields": true, ... }

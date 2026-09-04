@@ -4,6 +4,7 @@ import { eq, asc } from "drizzle-orm";
 import type { Metadata } from "next";
 import { PaystackCheckout } from "@/components/app/paystack-checkout";
 import { PlanPicker, type PlanOption } from "@/components/app/plan-picker";
+import { Price } from "@/components/app/price";
 
 export const metadata: Metadata = {
   title: "Billing & plans",
@@ -81,7 +82,7 @@ export default async function BillingPage() {
   const isPastDue = billing.plan.status === "past_due";
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8">
       <div>
         <h1 className="font-mono text-xl sm:text-2xl m-0 mb-1">Billing & Subscription</h1>
         <p className="text-sm text-ink-soft m-0">Manage your workspace plan and payment method.</p>
@@ -149,11 +150,11 @@ export default async function BillingPage() {
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-ink-soft">Base price (admin)</span>
-            <span className="font-mono">{billing.plan.currency}{billing.plan.basePriceMonthly.toLocaleString()}/mo</span>
+            <Price amount={billing.plan.basePriceMonthly} currency={billing.plan.currency} />/mo
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-ink-soft">Per additional member</span>
-            <span className="font-mono">{billing.plan.currency}{billing.plan.perSeatPriceMonthly.toLocaleString()}/mo</span>
+            <Price amount={billing.plan.perSeatPriceMonthly} currency={billing.plan.currency} />/mo
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-ink-soft">Free trial period</span>
@@ -178,7 +179,7 @@ export default async function BillingPage() {
             <h2 className="font-mono text-sm uppercase tracking-wider m-0">Change plan</h2>
           </div>
           <div className="p-4">
-            <PlanPicker plans={planOptions} currentPlanId={billing.plan.planId} />
+            <PlanPicker plans={planOptions} currentPlanId={billing.plan.planId} memberCount={billing.memberCount} />
             <p className="text-xs text-ink-soft mt-3 m-0">
               Plan changes apply to your next charge — your current paid period is unaffected.
             </p>
@@ -194,22 +195,22 @@ export default async function BillingPage() {
         <div className="p-4 space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-ink-soft">Workspace admin (you)</span>
-            <span className="font-mono">{billing.plan.currency}{billing.plan.basePriceMonthly.toLocaleString()}/mo</span>
+            <Price amount={billing.plan.basePriceMonthly} currency={billing.plan.currency} />/mo
           </div>
           {Math.max(0, billing.memberCount - 1) > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-ink-soft">
-                Additional members ({Math.max(0, billing.memberCount - 1)} × {billing.plan.currency}{billing.plan.perSeatPriceMonthly.toLocaleString()})
+                Additional members ({Math.max(0, billing.memberCount - 1)} × <Price amount={billing.plan.perSeatPriceMonthly} currency={billing.plan.currency} />)
               </span>
               <span className="font-mono">
-                {billing.plan.currency}{(Math.max(0, billing.memberCount - 1) * billing.plan.perSeatPriceMonthly).toLocaleString()}/mo
+                <Price amount={(Math.max(0, billing.memberCount - 1) * billing.plan.perSeatPriceMonthly)} currency={billing.plan.currency} />/mo
               </span>
             </div>
           )}
           <div className="border-t border-rule pt-2 flex justify-between">
             <span className="font-semibold">Total / month</span>
             <span className="font-mono font-bold text-lg text-register">
-              {billing.plan.currency}{billing.monthlyAmount.toLocaleString()}
+              <Price amount={billing.monthlyAmount} currency={billing.plan.currency} />
             </span>
           </div>
         </div>
@@ -234,7 +235,7 @@ export default async function BillingPage() {
                   {m.role === "admin" ? "Admin" : m.role}
                 </span>
                 <span className="text-xs font-mono text-ink-soft">
-                  {billing.plan.currency}{m.role === "admin" ? billing.plan.basePriceMonthly.toLocaleString() : billing.plan.perSeatPriceMonthly.toLocaleString()}/mo
+                  <Price amount={m.role === "admin" ? billing.plan.basePriceMonthly : billing.plan.perSeatPriceMonthly} currency={billing.plan.currency} className="text-xs" />/mo
                 </span>
               </div>
             </div>
@@ -255,7 +256,7 @@ export default async function BillingPage() {
               <div className="text-sm text-ink-soft">
                 <p className="m-0 mb-2">
                   ✓ You have a saved payment method. We&rsquo;ll automatically charge
-                  {" "}<span className="font-mono font-semibold text-ink">{billing.plan.currency}{billing.monthlyAmount.toLocaleString()}</span>
+                  {" "}<Price amount={billing.monthlyAmount} currency={billing.plan.currency} className="font-semibold text-ink" />
                   {" "}on your next billing date.
                 </p>
                 {sub?.lastPaymentAt && (
@@ -269,7 +270,7 @@ export default async function BillingPage() {
                 <p className="m-0">
                   Add a payment method via Paystack to activate your subscription.
                   You&rsquo;ll be charged{" "}
-                  <span className="font-mono font-semibold text-ink">{billing.plan.currency}{billing.monthlyAmount.toLocaleString()}</span>
+                  <Price amount={billing.monthlyAmount} currency={billing.plan.currency} className="font-semibold text-ink" />
                   {" "}now, and automatically billed each month.
                 </p>
               </div>
