@@ -101,16 +101,14 @@ export function BulkActionBar({
           {count} selected
         </span>
 
-        {/* Add to category */}
-        {categories.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setActivePanel(activePanel === "category" ? null : "category")}
-            className="text-xs font-semibold bg-paper text-ink rounded px-3 py-1.5 min-h-[36px] hover:bg-paper-2"
-          >
-            🏷 Category
-          </button>
-        )}
+        {/* Add to category — always visible */}
+        <button
+          type="button"
+          onClick={() => setActivePanel(activePanel === "category" ? null : "category")}
+          className="text-xs font-semibold bg-paper text-ink rounded px-3 py-1.5 min-h-[36px] hover:bg-paper-2"
+        >
+          🏷 Category
+        </button>
 
         {/* Assign rep */}
         {members.length > 0 && (
@@ -160,21 +158,35 @@ export function BulkActionBar({
       {/* Category panel */}
       {activePanel === "category" && (
         <div className="bg-panel border border-rule rounded p-3 mb-2">
-          <p className="text-xs font-semibold text-ink-soft mb-2">Assign to category:</p>
-          <div className="flex flex-wrap gap-1.5">
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                disabled={pending}
-                onClick={() => doAssignCategory(cat.id)}
-                className="text-xs px-2.5 py-1.5 min-h-[36px] rounded border border-rule bg-paper hover:bg-paper-2 flex items-center gap-1 transition-colors disabled:opacity-50"
+          {categories.length === 0 ? (
+            <div>
+              <p className="text-sm text-ink-soft mb-2">No categories yet. Create one first to organize your leads.</p>
+              <a
+                href="/categories"
+                className="text-xs font-semibold border border-ink rounded px-3 py-1.5 min-h-[36px] inline-flex items-center hover:bg-paper-2"
               >
-                <span>{cat.icon}</span>
-                <span>{cat.name}</span>
-              </button>
-            ))}
-          </div>
+                Go to Categories →
+              </a>
+            </div>
+          ) : (
+            <>
+              <p className="text-xs font-semibold text-ink-soft mb-2">Assign to category:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {categories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    disabled={pending}
+                    onClick={() => doAssignCategory(cat.id)}
+                    className="text-xs px-2.5 py-1.5 min-h-[36px] rounded border border-rule bg-paper hover:bg-paper-2 flex items-center gap-1 transition-colors disabled:opacity-50"
+                  >
+                    <span>{cat.icon}</span>
+                    <span>{cat.name}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 
