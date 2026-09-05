@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, ilike, or } from "drizzle-orm";
+import { and, desc, eq, ilike, or, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 
 export interface LeadListItem {
@@ -21,6 +21,7 @@ export interface LeadListItem {
   customFields: unknown;
   createdAt: Date;
   updatedAt: Date;
+  categories: { id: string; name: string; icon: string; color: string }[];
 }
 
 export interface LeadListFilters {
@@ -28,6 +29,7 @@ export interface LeadListFilters {
   stageId?: string;
   source?: string;
   assigneeId?: string;
+  categoryId?: string;
 }
 
 export async function getLeads(orgId: string, filters: LeadListFilters = {}): Promise<LeadListItem[]> {
@@ -47,6 +49,23 @@ export async function getLeads(orgId: string, filters: LeadListFilters = {}): Pr
   if (filters.stageId) conditions.push(eq(schema.leads.stageId, filters.stageId));
   if (filters.source) conditions.push(eq(schema.leads.source, filters.source as never));
   if (filters.assigneeId) conditions.push(eq(schema.leads.assigneeId, filters.assigneeId));
+
+  // Category filter: find lead IDs in that category first, then filter.
+  let categoryFilteredLeadIds: string[] | null = null;
+  if (filters.categoryId) {
+    const assignments = await db
+      .select({ leadId: schema.leadCategoryAssignments.leadId })
+      .from(schema.leadCategoryAssignments)
+      .where(
+        and(
+          eq(schema.leadCategoryAssignments.orgId, orgId),
+          eq(schema.leadCategoryAssignments.categoryId, filters.categoryId),
+        ),
+      );
+    categoryFilteredLeadIds = assignments.map((a) => a.leadId);
+    if (categoryFilteredLeadIds.length === 0) return [];
+    conditions.push(inArray(schema.leads.id, categoryFilteredLeadIds));
+  }
 
   const rows = await db
     .select({
@@ -75,5 +94,37 @@ export async function getLeads(orgId: string, filters: LeadListFilters = {}): Pr
     .where(and(...conditions))
     .orderBy(desc(schema.leads.updatedAt));
 
-  return rows;
+  if (rows.length === 0) return [];
+
+  // Fetch categories for all returned leads.
+  const leadIds = rows.map((r) => r.id);
+  const assignments = await db
+    .select({
+      leadId: schema.leadCategoryAssignments.leadId,
+      categoryId: schema.leadCategories.id,
+      categoryName: schema.leadCategories.name,
+      categoryIcon: schema.leadCategories.icon,
+      categoryColor: schema.leadCategories.color,
+    })
+    .from(schema.leadCategoryAssignments)
+    .innerJoin(schema.leadCategories, eq(schema.leadCategoryAssignments.categoryId, schema.leadCategories.id))
+    .where(
+      and(
+        eq(schema.leadCategoryAssignments.orgId, orgId),
+        inArray(schema.leadCategoryAssignments.leadId, leadIds),
+      ),
+    );
+
+  // Group categories by lead.
+  const catMap = new Map<string, { id: string; name: string; icon: string; color: string }[]>();
+  for (const a of assignments) {
+    const arr = catMap.get(a.leadId) ?? [];
+    arr.push({ id: a.categoryId, name: a.categoryName, icon: a.categoryIcon, color: a.categoryColor });
+    catMap.set(a.leadId, arr);
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    categories: catMap.get(r.id) ?? [],
+  }));
 }

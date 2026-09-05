@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <!-- Base config trusts system CAs and disallows cleartext.
-         Let’s Encrypt certificate is used for xsta360.67-211-210-8.sslip.io. -->
+         xsta360.com.ng uses a standard CA certificate. -->
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />

@@ -11,6 +11,7 @@ export interface AddLeadModalProps {
   stages: { id: string; name: string }[];
   members: { userId: string; name: string }[];
   currentUserId: string;
+  categories?: { id: string; name: string; icon: string; color: string }[];
 }
 
 const SOURCES: { value: string; label: string }[] = [
@@ -22,9 +23,10 @@ const SOURCES: { value: string; label: string }[] = [
   { value: "other", label: "Other" },
 ];
 
-export function AddLeadModal({ stages, members, currentUserId }: AddLeadModalProps) {
+export function AddLeadModal({ stages, members, currentUserId, categories = [] }: AddLeadModalProps) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState<LeadFormState, FormData>(createLead, {});
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
 
   // Close on success: reset open state so the modal can be reopened.
   const showOpen = open;
@@ -133,6 +135,43 @@ export function AddLeadModal({ stages, members, currentUserId }: AddLeadModalPro
           {state.errors?.duplicate && (
             <input type="hidden" name="forceCreate" value="true" />
           )}
+
+          {/* Category picker */}
+          {categories.length > 0 && (
+            <div>
+              <Label>Categories</Label>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {categories.map((cat) => {
+                  const selected = selectedCategoryIds.includes(cat.id);
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedCategoryIds((prev) =>
+                          prev.includes(cat.id)
+                            ? prev.filter((id) => id !== cat.id)
+                            : [...prev, cat.id],
+                        );
+                      }}
+                      className={`text-xs px-2.5 py-1.5 min-h-[36px] rounded border flex items-center gap-1 transition-colors ${
+                        selected
+                          ? "border-ink bg-ink text-paper"
+                          : "border-rule bg-paper text-ink-soft hover:bg-paper-2"
+                      }`}
+                      style={selected ? { backgroundColor: cat.color, borderColor: cat.color } : {}}
+                    >
+                      <span>{cat.icon}</span>
+                      <span>{cat.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-ink-soft mt-1">Tap to assign categories — auto-enrolls sequences and schedules follow-ups.</p>
+            </div>
+          )}
+
+          <input type="hidden" name="categoryIds" value={selectedCategoryIds.join(",")} />
 
           {state.message && (
             <p className="text-sm text-stamp bg-stamp/10 px-3 py-2 rounded">{state.message}</p>

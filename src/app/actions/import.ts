@@ -6,6 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { verifySession } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
+import { enrollLeadInSequence } from "@/lib/sequences";
 
 export type ImportFormState = {
   ok?: boolean;
@@ -33,6 +34,7 @@ export async function importLeads(
   if (!ctx) return { message: "Not signed in" };
 
   const rowsJson = String(formData.get("rows") ?? "[]");
+  const categoryId = String(formData.get("categoryId") ?? "").trim() || null;
   let rows: unknown;
   try {
     rows = JSON.parse(rowsJson);
@@ -51,6 +53,17 @@ export async function importLeads(
     .where(and(eq(schema.pipelineStages.orgId, ctx.orgId), eq(schema.pipelineStages.kind, "open")))
     .orderBy(schema.pipelineStages.position)
     .limit(1);
+
+  // Load the category if one was selected.
+  let category: typeof schema.leadCategories.$inferSelect | null = null;
+  if (categoryId) {
+    const [cat] = await db
+      .select()
+      .from(schema.leadCategories)
+      .where(and(eq(schema.leadCategories.id, categoryId), eq(schema.leadCategories.orgId, ctx.orgId)))
+      .limit(1);
+    category = cat ?? null;
+  }
 
   let imported = 0;
   const errors: string[] = [];
@@ -75,7 +88,7 @@ export async function importLeads(
           campaign: r.campaign || null,
           notes: r.notes || null,
           stageId: firstStage?.id,
-          assigneeId: ctx.userId,
+          assigneeId: category?.defaultAssigneeId ?? ctx.userId,
           createdById: ctx.userId,
         })
         .returning();
@@ -84,6 +97,35 @@ export async function importLeads(
         actorId: ctx.userId,
         meta: { source: lead.source, via: "csv_import" },
       });
+
+      // Assign to category if selected.
+      if (category) {
+        await db.insert(schema.leadCategoryAssignments).values({
+          leadId: lead.id,
+          categoryId: category.id,
+          orgId: ctx.orgId,
+          assignedBy: ctx.userId,
+        }).catch(() => {});
+
+        // Auto-enroll in linked sequence.
+        if (category.linkedSequenceId) {
+          await enrollLeadInSequence(ctx.orgId, lead.id, category.linkedSequenceId, ctx.userId).catch(() => {});
+        }
+
+        // Auto-schedule follow-up.
+        if (category.followUpCadenceDays) {
+          const dueAt = new Date(Date.now() + category.followUpCadenceDays * 86_400_000);
+          await db.insert(schema.reminders).values({
+            leadId: lead.id,
+            orgId: ctx.orgId,
+            assigneeId: category.defaultAssigneeId ?? lead.assigneeId,
+            dueAt,
+            note: `[Category: ${category.name}] Follow-up scheduled by category cadence`,
+            channel: "reminder",
+          });
+        }
+      }
+
       imported++;
     } catch (err) {
       errors.push(`Row ${i + 2}: ${err instanceof Error ? err.message : "insert failed"}`);

@@ -8,7 +8,7 @@ const config: CapacitorConfig = {
   server: {
     // Load the live app directly inside the Capacitor webview.
     // This keeps the user in the app instead of opening the system browser.
-    url: "https://xsta360.67-211-210-8.sslip.io/login",
+    url: "https://xsta360.com.ng/login",
   },
   android: {
     // captureInput keeps the virtual keyboard from covering focused fields.

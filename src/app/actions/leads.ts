@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { verifySession, can, type AuthContext } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
@@ -37,6 +37,7 @@ const CreateLeadSchema = z.object({
   expectedCloseDate: z.string().trim().nullish().or(z.literal("")),
   customFields: z.string().trim().nullish().or(z.literal("")),
   forceCreate: z.string().nullish().or(z.literal("")),
+  categoryIds: z.string().trim().nullish().or(z.literal("")),
 });
 
 const RemarkSchema = z.object({
@@ -118,6 +119,7 @@ export async function createLead(
     expectedCloseDate: formData.get("expectedCloseDate"),
     customFields: formData.get("customFields"),
     forceCreate: formData.get("forceCreate"),
+    categoryIds: formData.get("categoryIds"),
   });
 
   if (!parsed.success) {
@@ -130,7 +132,7 @@ export async function createLead(
     };
   }
 
-  const { assigneeId, stageId, value, expectedCloseDate, customFields, forceCreate, ...rest } = parsed.data;
+  const { assigneeId, stageId, value, expectedCloseDate, customFields, forceCreate, categoryIds, ...rest } = parsed.data;
 
   // Duplicate detection — unless forceCreate is set.
   if (forceCreate !== "true" && (rest.email || rest.phone || rest.company)) {
@@ -202,6 +204,58 @@ export async function createLead(
   });
 
   await notifyAssignee(ctx, lead);
+
+  // Assign categories if provided (comma-separated UUIDs).
+  if (categoryIds) {
+    const ids = categoryIds.split(",").map((s) => s.trim()).filter(Boolean);
+    if (ids.length > 0) {
+      const { enrollLeadInSequence } = await import("@/lib/sequences");
+      const cats = await db
+        .select()
+        .from(schema.leadCategories)
+        .where(
+          and(
+            eq(schema.leadCategories.orgId, ctx.orgId),
+            inArray(schema.leadCategories.id, ids),
+          ),
+        );
+
+      for (const cat of cats) {
+        await db.insert(schema.leadCategoryAssignments).values({
+          leadId: lead.id,
+          categoryId: cat.id,
+          orgId: ctx.orgId,
+          assignedBy: ctx.userId,
+        }).catch(() => {}); // ignore duplicate errors
+
+        // Auto-enroll in linked sequence.
+        if (cat.linkedSequenceId) {
+          await enrollLeadInSequence(ctx.orgId, lead.id, cat.linkedSequenceId, ctx.userId).catch(() => {});
+        }
+
+        // Auto-assign rep.
+        if (cat.defaultAssigneeId) {
+          await db
+            .update(schema.leads)
+            .set({ assigneeId: cat.defaultAssigneeId, updatedAt: new Date() })
+            .where(eq(schema.leads.id, lead.id));
+        }
+
+        // Auto-schedule follow-up.
+        if (cat.followUpCadenceDays) {
+          const dueAt = new Date(Date.now() + cat.followUpCadenceDays * 86_400_000);
+          await db.insert(schema.reminders).values({
+            leadId: lead.id,
+            orgId: ctx.orgId,
+            assigneeId: cat.defaultAssigneeId ?? lead.assigneeId,
+            dueAt,
+            note: `[Category: ${cat.name}] Follow-up scheduled by category cadence`,
+            channel: "reminder",
+          });
+        }
+      }
+    }
+  }
 
   revalidatePath("/dashboard");
   revalidatePath("/leads");
