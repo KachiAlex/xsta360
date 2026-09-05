@@ -15,14 +15,25 @@ const transport = nodemailer.createTransport({
   auth: smtpUser && smtpPass ? { user: smtpUser, pass: smtpPass } : undefined,
 });
 
+export interface EmailAttachment {
+  filename: string;
+  path?: string; // URL to download the file
+  content?: Buffer; // or raw content
+  contentType?: string;
+}
+
 export async function sendMail(
   to: string,
   subject: string,
   html: string,
-  options?: { senderName?: string; replyTo?: string },
+  options?: {
+    senderName?: string;
+    replyTo?: string;
+    attachments?: EmailAttachment[];
+  },
 ): Promise<void> {
   if (!smtpUser || !smtpPass) {
-    console.log(`[email/dev] To: ${to} | Subject: ${subject}${options?.senderName ? ` | From: ${options.senderName}` : ""}`);
+    console.log(`[email/dev] To: ${to} | Subject: ${subject}${options?.senderName ? ` | From: ${options.senderName}` : ""}${options?.attachments?.length ? ` | ${options.attachments.length} attachment(s)` : ""}`);
     return;
   }
 
@@ -32,12 +43,21 @@ export async function sendMail(
     ? `${options.senderName} <${extractEmail(fromAddress)}>`
     : fromAddress;
 
+  // Build nodemailer attachments array.
+  const attachments = options?.attachments?.map((a) => ({
+    filename: a.filename,
+    path: a.path,
+    content: a.content,
+    contentType: a.contentType,
+  })).filter((a) => a.path || a.content);
+
   await transport.sendMail({
     from: fromHeader,
     to,
     subject,
     html,
     replyTo: options?.replyTo || undefined,
+    attachments: attachments?.length ? attachments : undefined,
   });
 }
 

@@ -14,6 +14,8 @@ import { Label, Input, Textarea, Select } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import { PlaceholderHelp } from "@/components/app/placeholder-help";
 import { RichTextEditor } from "@/components/app/rich-text-editor";
+import { EmailPreview } from "@/components/app/email-preview";
+import { AttachmentPicker, type AttachmentDoc } from "@/components/app/attachment-picker";
 
 interface Step {
   id: string;
@@ -23,6 +25,7 @@ interface Step {
   subject: string | null;
   body: string;
   senderName: string | null;
+  attachments: string[];
 }
 
 interface Sequence {
@@ -34,7 +37,15 @@ interface Sequence {
   enrollmentCount: number;
 }
 
-export function SequenceList({ sequences }: { sequences: Sequence[] }) {
+export function SequenceList({
+  sequences,
+  documents,
+  orgName,
+}: {
+  sequences: Sequence[];
+  documents: AttachmentDoc[];
+  orgName: string;
+}) {
   const [showForm, setShowForm] = useState(false);
   const [state, action, pending] = useActionState<SequenceFormState, FormData>(createSequence, {});
   // Close on success: reset showForm so the form can be reopened.
@@ -74,7 +85,7 @@ export function SequenceList({ sequences }: { sequences: Sequence[] }) {
       ) : (
         <div className="divide-y divide-rule">
           {sequences.map((seq) => (
-            <SequenceItem key={seq.id} sequence={seq} />
+            <SequenceItem key={seq.id} sequence={seq} documents={documents} orgName={orgName} />
           ))}
         </div>
       )}
@@ -82,15 +93,33 @@ export function SequenceList({ sequences }: { sequences: Sequence[] }) {
   );
 }
 
-function SequenceItem({ sequence }: { sequence: Sequence }) {
+function SequenceItem({
+  sequence,
+  documents,
+  orgName,
+}: {
+  sequence: Sequence;
+  documents: AttachmentDoc[];
+  orgName: string;
+}) {
   const [, startTransition] = useTransition();
   const [showStepForm, setShowStepForm] = useState(false);
   const [stepState, stepAction, stepPending] = useActionState<SequenceFormState, FormData>(addSequenceStep, {});
   const [stepActionType, setStepActionType] = useState<string>("reminder");
+  const [emailBody, setEmailBody] = useState<string>("");
+  const [emailSubject, setEmailSubject] = useState<string>("");
+  const [emailSender, setEmailSender] = useState<string>("");
+  const [attachmentIds, setAttachmentIds] = useState<string[]>([]);
   // Close on success: reset showStepForm so the form can be reopened.
   const stepVisible = showStepForm;
   useEffect(() => {
-    if (stepState.ok) setShowStepForm(false);
+    if (stepState.ok) {
+      setShowStepForm(false);
+      setEmailBody("");
+      setEmailSubject("");
+      setEmailSender("");
+      setAttachmentIds([]);
+    }
   }, [stepState.ok]);
 
   return (
@@ -158,6 +187,9 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
                 {step.action === "email" && step.senderName && (
                   <div className="text-[11px] text-ink-soft mt-0.5">From: {step.senderName}</div>
                 )}
+                {step.action === "email" && step.attachments && step.attachments.length > 0 && (
+                  <div className="text-[11px] text-ink-soft mt-0.5">📎 {step.attachments.length} attachment{step.attachments.length === 1 ? "" : "s"}</div>
+                )}
                 <div className="text-xs text-ink-soft mt-0.5 line-clamp-2">{stripHtml(step.body)}</div>
               </div>
               <button
@@ -182,6 +214,7 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
       {stepVisible ? (
         <form action={stepAction} className="bg-paper-2 rounded p-3 space-y-3 ml-4">
           <input type="hidden" name="sequenceId" value={sequence.id} />
+          <input type="hidden" name="attachments" value={JSON.stringify(attachmentIds)} />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
               <Label>Delay (days)</Label>
@@ -204,7 +237,11 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
             </div>
             <div>
               <Label>Subject {stepActionType === "email" ? "" : "(optional)"}</Label>
-              <Input name="subject" placeholder={stepActionType === "email" ? "Welcome to Xsta360" : "Follow-up call"} />
+              <Input
+                name="subject"
+                placeholder={stepActionType === "email" ? "Welcome to Xsta360" : "Follow-up call"}
+                onChange={(e) => setEmailSubject(e.currentTarget.value)}
+              />
             </div>
           </div>
 
@@ -212,27 +249,64 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
           {stepActionType === "email" && (
             <div>
               <Label>Sender name (displayed to recipient)</Label>
-              <Input name="senderName" placeholder="e.g. Tunde from Kreatix" />
+              <Input
+                name="senderName"
+                placeholder="e.g. Tunde from Kreatix"
+                onChange={(e) => setEmailSender(e.currentTarget.value)}
+              />
               <p className="text-[11px] text-ink-soft mt-1">This appears as the sender's display name in the recipient's inbox. Defaults to your org name if left blank.</p>
             </div>
           )}
 
           <div>
-            <Label>Content {stepActionType === "email" ? "(rich text)" : ""}</Label>
+            <div className="flex items-center justify-between mb-1">
+              <Label>Content {stepActionType === "email" ? "(rich text)" : ""}</Label>
+              {stepActionType === "email" && (
+                <EmailPreview
+                  subject={emailSubject}
+                  senderName={emailSender}
+                  body={emailBody}
+                  orgName={orgName}
+                  recipientName="Adaeze Okonkwo"
+                  attachments={documents
+                    .filter((d) => attachmentIds.includes(d.id))
+                    .map((d) => ({ fileName: d.fileName, sizeBytes: d.sizeBytes }))}
+                />
+              )}
+            </div>
             {stepActionType === "email" ? (
               <RichTextEditor
                 name="body"
                 placeholder="Hi {{first_name}}, this is {{rep_name}} from {{org_name}}. Following up on our conversation..."
                 rows={6}
+                defaultValue={emailBody}
+                onChange={setEmailBody}
               />
             ) : (
-              <Textarea name="body" rows={3} placeholder="Hi {{first_name}}, this is {{rep_name}} from {{org_name}}. Following up on our conversation..." />
+              <Textarea
+                name="body"
+                rows={3}
+                placeholder="Hi {{first_name}}, this is {{rep_name}} from {{org_name}}. Following up on our conversation..."
+                onChange={(e) => setEmailBody(e.currentTarget.value)}
+              />
             )}
             {stepState.errors?.body && <p className="text-xs text-stamp mt-1">{stepState.errors.body[0]}</p>}
             <div className="mt-1.5">
               <PlaceholderHelp />
             </div>
           </div>
+
+          {/* Attachments — only for email steps */}
+          {stepActionType === "email" && (
+            <div>
+              <Label>Attachments</Label>
+              <AttachmentPicker
+                documents={documents}
+                selectedIds={attachmentIds}
+                onChange={setAttachmentIds}
+              />
+            </div>
+          )}
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={() => setShowStepForm(false)}>Cancel</Button>

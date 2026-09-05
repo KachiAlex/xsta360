@@ -658,6 +658,8 @@ export const sequenceSteps = pgTable(
     body: text("body").notNull(),
     // Sender display name for email steps (e.g. "Tunde from Kreatix").
     senderName: text("sender_name"),
+    // Attached document IDs (JSON array of document UUIDs) for email steps.
+    attachments: jsonb("attachments").notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

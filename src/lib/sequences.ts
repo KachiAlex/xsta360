@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { logEvent } from "@/lib/audit";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
@@ -186,6 +186,36 @@ export async function processSequenceSteps(): Promise<{
               ? buildEmailHtmlFromRich(personalizedBody, orgName)
               : buildEmailHtml(personalizedBody, orgName);
 
+            // Fetch attachment download URLs.
+            const attachmentIds = (nextStep.attachments as string[]) ?? [];
+            let attachments: { filename: string; path: string; contentType?: string }[] = [];
+            if (attachmentIds.length > 0) {
+              const docs = await db
+                .select({
+                  id: schema.documents.id,
+                  fileName: schema.documents.fileName,
+                  r2Key: schema.documents.r2Key,
+                  publicUrl: schema.documents.publicUrl,
+                  mimeType: schema.documents.mimeType,
+                })
+                .from(schema.documents)
+                .where(
+                  and(
+                    eq(schema.documents.orgId, enrollment.orgId),
+                    inArray(schema.documents.id, attachmentIds),
+                  ),
+                );
+              const { getDownloadUrl } = await import("@/lib/r2");
+              for (const doc of docs) {
+                const url = await getDownloadUrl(doc.r2Key, doc.publicUrl);
+                attachments.push({
+                  filename: doc.fileName,
+                  path: url,
+                  contentType: doc.mimeType,
+                });
+              }
+            }
+
             await sendMail(
               lead.email,
               personalizedSubject,
@@ -193,6 +223,7 @@ export async function processSequenceSteps(): Promise<{
               {
                 senderName: nextStep.senderName || orgName,
                 replyTo: org?.replyToEmail || undefined,
+                attachments,
               },
             );
             emailsSent++;

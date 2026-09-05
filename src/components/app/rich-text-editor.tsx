@@ -18,11 +18,13 @@ export function RichTextEditor({
   defaultValue,
   placeholder,
   rows = 6,
+  onChange,
 }: {
   name: string;
   defaultValue?: string;
   placeholder?: string;
   rows?: number;
+  onChange?: (html: string) => void;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
   const linkModalRef = useRef<HTMLDivElement>(null);
@@ -49,7 +51,9 @@ export function RichTextEditor({
 
   function syncHtml() {
     if (editorRef.current) {
-      setHtml(editorRef.current.innerHTML);
+      const newHtml = editorRef.current.innerHTML;
+      setHtml(newHtml);
+      onChange?.(newHtml);
     }
   }
 

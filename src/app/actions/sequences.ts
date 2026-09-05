@@ -35,6 +35,7 @@ const CreateStepSchema = z.object({
   subject: z.string().trim().optional().or(z.literal("")),
   body: z.string().min(1, "Content is required"),
   senderName: z.string().trim().optional().or(z.literal("")),
+  attachments: z.string().optional().or(z.literal("")),
 });
 
 const EnrollSchema = z.object({
@@ -138,6 +139,7 @@ export async function addSequenceStep(
     subject: formData.get("subject"),
     body: formData.get("body"),
     senderName: formData.get("senderName"),
+    attachments: formData.get("attachments"),
   });
   if (!parsed.success) {
     return {
@@ -166,6 +168,17 @@ export async function addSequenceStep(
 
   const nextPos = steps.length;
 
+  // Parse attachments (JSON array of document IDs).
+  let attachmentIds: string[] = [];
+  if (parsed.data.attachments) {
+    try {
+      const parsedAttachments = JSON.parse(parsed.data.attachments);
+      if (Array.isArray(parsedAttachments)) attachmentIds = parsedAttachments.filter((x) => typeof x === "string");
+    } catch {
+      // ignore invalid JSON
+    }
+  }
+
   await db.insert(schema.sequenceSteps).values({
     sequenceId: parsed.data.sequenceId,
     orgId: ctx.orgId,
@@ -175,6 +188,7 @@ export async function addSequenceStep(
     subject: parsed.data.subject || null,
     body: parsed.data.body,
     senderName: parsed.data.senderName || null,
+    attachments: attachmentIds,
   });
 
   revalidatePath("/sequences");

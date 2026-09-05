@@ -15,6 +15,7 @@ export interface SequenceWithSteps {
     subject: string | null;
     body: string;
     senderName: string | null;
+    attachments: string[];
   }[];
   enrollmentCount: number;
 }
@@ -66,6 +67,7 @@ export async function getOrgSequences(orgId: string): Promise<SequenceWithSteps[
         subject: s.subject,
         body: s.body,
         senderName: s.senderName,
+        attachments: (s.attachments as string[]) ?? [],
       })),
     enrollmentCount: enrollmentCounts.get(seq.id) ?? 0,
   }));
