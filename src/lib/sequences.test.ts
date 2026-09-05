@@ -118,9 +118,10 @@ describe("processSequenceSteps — email flow", () => {
   //   1. enrollments (where status=active) — no limit, iterated directly
   //   2. steps (where sequenceId=..., orderBy position) — no limit
   //   3. lead (where id=leadId, limit 1)
-  //   4. org (where id=orgId, limit 1)
-  //   5. rep (where id=assigneeId, limit 1) — only if lead.assigneeId is set
-  //   6. documents (where orgId + inArray attachmentIds) — only if attachments
+  //   4. sequence (where id=sequenceId, limit 1) — for business hours
+  //   5. org (where id=orgId, limit 1)
+  //   6. rep (where id=assigneeId, limit 1) — only if lead.assigneeId is set
+  //   7. documents (where orgId + inArray attachmentIds) — only if attachments
   function buildMockDb(opts: {
     enrollments: any[];
     steps: any[];
@@ -128,12 +129,14 @@ describe("processSequenceSteps — email flow", () => {
     org?: any;
     rep?: any;
     documents?: any[];
+    sequence?: any;
   }) {
     let callIdx = 0;
     const selectReturns = [
       opts.enrollments, // enrollments
       opts.steps, // steps
       opts.lead ? [opts.lead] : [], // lead
+      opts.sequence ? [opts.sequence] : [{ id: "seq-1", sendWindowStart: null, sendWindowEnd: null, skipWeekends: false, timezone: "Africa/Lagos" }], // sequence
       opts.org ? [opts.org] : [], // org
       opts.rep ? [opts.rep] : [], // rep (if assigneeId)
       opts.documents ?? [], // documents (if attachments)
@@ -160,7 +163,9 @@ describe("processSequenceSteps — email flow", () => {
         };
       }),
       insert: vi.fn(() => ({
-        values: vi.fn(() => Promise.resolve()),
+        values: vi.fn(() => ({
+          returning: vi.fn(() => Promise.resolve([{ id: "evt-" + Math.random() }])),
+        })),
       })),
       update: vi.fn(() => ({
         set: vi.fn(() => ({
@@ -221,9 +226,10 @@ describe("processSequenceSteps — email flow", () => {
     vi.doMock("@/db", () => ({
       db: mockDbEmail,
       schema: {
-        sequences: { id: "id", orgId: "org_id", active: "active" },
-        sequenceEnrollments: { id: "id", sequenceId: "seq_id", leadId: "lead_id", status: "status", orgId: "org_id" },
+        sequences: { id: "id", orgId: "org_id", active: "active", sendWindowStart: "send_window_start", sendWindowEnd: "send_window_end", skipWeekends: "skip_weekends", timezone: "timezone" },
+        sequenceEnrollments: { id: "id", sequenceId: "seq_id", leadId: "lead_id", status: "status", orgId: "org_id", unsubscribeToken: "unsubscribe_token" },
         sequenceSteps: { sequenceId: "seq_id", position: "position" },
+        sequenceEmailEvents: { id: "id", orgId: "org_id", enrollmentId: "enrollment_id", stepId: "step_id", leadId: "lead_id", eventType: "event_type", variant: "variant" },
         leads: { id: "id" },
         organizations: { id: "id", name: "name", whatsappConfig: "whatsapp_config", replyToEmail: "reply_to_email" },
         users: { id: "id", name: "name" },
@@ -256,15 +262,15 @@ describe("processSequenceSteps — email flow", () => {
     expect(sendMailMock).toHaveBeenCalledTimes(1);
 
     // Check the email was sent with the right parameters
-    const callArgs = sendMailMock.mock.calls[0];
+    const callArgs = sendMailMock.mock.calls[0] as any[];
     expect(callArgs[0]).toBe("adaeze@example.com"); // to
     expect(callArgs[1]).toContain("Welcome"); // subject
     expect(callArgs[2]).toContain("<p>Hi"); // html body
 
     // Check options: senderName and replyTo
-    const options = callArgs[3];
-    expect(options.senderName).toBe("Tunde from Kreatix");
-    expect(options.replyTo).toBe("replies@kreatix.com");
+    const options = callArgs[3] as any;
+    expect(options?.senderName).toBe("Tunde from Kreatix");
+    expect(options?.replyTo).toBe("replies@kreatix.com");
   });
 
   it("skips email if lead has no email address", async () => {
@@ -311,9 +317,10 @@ describe("processSequenceSteps — email flow", () => {
     vi.doMock("@/db", () => ({
       db: mockDbNoEmail,
       schema: {
-        sequences: { id: "id", orgId: "org_id", active: "active" },
-        sequenceEnrollments: { id: "id", sequenceId: "seq_id", leadId: "lead_id", status: "status", orgId: "org_id" },
+        sequences: { id: "id", orgId: "org_id", active: "active", sendWindowStart: "send_window_start", sendWindowEnd: "send_window_end", skipWeekends: "skip_weekends", timezone: "timezone" },
+        sequenceEnrollments: { id: "id", sequenceId: "seq_id", leadId: "lead_id", status: "status", orgId: "org_id", unsubscribeToken: "unsubscribe_token" },
         sequenceSteps: { sequenceId: "seq_id", position: "position" },
+        sequenceEmailEvents: { id: "id", orgId: "org_id", enrollmentId: "enrollment_id", stepId: "step_id", leadId: "lead_id", eventType: "event_type", variant: "variant" },
         leads: { id: "id" },
         organizations: { id: "id", name: "name", whatsappConfig: "whatsapp_config", replyToEmail: "reply_to_email" },
         users: { id: "id", name: "name" },
@@ -387,9 +394,10 @@ describe("processSequenceSteps — email flow", () => {
     vi.doMock("@/db", () => ({
       db: mockDbDefaultSender,
       schema: {
-        sequences: { id: "id", orgId: "org_id", active: "active" },
-        sequenceEnrollments: { id: "id", sequenceId: "seq_id", leadId: "lead_id", status: "status", orgId: "org_id" },
+        sequences: { id: "id", orgId: "org_id", active: "active", sendWindowStart: "send_window_start", sendWindowEnd: "send_window_end", skipWeekends: "skip_weekends", timezone: "timezone" },
+        sequenceEnrollments: { id: "id", sequenceId: "seq_id", leadId: "lead_id", status: "status", orgId: "org_id", unsubscribeToken: "unsubscribe_token" },
         sequenceSteps: { sequenceId: "seq_id", position: "position" },
+        sequenceEmailEvents: { id: "id", orgId: "org_id", enrollmentId: "enrollment_id", stepId: "step_id", leadId: "lead_id", eventType: "event_type", variant: "variant" },
         leads: { id: "id" },
         organizations: { id: "id", name: "name", whatsappConfig: "whatsapp_config", replyToEmail: "reply_to_email" },
         users: { id: "id", name: "name" },
@@ -415,8 +423,8 @@ describe("processSequenceSteps — email flow", () => {
     await processSequenceSteps();
 
     expect(sendMailMock).toHaveBeenCalledTimes(1);
-    const options = sendMailMock.mock.calls[0][3];
-    expect(options.senderName).toBe("My Org"); // defaults to org name
+    const options = (sendMailMock.mock.calls[0] as any[])[3] as any;
+    expect(options?.senderName).toBe("My Org"); // defaults to org name
   });
 
   it("detects HTML body from rich text editor and uses buildEmailHtmlFromRich", async () => {
@@ -470,9 +478,10 @@ describe("processSequenceSteps — email flow", () => {
     vi.doMock("@/db", () => ({
       db: mockDbHtml,
       schema: {
-        sequences: { id: "id", orgId: "org_id", active: "active" },
-        sequenceEnrollments: { id: "id", sequenceId: "seq_id", leadId: "lead_id", status: "status", orgId: "org_id" },
+        sequences: { id: "id", orgId: "org_id", active: "active", sendWindowStart: "send_window_start", sendWindowEnd: "send_window_end", skipWeekends: "skip_weekends", timezone: "timezone" },
+        sequenceEnrollments: { id: "id", sequenceId: "seq_id", leadId: "lead_id", status: "status", orgId: "org_id", unsubscribeToken: "unsubscribe_token" },
         sequenceSteps: { sequenceId: "seq_id", position: "position" },
+        sequenceEmailEvents: { id: "id", orgId: "org_id", enrollmentId: "enrollment_id", stepId: "step_id", leadId: "lead_id", eventType: "event_type", variant: "variant" },
         leads: { id: "id" },
         organizations: { id: "id", name: "name", whatsappConfig: "whatsapp_config", replyToEmail: "reply_to_email" },
         users: { id: "id", name: "name" },

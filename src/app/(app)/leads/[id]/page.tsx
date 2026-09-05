@@ -293,6 +293,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     totalSteps: e.totalSteps,
                     enrolledAt: e.enrolledAt.toISOString(),
                     completedAt: e.completedAt?.toISOString() ?? null,
+                    pausedReason: e.pausedReason,
+                    repliedAt: e.repliedAt?.toISOString() ?? null,
+                    bouncedAt: e.bouncedAt?.toISOString() ?? null,
                   }))}
                 />
               </Panel>

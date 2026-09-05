@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { bulkAssignCategory, type CategoryFormState } from "@/app/actions/categories";
 import { bulkDeleteLeads, bulkAssignLeads, bulkMoveStage, type BulkFormState } from "@/app/actions/leads";
+import { bulkEnrollLeads } from "@/app/actions/sequences";
 
 export interface BulkCategoryOption {
   id: string;
@@ -22,13 +23,20 @@ export interface BulkStageOption {
   name: string;
 }
 
-type Panel = "category" | "assign" | "stage" | "delete" | null;
+export interface BulkSequenceOption {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
+type Panel = "category" | "assign" | "stage" | "delete" | "sequence" | null;
 
 export function BulkActionBar({
   leadIds,
   categories,
   members,
   stages,
+  sequences,
   selected,
   onClear,
   canDelete,
@@ -37,6 +45,7 @@ export function BulkActionBar({
   categories: BulkCategoryOption[];
   members: BulkMemberOption[];
   stages: BulkStageOption[];
+  sequences: BulkSequenceOption[];
   selected: Set<string>;
   onClear: () => void;
   canDelete: boolean;
@@ -91,6 +100,13 @@ export function BulkActionBar({
     run(() => bulkMoveStage({}, fd));
   }
 
+  function doEnrollSequence(sequenceId: string) {
+    const fd = new FormData();
+    fd.set("leadIds", selectedIds.join(","));
+    fd.set("sequenceId", sequenceId);
+    run(() => bulkEnrollLeads({}, fd));
+  }
+
   if (count === 0) return null;
 
   return (
@@ -129,6 +145,17 @@ export function BulkActionBar({
             className="text-xs font-semibold bg-paper text-ink rounded px-3 py-1.5 min-h-[36px] hover:bg-paper-2"
           >
             📋 Stage
+          </button>
+        )}
+
+        {/* Enroll in sequence */}
+        {sequences.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setActivePanel(activePanel === "sequence" ? null : "sequence")}
+            className="text-xs font-semibold bg-paper text-ink rounded px-3 py-1.5 min-h-[36px] hover:bg-paper-2"
+          >
+            ⚡ Sequence
           </button>
         )}
 
@@ -234,6 +261,29 @@ export function BulkActionBar({
                 {s.name}
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Sequence enrollment panel */}
+      {activePanel === "sequence" && (
+        <div className="bg-panel border border-rule rounded p-3 mb-2">
+          <p className="text-xs font-semibold text-ink-soft mb-2">Enroll {count} lead{count === 1 ? "" : "s"} in sequence:</p>
+          <div className="flex flex-wrap gap-1.5">
+            {sequences.filter((s) => s.active).map((seq) => (
+              <button
+                key={seq.id}
+                type="button"
+                disabled={pending}
+                onClick={() => doEnrollSequence(seq.id)}
+                className="text-xs px-2.5 py-1.5 min-h-[36px] rounded border border-rule bg-paper hover:bg-paper-2 transition-colors disabled:opacity-50"
+              >
+                ⚡ {seq.name}
+              </button>
+            ))}
+            {sequences.filter((s) => s.active).length === 0 && (
+              <p className="text-xs text-ink-soft">No active sequences. Activate a sequence first.</p>
+            )}
           </div>
         </div>
       )}

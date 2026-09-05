@@ -1,5 +1,6 @@
 import "server-only";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import { db, schema } from "@/db";
 import { logEvent } from "@/lib/audit";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
@@ -8,6 +9,7 @@ import { replacePlaceholders, buildEmailHtml, buildEmailHtmlFromRich, formatWhat
 
 /**
  * Enroll a lead in a sequence. Creates the enrollment record.
+ * Generates a unique unsubscribe token for the enrollment.
  * The cron job will process steps based on delayDays.
  */
 export async function enrollLeadInSequence(
@@ -27,6 +29,17 @@ export async function enrollLeadInSequence(
 
   if (!seq) return { ok: false, message: "Sequence not found" };
   if (!seq.active) return { ok: false, message: "Sequence is not active" };
+
+  // Check lead isn't unsubscribed
+  const [lead] = await db
+    .select({ unsubscribedAt: schema.leads.unsubscribedAt })
+    .from(schema.leads)
+    .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, orgId)))
+    .limit(1);
+
+  if (lead?.unsubscribedAt) {
+    return { ok: false, message: "Lead has unsubscribed from sequence emails" };
+  }
 
   // Check lead isn't already enrolled in this sequence.
   const [existing] = await db
@@ -52,6 +65,7 @@ export async function enrollLeadInSequence(
       enrolledBy,
       currentStep: 0,
       status: "active",
+      unsubscribeToken: randomUUID(),
     })
     .returning();
 
@@ -65,25 +79,71 @@ export async function enrollLeadInSequence(
 }
 
 /**
+ * Check if the current time is within the sequence's sending window.
+ * Returns true if we should send now, false if we should wait.
+ */
+function isWithinSendWindow(
+  seq: { sendWindowStart: string | null; sendWindowEnd: string | null; skipWeekends: boolean; timezone: string },
+  now: Date,
+): boolean {
+  // If no window configured, send anytime.
+  if (!seq.sendWindowStart || !seq.sendWindowEnd) return true;
+
+  // Get current time in the sequence's timezone.
+  // We use Intl to format the time in the target timezone.
+  const tz = seq.timezone || "Africa/Lagos";
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    weekday: "short",
+  });
+  const parts = formatter.formatToParts(now);
+  const hourPart = parts.find((p) => p.type === "hour")?.value ?? "0";
+  const minutePart = parts.find((p) => p.type === "minute")?.value ?? "0";
+  const weekdayPart = parts.find((p) => p.type === "weekday")?.value ?? "";
+
+  // Skip weekends if configured
+  if (seq.skipWeekends && (weekdayPart === "Sat" || weekdayPart === "Sun")) {
+    return false;
+  }
+
+  const currentMinutes = parseInt(hourPart) * 60 + parseInt(minutePart);
+  const [startH, startM] = seq.sendWindowStart.split(":").map(Number);
+  const [endH, endM] = seq.sendWindowEnd.split(":").map(Number);
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+
+  return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+}
+
+/**
  * Process due sequence steps. Called by the cron job.
  * For each active enrollment, checks if the next step is due and executes it.
  *
- * Step actions:
- * - "reminder" → create a reminder for the rep (assignee) to follow up
- * - "email" → send an email directly to the lead
- * - "whatsapp" → send a WhatsApp message directly to the lead
+ * Features:
+ * - Business hours / weekend skip
+ * - Skip unsubscribed leads
+ * - Skip paused enrollments (paused on reply/bounce/unsubscribe)
+ * - Email open/click tracking via tracking pixel + link rewriting
+ * - Unsubscribe link in email footer
+ * - A/B testing: randomly assign variant A or B
+ * - Record email events for analytics
  */
 export async function processSequenceSteps(): Promise<{
   processed: number;
   emailsSent: number;
   whatsappSent: number;
   remindersCreated: number;
+  skippedWindow: number;
 }> {
   const now = new Date();
   let processed = 0;
   let emailsSent = 0;
   let whatsappSent = 0;
   let remindersCreated = 0;
+  let skippedWindow = 0;
 
   // Get all active enrollments.
   const enrollments = await db
@@ -132,6 +192,35 @@ export async function processSequenceSteps(): Promise<{
       continue;
     }
 
+    // Skip unsubscribed leads for email steps.
+    if (lead.unsubscribedAt && nextStep.action === "email") {
+      await db
+        .update(schema.sequenceEnrollments)
+        .set({
+          status: "paused",
+          pausedReason: "unsubscribed",
+          pausedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(schema.sequenceEnrollments.id, enrollment.id));
+      continue;
+    }
+
+    // Load the sequence for business hours.
+    const [seq] = await db
+      .select()
+      .from(schema.sequences)
+      .where(eq(schema.sequences.id, enrollment.sequenceId))
+      .limit(1);
+
+    // Check business hours for email/whatsapp steps (reminders can fire anytime).
+    if (nextStep.action !== "reminder" && seq) {
+      if (!isWithinSendWindow(seq, now)) {
+        skippedWindow++;
+        continue;
+      }
+    }
+
     // Load the org for WhatsApp config, org name, and reply-to email.
     const [org] = await db
       .select({
@@ -169,22 +258,54 @@ export async function processSequenceSteps(): Promise<{
       ? `${nextStep.subject}: ${nextStep.body}`
       : nextStep.body;
 
+    // A/B testing: pick variant
+    let useVariantB = false;
+    if (nextStep.variantBBody && nextStep.action === "email") {
+      useVariantB = Math.random() < 0.5;
+    }
+
+    const stepBody = useVariantB ? (nextStep.variantBBody || nextStep.body) : nextStep.body;
+    const stepSubject = useVariantB ? (nextStep.variantBSubject || nextStep.subject) : nextStep.subject;
+    const stepSenderName = useVariantB ? (nextStep.variantBSenderName || nextStep.senderName) : nextStep.senderName;
+    const variant = useVariantB ? "b" : "a";
+
     switch (action) {
       case "email": {
         // Send email directly to the lead.
         if (lead.email) {
           try {
-            const personalizedBody = replacePlaceholders(nextStep.body, msgCtx);
+            const personalizedBody = replacePlaceholders(stepBody, msgCtx);
             const personalizedSubject = replacePlaceholders(
-              nextStep.subject || `Message from ${orgName}`,
+              stepSubject || `Message from ${orgName}`,
               msgCtx,
             );
+
+            // Create a tracking event record first (we need the ID for the pixel).
+            const [emailEvent] = await db
+              .insert(schema.sequenceEmailEvents)
+              .values({
+                orgId: enrollment.orgId,
+                enrollmentId: enrollment.id,
+                stepId: nextStep.id,
+                leadId: lead.id,
+                eventType: "sent",
+                variant,
+              })
+              .returning();
+
+            const appUrl = process.env.APP_URL ?? "https://xsta360.com.ng";
+            const tracking = {
+              eventId: emailEvent.id,
+              appUrl,
+              unsubscribeToken: enrollment.unsubscribeToken || "",
+            };
+
             // If body is already HTML (from rich text editor), use it directly.
             // Otherwise, convert markdown to HTML.
-            const isHtml = /<[a-z][\s\S]*>/i.test(nextStep.body);
+            const isHtml = /<[a-z][\s\S]*>/i.test(stepBody);
             const emailHtml = isHtml
-              ? buildEmailHtmlFromRich(personalizedBody, orgName)
-              : buildEmailHtml(personalizedBody, orgName);
+              ? buildEmailHtmlFromRich(personalizedBody, orgName, tracking)
+              : buildEmailHtml(personalizedBody, orgName, tracking);
 
             // Fetch attachment download URLs.
             const attachmentIds = (nextStep.attachments as string[]) ?? [];
@@ -221,7 +342,7 @@ export async function processSequenceSteps(): Promise<{
               personalizedSubject,
               emailHtml,
               {
-                senderName: nextStep.senderName || orgName,
+                senderName: stepSenderName || orgName,
                 replyTo: org?.replyToEmail || undefined,
                 attachments,
               },
@@ -251,7 +372,7 @@ export async function processSequenceSteps(): Promise<{
           | { enabled?: boolean; phoneNumberId?: string; apiKey?: string }
           | undefined;
         if (whatsappConfig?.enabled && whatsappConfig.phoneNumberId && whatsappConfig.apiKey && lead.phone) {
-          const personalizedBody = replacePlaceholders(nextStep.body, msgCtx);
+          const personalizedBody = replacePlaceholders(stepBody, msgCtx);
           const msg = formatWhatsAppMessage(personalizedBody, orgName);
           const result = await sendWhatsAppMessage(whatsappConfig, lead.phone, msg);
           if (result.success) {
@@ -299,6 +420,7 @@ export async function processSequenceSteps(): Promise<{
         stepId: nextStep.id,
         stepPosition: nextStep.position,
         action,
+        variant,
       },
     });
 
@@ -314,5 +436,5 @@ export async function processSequenceSteps(): Promise<{
     processed++;
   }
 
-  return { processed, emailsSent, whatsappSent, remindersCreated };
+  return { processed, emailsSent, whatsappSent, remindersCreated, skippedWindow };
 }

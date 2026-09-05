@@ -138,6 +138,7 @@ export async function GET(request: Request) {
     sequenceEmails: seqResult.emailsSent,
     sequenceWhatsapp: seqResult.whatsappSent,
     sequenceReminders: seqResult.remindersCreated,
+    sequenceSkippedWindow: seqResult.skippedWindow,
     scoresUpdated,
   });
 }

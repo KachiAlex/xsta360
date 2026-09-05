@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useActionState } from "react";
-import { enrollLead, unenrollLead, type SequenceFormState } from "@/app/actions/sequences";
+import { enrollLead, unenrollLead, pauseEnrollment, resumeEnrollment, type SequenceFormState } from "@/app/actions/sequences";
 
 export interface SequenceOption {
   id: string;
@@ -20,6 +20,9 @@ export interface Enrollment {
   totalSteps: number;
   enrolledAt: string;
   completedAt: string | null;
+  pausedReason: string | null;
+  repliedAt: string | null;
+  bouncedAt: string | null;
 }
 
 export function LeadSequences({
@@ -37,6 +40,10 @@ export function LeadSequences({
   );
   const [unenrollState, unenrollAction, unenrollPending] = useActionState<SequenceFormState, FormData>(
     unenrollLead,
+    {},
+  );
+  const [, resumeAction] = useActionState<SequenceFormState, FormData>(
+    resumeEnrollment,
     {},
   );
   const [showEnroll, setShowEnroll] = useState(false);
@@ -60,6 +67,17 @@ export function LeadSequences({
                     )}
                     {e.status === "completed" && <span className="text-register">✓ Completed</span>}
                     {e.status === "cancelled" && <span className="text-stamp">Cancelled</span>}
+                    {e.status === "paused" && (
+                      <span className="text-amber-600">
+                        ⏸ Paused
+                        {e.pausedReason === "reply" && " — lead replied"}
+                        {e.pausedReason === "bounce" && " — email bounced"}
+                        {e.pausedReason === "unsubscribed" && " — unsubscribed"}
+                        {e.pausedReason === "manual" && " — manual"}
+                      </span>
+                    )}
+                    {e.repliedAt && <div className="text-register mt-0.5">↩ Replied {new Date(e.repliedAt).toLocaleDateString()}</div>}
+                    {e.bouncedAt && <div className="text-stamp mt-0.5">⚠ Email bounced {new Date(e.bouncedAt).toLocaleDateString()}</div>}
                   </div>
                 </div>
                 {e.status === "active" && (
@@ -71,6 +89,17 @@ export function LeadSequences({
                       className="text-xs text-stamp hover:underline disabled:opacity-50 min-h-[40px] px-2"
                     >
                       Unenroll
+                    </button>
+                  </form>
+                )}
+                {e.status === "paused" && e.pausedReason !== "unsubscribed" && (
+                  <form action={resumeAction}>
+                    <input type="hidden" name="enrollmentId" value={e.enrollmentId} />
+                    <button
+                      type="submit"
+                      className="text-xs text-register hover:underline min-h-[40px] px-2"
+                    >
+                      Resume
                     </button>
                   </form>
                 )}

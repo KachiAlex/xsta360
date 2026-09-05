@@ -3,6 +3,7 @@ import { requireAuth } from "@/lib/dal";
 import { getOrgStages, getOrgMembers } from "@/lib/queries";
 import { getLeads } from "@/lib/leads";
 import { getOrgCategories } from "@/lib/category-queries";
+import { getOrgSequences } from "@/lib/sequence-queries";
 import { Topbar } from "@/components/app/topbar";
 import { AddLeadModal } from "@/components/app/add-lead-modal";
 import { MobileFab } from "@/components/app/fab";
@@ -28,11 +29,12 @@ export default async function LeadsPage(props: {
 }) {
   const ctx = await requireAuth();
   const filters = await props.searchParams;
-  const [stages, members, leads, categories] = await Promise.all([
+  const [stages, members, leads, categories, sequences] = await Promise.all([
     getOrgStages(ctx.orgId),
     getOrgMembers(ctx.orgId),
     getLeads(ctx.orgId, filters),
     getOrgCategories(ctx.orgId),
+    getOrgSequences(ctx.orgId),
   ]);
 
   const categoryOptions = categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon, color: c.color }));
@@ -142,6 +144,7 @@ export default async function LeadsPage(props: {
               categories={categoryOptions}
               members={members.map((m) => ({ userId: m.userId, name: m.name }))}
               stages={stages.map((s) => ({ id: s.id, name: s.name }))}
+              sequences={sequences.map((s) => ({ id: s.id, name: s.name, active: s.active }))}
               canDelete={ctx.role === "admin" || ctx.role === "manager"}
             />
           </Panel>

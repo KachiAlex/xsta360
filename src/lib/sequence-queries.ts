@@ -7,6 +7,10 @@ export interface SequenceWithSteps {
   name: string;
   description: string | null;
   active: boolean;
+  sendWindowStart: string | null;
+  sendWindowEnd: string | null;
+  skipWeekends: boolean;
+  timezone: string;
   steps: {
     id: string;
     position: number;
@@ -16,6 +20,9 @@ export interface SequenceWithSteps {
     body: string;
     senderName: string | null;
     attachments: string[];
+    variantBSubject: string | null;
+    variantBBody: string | null;
+    variantBSenderName: string | null;
   }[];
   enrollmentCount: number;
 }
@@ -57,6 +64,10 @@ export async function getOrgSequences(orgId: string): Promise<SequenceWithSteps[
     name: seq.name,
     description: seq.description,
     active: seq.active,
+    sendWindowStart: seq.sendWindowStart,
+    sendWindowEnd: seq.sendWindowEnd,
+    skipWeekends: seq.skipWeekends,
+    timezone: seq.timezone,
     steps: steps
       .filter((s) => s.sequenceId === seq.id)
       .map((s) => ({
@@ -68,6 +79,9 @@ export async function getOrgSequences(orgId: string): Promise<SequenceWithSteps[
         body: s.body,
         senderName: s.senderName,
         attachments: (s.attachments as string[]) ?? [],
+        variantBSubject: s.variantBSubject,
+        variantBBody: s.variantBBody,
+        variantBSenderName: s.variantBSenderName,
       })),
     enrollmentCount: enrollmentCounts.get(seq.id) ?? 0,
   }));
@@ -82,6 +96,9 @@ export interface LeadEnrollment {
   totalSteps: number;
   enrolledAt: Date;
   completedAt: Date | null;
+  pausedReason: string | null;
+  repliedAt: Date | null;
+  bouncedAt: Date | null;
 }
 
 /**
@@ -97,6 +114,9 @@ export async function getLeadEnrollments(orgId: string, leadId: string): Promise
       currentStep: schema.sequenceEnrollments.currentStep,
       enrolledAt: schema.sequenceEnrollments.enrolledAt,
       completedAt: schema.sequenceEnrollments.completedAt,
+      pausedReason: schema.sequenceEnrollments.pausedReason,
+      repliedAt: schema.sequenceEnrollments.repliedAt,
+      bouncedAt: schema.sequenceEnrollments.bouncedAt,
     })
     .from(schema.sequenceEnrollments)
     .leftJoin(schema.sequences, eq(schema.sequenceEnrollments.sequenceId, schema.sequences.id))
@@ -129,5 +149,8 @@ export async function getLeadEnrollments(orgId: string, leadId: string): Promise
     totalSteps: stepCounts.get(e.sequenceId) ?? 0,
     enrolledAt: e.enrolledAt,
     completedAt: e.completedAt,
+    pausedReason: e.pausedReason,
+    repliedAt: e.repliedAt,
+    bouncedAt: e.bouncedAt,
   }));
 }

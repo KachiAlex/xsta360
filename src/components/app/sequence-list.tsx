@@ -7,6 +7,8 @@ import {
   toggleSequenceActive,
   addSequenceStep,
   deleteSequenceStep,
+  updateSequenceStep,
+  updateSequenceSettings,
   type SequenceFormState,
 } from "@/app/actions/sequences";
 import { Button } from "@/components/ui/button";
@@ -26,6 +28,9 @@ interface Step {
   body: string;
   senderName: string | null;
   attachments: string[];
+  variantBSubject: string | null;
+  variantBBody: string | null;
+  variantBSenderName: string | null;
 }
 
 interface Sequence {
@@ -33,6 +38,10 @@ interface Sequence {
   name: string;
   description: string | null;
   active: boolean;
+  sendWindowStart: string | null;
+  sendWindowEnd: string | null;
+  skipWeekends: boolean;
+  timezone: string;
   steps: Step[];
   enrollmentCount: number;
 }
@@ -137,9 +146,19 @@ function SequenceItem({
           )}
           <div className="text-xs text-ink-soft font-mono mt-1">
             {sequence.enrollmentCount} enrolled · {sequence.steps.length} steps
+            {sequence.sendWindowStart && sequence.sendWindowEnd && (
+              <span className="ml-2">· ⏰ {sequence.sendWindowStart}–{sequence.sendWindowEnd} {sequence.timezone}</span>
+            )}
+            {sequence.skipWeekends && <span className="ml-2">· No weekends</span>}
           </div>
         </div>
         <div className="flex gap-2 shrink-0">
+          <a
+            href={`/sequences/${sequence.id}`}
+            className="text-xs text-ink-soft hover:text-ink min-h-[40px] px-2 active:bg-paper-2 rounded flex items-center"
+          >
+            📊 Analytics
+          </a>
           <button
             type="button"
             className="text-xs text-ink-soft hover:text-ink min-h-[40px] px-2 active:bg-paper-2 rounded"

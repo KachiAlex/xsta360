@@ -367,6 +367,8 @@ export const leads = pgTable(
     contactCardId: uuid("contact_card_id").references(() => contactCards.id, {
       onDelete: "set null",
     }),
+    // When the lead unsubscribed from sequence emails (null = not unsubscribed).
+    unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -626,6 +628,14 @@ export const sequences = pgTable(
     description: text("description"),
     // Whether this sequence is active and can enroll new leads.
     active: boolean("active").notNull().default(true),
+    // Business hours: only send emails during this window (e.g. "09:00"–"17:00").
+    // null = send anytime.
+    sendWindowStart: text("send_window_start"),
+    sendWindowEnd: text("send_window_end"),
+    // Skip sending on weekends (Saturday + Sunday).
+    skipWeekends: boolean("skip_weekends").notNull().default(false),
+    // Timezone for business hours evaluation (IANA name, e.g. "Africa/Lagos").
+    timezone: text("timezone").notNull().default("Africa/Lagos"),
     createdBy: uuid("created_by").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -660,6 +670,10 @@ export const sequenceSteps = pgTable(
     senderName: text("sender_name"),
     // Attached document IDs (JSON array of document UUIDs) for email steps.
     attachments: jsonb("attachments").notNull().default([]),
+    // A/B testing: variant B content (null = no A/B test for this step).
+    variantBSubject: text("variant_b_subject"),
+    variantBBody: text("variant_b_body"),
+    variantBSenderName: text("variant_b_sender_name"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
@@ -686,6 +700,15 @@ export const sequenceEnrollments = pgTable(
     // Current step position (0 = not started yet).
     currentStep: integer("current_step").notNull().default(0),
     status: text("status").notNull().default("active"),
+    // Why the enrollment was paused: "reply", "bounce", "unsubscribed", "manual".
+    pausedReason: text("paused_reason"),
+    pausedAt: timestamp("paused_at", { withTimezone: true }),
+    // Reply/bounce tracking.
+    repliedAt: timestamp("replied_at", { withTimezone: true }),
+    bouncedAt: timestamp("bounced_at", { withTimezone: true }),
+    bounceReason: text("bounce_reason"),
+    // Unique token for unsubscribe links (generated at enrollment time).
+    unsubscribeToken: text("unsubscribe_token").unique(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     enrolledAt: timestamp("enrolled_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -694,6 +717,71 @@ export const sequenceEnrollments = pgTable(
     seqLeadIdx: index("sequence_enrollments_seq_lead_idx").on(t.sequenceId, t.leadId),
     orgStatusIdx: index("sequence_enrollments_org_status_idx").on(t.orgId, t.status),
     leadIdx: index("sequence_enrollments_lead_idx").on(t.leadId),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Sequence email events (tracking opens, clicks, replies, bounces, unsubscribes)
+// ---------------------------------------------------------------------------
+
+export const sequenceEmailEvents = pgTable(
+  "sequence_email_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    enrollmentId: uuid("enrollment_id")
+      .notNull()
+      .references(() => sequenceEnrollments.id, { onDelete: "cascade" }),
+    stepId: uuid("step_id")
+      .notNull()
+      .references(() => sequenceSteps.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    // Event type: "sent", "delivered", "opened", "clicked", "replied", "bounced", "unsubscribed"
+    eventType: text("event_type").notNull(),
+    // For click events: the URL that was clicked.
+    url: text("url"),
+    // Which A/B variant was sent: "a" or "b" (null for non-email steps).
+    variant: text("variant"),
+    // Request metadata for analytics.
+    userAgent: text("user_agent"),
+    ipAddress: text("ip_address"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    enrollmentIdx: index("seq_email_events_enrollment_idx").on(t.enrollmentId),
+    stepIdx: index("seq_email_events_step_idx").on(t.stepId),
+    orgTypeIdx: index("seq_email_events_org_type_idx").on(t.orgId, t.eventType),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Sequence templates (reusable sequence definitions)
+// ---------------------------------------------------------------------------
+
+export const sequenceTemplates = pgTable(
+  "sequence_templates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    // Category for filtering: "real_estate", "saas", "agency", "general", etc.
+    category: text("category").notNull().default("general"),
+    // Full sequence definition as JSON: { steps: [{ delayDays, action, subject, body, senderName }] }
+    definition: jsonb("definition").notNull().default({}),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("sequence_templates_org_idx").on(t.orgId),
   }),
 );
 
