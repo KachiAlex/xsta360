@@ -139,13 +139,13 @@ export default async function FollowUpsPage() {
 
             {/* Sheet (table) view */}
             <div data-fu-view="sheet" style={{ display: "none" }}>
-              <div className="bg-panel border border-rule rounded-md overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="bg-panel border border-rule rounded-md overflow-x-auto">
+                <table className="w-full text-sm min-w-[640px]">
                   <thead className="bg-paper-2 border-b border-rule">
                     <tr className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft">
                       <th className="px-3 sm:px-4 py-3 font-semibold">Lead</th>
                       <th className="px-3 sm:px-4 py-3 font-semibold hidden sm:table-cell">Stage</th>
-                      <th className="px-3 sm:px-4 py-3 font-semibold">Last activity</th>
+                      <th className="px-3 sm:px-4 py-3 font-semibold max-w-[200px]">Last activity</th>
                       <th className="px-3 sm:px-4 py-3 font-semibold">Bucket</th>
                       <th className="px-3 sm:px-4 py-3 font-semibold hidden sm:table-cell">Reminder</th>
                       <th className="px-3 sm:px-4 py-3 font-semibold hidden sm:table-cell">Score</th>
@@ -172,11 +172,11 @@ export default async function FollowUpsPage() {
                         <td className="px-3 sm:px-4 py-3 hidden sm:table-cell">
                           {lead.stageName && <Badge tone="neutral">{lead.stageName}</Badge>}
                         </td>
-                        <td className="px-3 sm:px-4 py-3 text-xs text-ink-soft">
+                        <td className="px-3 sm:px-4 py-3 text-xs text-ink-soft max-w-[200px]">
                           {lead.lastActivityBody ? (
                             <>
                               <span className="mr-1">{ACTIVITY_ICONS[lead.lastActivityType ?? "note"] ?? "📝"}</span>
-                              <span className="truncate">{lead.lastActivityBody}</span>
+                              <span className="block truncate">{lead.lastActivityBody}</span>
                               <div className="text-[10px] mt-0.5">{formatRelative(lead.lastActivityAt)}</div>
                             </>
                           ) : (
@@ -268,10 +268,10 @@ export default async function FollowUpsPage() {
                 </table>
               </div>
 
-              {/* Mobile card fallback for sheet view */}
+              {/* Mobile hint for sheet view */}
               <div className="sm:hidden mt-3">
                 <div className="text-xs text-ink-soft text-center">
-                  Swipe horizontally to see all columns →
+                  Scroll horizontally to see all columns →
                 </div>
               </div>
             </div>

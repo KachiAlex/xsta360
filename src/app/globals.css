@@ -64,6 +64,19 @@ body {
   }
 }
 
+/* Prevent overscroll bounce on mobile for the app shell. */
+@media (max-width: 767px) {
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
+/* Improve touch scrolling on horizontal scroll containers. */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
 /* App main content needs padding for the fixed hamburger and bottom nav.
    Account for the device safe area so content isn't hidden by notches. */
 .app-main {

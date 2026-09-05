@@ -190,7 +190,7 @@ export function DocumentUpload({
               <button
                 type="button"
                 onClick={() => handleDelete(doc.id)}
-                className="text-xs text-stamp hover:underline flex-shrink-0"
+                className="text-xs text-stamp hover:underline flex-shrink-0 min-h-[40px] px-2 flex items-center"
               >
                 Delete
               </button>

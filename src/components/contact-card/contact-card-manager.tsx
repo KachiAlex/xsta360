@@ -173,7 +173,7 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full rounded border border-rule bg-paper px-3 py-2 text-ink focus:outline-none focus:ring-2 focus:ring-ink"
+              className="w-full rounded border border-rule bg-paper px-3 py-2 min-h-[44px] text-ink focus:outline-none focus:ring-2 focus:ring-ink"
               placeholder="Tunde Bakare"
               required
             />
@@ -192,7 +192,7 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded border border-rule bg-paper px-3 py-2 text-ink focus:outline-none focus:ring-2 focus:ring-ink"
+              className="w-full rounded border border-rule bg-paper px-3 py-2 min-h-[44px] text-ink focus:outline-none focus:ring-2 focus:ring-ink"
               placeholder="Sales Rep"
             />
           </div>
@@ -207,7 +207,7 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
               type="text"
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="w-full rounded border border-rule bg-paper px-3 py-2 text-ink focus:outline-none focus:ring-2 focus:ring-ink"
+              className="w-full rounded border border-rule bg-paper px-3 py-2 min-h-[44px] text-ink focus:outline-none focus:ring-2 focus:ring-ink"
               placeholder="Account Executive"
             />
           </div>
@@ -222,7 +222,7 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
               type="text"
               value={company}
               onChange={(e) => setCompany(e.target.value)}
-              className="w-full rounded border border-rule bg-paper px-3 py-2 text-ink focus:outline-none focus:ring-2 focus:ring-ink"
+              className="w-full rounded border border-rule bg-paper px-3 py-2 min-h-[44px] text-ink focus:outline-none focus:ring-2 focus:ring-ink"
               placeholder="Kreatix Technologies"
             />
           </div>
@@ -237,7 +237,7 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
               type="url"
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
-              className="w-full rounded border border-rule bg-paper px-3 py-2 text-ink focus:outline-none focus:ring-2 focus:ring-ink"
+              className="w-full rounded border border-rule bg-paper px-3 py-2 min-h-[44px] text-ink focus:outline-none focus:ring-2 focus:ring-ink"
               placeholder="https://kreatix.com"
             />
             {state?.errors?.website && (
@@ -255,7 +255,7 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded border border-rule bg-paper px-3 py-2 text-ink focus:outline-none focus:ring-2 focus:ring-ink"
+              className="w-full rounded border border-rule bg-paper px-3 py-2 min-h-[44px] text-ink focus:outline-none focus:ring-2 focus:ring-ink"
               placeholder="tunde@kreatix.com"
             />
             {state?.errors?.email && (
@@ -273,7 +273,7 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full rounded border border-rule bg-paper px-3 py-2 text-ink focus:outline-none focus:ring-2 focus:ring-ink"
+              className="w-full rounded border border-rule bg-paper px-3 py-2 min-h-[44px] text-ink focus:outline-none focus:ring-2 focus:ring-ink"
               placeholder="+2348012345678"
             />
           </div>
@@ -288,7 +288,7 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
               type="tel"
               value={whatsapp}
               onChange={(e) => setWhatsapp(e.target.value)}
-              className="w-full rounded border border-rule bg-paper px-3 py-2 text-ink focus:outline-none focus:ring-2 focus:ring-ink"
+              className="w-full rounded border border-rule bg-paper px-3 py-2 min-h-[44px] text-ink focus:outline-none focus:ring-2 focus:ring-ink"
               placeholder="+2348012345678"
             />
           </div>
@@ -322,7 +322,7 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
                 <button
                   type="button"
                   onClick={handleRemovePhoto}
-                  className="text-xs text-stamp hover:underline mt-2"
+                  className="text-xs text-stamp hover:underline mt-2 min-h-[40px] px-2"
                 >
                   Remove photo
                 </button>
@@ -337,7 +337,7 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
             <button
               type="button"
               onClick={addSocialLink}
-              className="text-xs text-ink hover:underline font-medium"
+              className="text-xs text-ink hover:underline font-medium min-h-[40px] px-2"
             >
               + Add link
             </button>
@@ -362,7 +362,7 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
                 <button
                   type="button"
                   onClick={() => removeSocialLink(index)}
-                  className="px-2 text-stamp hover:text-stamp-deep"
+                  className="px-3 min-h-[44px] min-w-[44px] text-stamp hover:text-stamp-deep flex items-center justify-center rounded border border-rule"
                   aria-label="Remove link"
                 >
                   ×
@@ -402,12 +402,12 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
                     type="text"
                     readOnly
                     value={cardUrl}
-                    className="flex-1 rounded border border-rule bg-paper px-3 py-2 text-sm text-ink"
+                    className="flex-1 rounded border border-rule bg-paper px-3 py-2 min-h-[44px] text-sm text-ink"
                   />
                   <button
                     type="button"
                     onClick={handleCopyLink}
-                    className="px-4 py-2 rounded border border-ink text-ink font-medium hover:bg-paper-2 transition-colors"
+                    className="px-4 py-2 min-h-[44px] rounded border border-ink text-ink font-medium hover:bg-paper-2 transition-colors"
                   >
                     {copied ? "Copied" : "Copy"}
                   </button>
@@ -419,7 +419,7 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
                   <a
                     href={qrDataUrl()}
                     download={`${card.slug}.svg`}
-                    className="inline-flex items-center justify-center px-4 py-2 rounded bg-ink text-paper font-medium hover:bg-ink-soft transition-colors"
+                    className="inline-flex items-center justify-center px-4 py-2 min-h-[44px] rounded bg-ink text-paper font-medium hover:bg-ink-soft transition-colors"
                   >
                     Download QR (SVG)
                   </a>
@@ -427,7 +427,7 @@ export function ContactCardManager({ card }: ContactCardManagerProps) {
                 <Link
                   href={`/c/${card.slug}`}
                   target="_blank"
-                  className="inline-flex items-center justify-center px-4 py-2 rounded border border-ink text-ink font-medium hover:bg-paper-2 transition-colors"
+                  className="inline-flex items-center justify-center px-4 py-2 min-h-[44px] rounded border border-ink text-ink font-medium hover:bg-paper-2 transition-colors"
                 >
                   Open card
                 </Link>

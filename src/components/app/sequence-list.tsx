@@ -110,7 +110,7 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
         <div className="flex gap-2 shrink-0">
           <button
             type="button"
-            className="text-xs text-ink-soft hover:text-ink min-h-[36px] px-2 active:bg-paper-2 rounded"
+            className="text-xs text-ink-soft hover:text-ink min-h-[40px] px-2 active:bg-paper-2 rounded"
             onClick={() => {
               const fd = new FormData();
               fd.set("id", sequence.id);
@@ -123,7 +123,7 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
           </button>
           <button
             type="button"
-            className="text-xs text-stamp hover:underline min-h-[36px] px-2 active:bg-stamp/10 rounded"
+            className="text-xs text-stamp hover:underline min-h-[40px] px-2 active:bg-stamp/10 rounded"
             onClick={() => {
               if (!confirm("Delete this sequence?")) return;
               const fd = new FormData();
@@ -156,7 +156,7 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
               </div>
               <button
                 type="button"
-                className="text-xs text-ink-soft hover:text-stamp"
+                className="text-xs text-ink-soft hover:text-stamp min-w-[36px] min-h-[36px] flex items-center justify-center rounded hover:bg-paper-2"
                 onClick={() => {
                   const fd = new FormData();
                   fd.set("id", step.id);
@@ -211,7 +211,7 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
         <button
           type="button"
           onClick={() => setShowStepForm(true)}
-          className="text-xs font-semibold text-ink-soft hover:text-ink ml-4"
+          className="text-xs font-semibold text-ink-soft hover:text-ink ml-4 min-h-[40px] px-2"
         >
           + Add step
         </button>

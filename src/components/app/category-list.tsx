@@ -58,7 +58,7 @@ export function CategoryList({
         <button
           type="button"
           onClick={() => { setShowForm(true); setEditingId(null); }}
-          className="text-sm font-semibold text-ink hover:underline"
+          className="text-sm font-semibold text-ink hover:underline min-h-[40px] px-2"
         >
           + New category
         </button>
@@ -146,12 +146,12 @@ function CategoryCard({ category, onEdit }: { category: CategoryItem; onEdit: ()
 
       {/* Actions */}
       <div className="mt-3 flex gap-3">
-        <button type="button" onClick={onEdit} className="text-xs font-semibold text-ink-soft hover:text-ink">
+        <button type="button" onClick={onEdit} className="text-xs font-semibold text-ink-soft hover:text-ink min-h-[40px] px-2">
           Edit
         </button>
         <form action={deleteAction}>
           <input type="hidden" name="id" value={category.id} />
-          <button type="submit" disabled={deletePending} className="text-xs font-semibold text-stamp hover:underline disabled:opacity-50">
+          <button type="submit" disabled={deletePending} className="text-xs font-semibold text-stamp hover:underline disabled:opacity-50 min-h-[40px] px-2">
             Delete
           </button>
         </form>
@@ -209,7 +209,7 @@ function CategoryForm({
               key={ic}
               type="button"
               onClick={() => setIcon(ic)}
-              className={`w-8 h-8 rounded text-lg flex items-center justify-center border ${icon === ic ? "border-ink bg-paper" : "border-rule"}`}
+              className={`w-10 h-10 rounded text-lg flex items-center justify-center border ${icon === ic ? "border-ink bg-paper" : "border-rule"}`}
             >
               {ic}
             </button>
@@ -227,7 +227,7 @@ function CategoryForm({
               key={c}
               type="button"
               onClick={() => setColor(c)}
-              className={`w-7 h-7 rounded-full border-2 ${color === c ? "border-ink" : "border-transparent"}`}
+              className={`w-9 h-9 rounded-full border-2 ${color === c ? "border-ink" : "border-transparent"}`}
               style={{ backgroundColor: c }}
             />
           ))}

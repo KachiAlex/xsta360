@@ -68,7 +68,7 @@ export function LeadSequences({
                     <button
                       type="submit"
                       disabled={unenrollPending}
-                      className="text-xs text-stamp hover:underline disabled:opacity-50"
+                      className="text-xs text-stamp hover:underline disabled:opacity-50 min-h-[40px] px-2"
                     >
                       Unenroll
                     </button>
@@ -98,7 +98,7 @@ export function LeadSequences({
             <button
               type="button"
               onClick={() => setShowEnroll(true)}
-              className="text-xs font-semibold text-ink hover:underline"
+              className="text-xs font-semibold text-ink hover:underline min-h-[40px] px-2"
             >
               + Enroll in sequence
             </button>
@@ -107,7 +107,7 @@ export function LeadSequences({
               <input type="hidden" name="leadId" value={leadId} />
               <select
                 name="sequenceId"
-                className="w-full text-sm border border-rule bg-paper px-3 py-2 rounded font-mono"
+                className="w-full text-sm border border-rule bg-paper px-3 py-2 min-h-[44px] rounded font-mono"
                 defaultValue=""
               >
                 <option value="" disabled>Select a sequence...</option>
@@ -121,14 +121,14 @@ export function LeadSequences({
                 <button
                   type="button"
                   onClick={() => setShowEnroll(false)}
-                  className="text-xs px-3 py-1.5 border border-rule rounded hover:bg-paper-2"
+                  className="text-xs px-3 py-1.5 min-h-[40px] border border-rule rounded hover:bg-paper-2"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={pending}
-                  className="text-xs px-3 py-1.5 bg-ink text-paper rounded hover:opacity-90 disabled:opacity-50"
+                  className="text-xs px-3 py-1.5 min-h-[40px] bg-ink text-paper rounded hover:opacity-90 disabled:opacity-50"
                 >
                   {pending ? "Enrolling..." : "Enroll"}
                 </button>
