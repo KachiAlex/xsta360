@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { BulkCategoryBar, LeadCheckbox } from "@/components/app/bulk-category-bar";
+import { BulkActionBar, LeadCheckbox } from "@/components/app/bulk-category-bar";
 import type { BulkCategoryOption } from "@/components/app/bulk-category-bar";
 
 export interface LeadRow {
@@ -35,9 +35,15 @@ const SOURCE_LABELS: Record<string, string> = {
 export function LeadsList({
   leads,
   categories,
+  members,
+  stages,
+  canDelete,
 }: {
   leads: LeadRow[];
   categories: BulkCategoryOption[];
+  members: { userId: string; name: string }[];
+  stages: { id: string; name: string }[];
+  canDelete: boolean;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -67,12 +73,15 @@ export function LeadsList({
 
   return (
     <div>
-      {/* Bulk category bar — shared selection state */}
-      <BulkCategoryBar
+      {/* Bulk action bar — shared selection state */}
+      <BulkActionBar
         leadIds={leadIds}
         categories={categories}
+        members={members}
+        stages={stages}
         selected={selected}
         onClear={clearSelection}
+        canDelete={canDelete}
       />
 
       {/* Select all toggle (always visible when there are leads) */}

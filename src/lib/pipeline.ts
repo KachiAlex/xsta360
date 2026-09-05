@@ -1,5 +1,5 @@
 import "server-only";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, and, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 
 export interface PipelineColumn {
@@ -15,14 +15,14 @@ export interface PipelineColumn {
   }[];
 }
 
-export async function getPipelineBoard(orgId: string): Promise<PipelineColumn[]> {
+export async function getPipelineBoard(orgId: string, categoryId?: string): Promise<PipelineColumn[]> {
   const stages = await db
     .select()
     .from(schema.pipelineStages)
     .where(eq(schema.pipelineStages.orgId, orgId))
     .orderBy(asc(schema.pipelineStages.position));
 
-  const leads = await db
+  let leadQuery = db
     .select({
       id: schema.leads.id,
       name: schema.leads.name,
@@ -31,7 +31,56 @@ export async function getPipelineBoard(orgId: string): Promise<PipelineColumn[]>
       stageId: schema.leads.stageId,
     })
     .from(schema.leads)
-    .where(eq(schema.leads.orgId, orgId));
+    .where(eq(schema.leads.orgId, orgId))
+    .as("leadQuery");
+
+  let leads;
+
+  if (categoryId) {
+    // Find lead IDs in this category first.
+    const assignments = await db
+      .select({ leadId: schema.leadCategoryAssignments.leadId })
+      .from(schema.leadCategoryAssignments)
+      .where(
+        and(
+          eq(schema.leadCategoryAssignments.orgId, orgId),
+          eq(schema.leadCategoryAssignments.categoryId, categoryId),
+        ),
+      );
+
+    if (assignments.length === 0) {
+      return stages.map((s) => ({
+        id: s.id,
+        name: s.name,
+        kind: s.kind,
+        position: s.position,
+        leads: [],
+      }));
+    }
+
+    const leadIds = assignments.map((a) => a.leadId);
+    leads = await db
+      .select({
+        id: schema.leads.id,
+        name: schema.leads.name,
+        company: schema.leads.company,
+        source: schema.leads.source,
+        stageId: schema.leads.stageId,
+      })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.orgId, orgId), inArray(schema.leads.id, leadIds)));
+  } else {
+    leads = await db
+      .select({
+        id: schema.leads.id,
+        name: schema.leads.name,
+        company: schema.leads.company,
+        source: schema.leads.source,
+        stageId: schema.leads.stageId,
+      })
+      .from(schema.leads)
+      .where(eq(schema.leads.orgId, orgId));
+  }
 
   const byStage = new Map<string, PipelineColumn["leads"]>();
   for (const l of leads) {

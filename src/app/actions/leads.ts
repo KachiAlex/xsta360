@@ -783,3 +783,133 @@ async function notifyAssigneeById(ctx: AuthContext, leadId: string, leadName: st
     link: `/leads`,
   }).catch((e) => console.error("Lead assigned notification failed:", e));
 }
+
+// ---------------------------------------------------------------------------
+// Bulk actions
+// ---------------------------------------------------------------------------
+
+export type BulkFormState = {
+  ok?: boolean;
+  message?: string;
+};
+
+/** Bulk delete leads (admin/manager only). */
+export async function bulkDeleteLeads(
+  _prev: BulkFormState,
+  formData: FormData,
+): Promise<BulkFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+  if (!can(ctx, "delete")) return { message: "Not allowed" };
+
+  const leadIdsRaw = String(formData.get("leadIds") ?? "");
+  const leadIds = leadIdsRaw.split(",").map((s) => s.trim()).filter(Boolean);
+  if (leadIds.length === 0) return { message: "No leads selected" };
+
+  // Verify all leads belong to this org.
+  const leads = await db
+    .select({ id: schema.leads.id })
+    .from(schema.leads)
+    .where(and(eq(schema.leads.orgId, ctx.orgId), inArray(schema.leads.id, leadIds)));
+  const validIds = leads.map((l) => l.id);
+  if (validIds.length === 0) return { message: "No valid leads found" };
+
+  // Delete related records first.
+  await db.delete(schema.leadCategoryAssignments).where(inArray(schema.leadCategoryAssignments.leadId, validIds));
+  await db.delete(schema.reminders).where(inArray(schema.reminders.leadId, validIds));
+  await db.delete(schema.remarks).where(inArray(schema.remarks.leadId, validIds));
+  await db.delete(schema.sequenceEnrollments).where(inArray(schema.sequenceEnrollments.leadId, validIds));
+  await db.delete(schema.documents).where(inArray(schema.documents.leadId, validIds));
+  await db.delete(schema.leads).where(and(eq(schema.leads.orgId, ctx.orgId), inArray(schema.leads.id, validIds)));
+
+  for (const id of validIds) {
+    await logEvent(ctx.orgId, "lead_updated", { leadId: id, actorId: ctx.userId, meta: { action: "deleted" } });
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/leads");
+  revalidatePath("/pipeline");
+  return { ok: true, message: `Deleted ${validIds.length} lead${validIds.length === 1 ? "" : "s"}` };
+}
+
+/** Bulk assign leads to a rep (admin/manager only). */
+export async function bulkAssignLeads(
+  _prev: BulkFormState,
+  formData: FormData,
+): Promise<BulkFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+  if (!can(ctx, "assign")) return { message: "Not allowed" };
+
+  const leadIdsRaw = String(formData.get("leadIds") ?? "");
+  const leadIds = leadIdsRaw.split(",").map((s) => s.trim()).filter(Boolean);
+  const assigneeId = String(formData.get("assigneeId") ?? "").trim() || null;
+  if (leadIds.length === 0) return { message: "No leads selected" };
+
+  // Verify all leads belong to this org.
+  const leads = await db
+    .select({ id: schema.leads.id })
+    .from(schema.leads)
+    .where(and(eq(schema.leads.orgId, ctx.orgId), inArray(schema.leads.id, leadIds)));
+  const validIds = leads.map((l) => l.id);
+  if (validIds.length === 0) return { message: "No valid leads found" };
+
+  await db
+    .update(schema.leads)
+    .set({ assigneeId, updatedAt: new Date() })
+    .where(and(eq(schema.leads.orgId, ctx.orgId), inArray(schema.leads.id, validIds)));
+
+  for (const id of validIds) {
+    await logEvent(ctx.orgId, "lead_assigned", { leadId: id, actorId: ctx.userId, meta: { toAssigneeId: assigneeId } });
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/leads");
+  revalidatePath("/pipeline");
+  return { ok: true, message: `Assigned ${validIds.length} lead${validIds.length === 1 ? "" : "s"}` };
+}
+
+/** Bulk move leads to a stage. */
+export async function bulkMoveStage(
+  _prev: BulkFormState,
+  formData: FormData,
+): Promise<BulkFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+
+  const leadIdsRaw = String(formData.get("leadIds") ?? "");
+  const leadIds = leadIdsRaw.split(",").map((s) => s.trim()).filter(Boolean);
+  const stageId = String(formData.get("stageId") ?? "").trim() || null;
+  if (leadIds.length === 0) return { message: "No leads selected" };
+  if (!stageId) return { message: "No stage selected" };
+
+  // Verify stage belongs to org.
+  const [stage] = await db
+    .select()
+    .from(schema.pipelineStages)
+    .where(and(eq(schema.pipelineStages.id, stageId), eq(schema.pipelineStages.orgId, ctx.orgId)))
+    .limit(1);
+  if (!stage) return { message: "Stage not found" };
+
+  // Verify leads belong to org.
+  const leads = await db
+    .select({ id: schema.leads.id })
+    .from(schema.leads)
+    .where(and(eq(schema.leads.orgId, ctx.orgId), inArray(schema.leads.id, leadIds)));
+  const validIds = leads.map((l) => l.id);
+  if (validIds.length === 0) return { message: "No valid leads found" };
+
+  await db
+    .update(schema.leads)
+    .set({ stageId, updatedAt: new Date() })
+    .where(and(eq(schema.leads.orgId, ctx.orgId), inArray(schema.leads.id, validIds)));
+
+  for (const id of validIds) {
+    await logEvent(ctx.orgId, "stage_changed", { leadId: id, actorId: ctx.userId, meta: { toStage: stage.name } });
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/leads");
+  revalidatePath("/pipeline");
+  return { ok: true, message: `Moved ${validIds.length} lead${validIds.length === 1 ? "" : "s"} to ${stage.name}` };
+}

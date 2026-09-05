@@ -72,7 +72,7 @@ function daysBetween(from: Date, to: Date): number {
 // Get all assigned leads grouped by urgency bucket
 // ---------------------------------------------------------------------------
 
-export async function getPulseLeads(orgId: string, userId: string): Promise<{
+export async function getPulseLeads(orgId: string, userId: string, categoryId?: string): Promise<{
   overdue: PulseLead[];
   today: PulseLead[];
   upcoming: PulseLead[];
@@ -83,6 +83,24 @@ export async function getPulseLeads(orgId: string, userId: string): Promise<{
   const eod = endOfDay(now);
   const sevenDaysAhead = new Date(now.getTime() + 7 * 86_400_000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000);
+
+  // If filtering by category, find lead IDs in that category first.
+  let categoryLeadIds: string[] | null = null;
+  if (categoryId) {
+    const assignments = await db
+      .select({ leadId: schema.leadCategoryAssignments.leadId })
+      .from(schema.leadCategoryAssignments)
+      .where(
+        and(
+          eq(schema.leadCategoryAssignments.orgId, orgId),
+          eq(schema.leadCategoryAssignments.categoryId, categoryId),
+        ),
+      );
+    categoryLeadIds = assignments.map((a) => a.leadId);
+    if (categoryLeadIds.length === 0) {
+      return { overdue: [], today: [], upcoming: [], quiet: [] };
+    }
+  }
 
   // Load all open-stage leads assigned to the user.
   const leads = await db
@@ -102,6 +120,7 @@ export async function getPulseLeads(orgId: string, userId: string): Promise<{
       and(
         eq(schema.leads.orgId, orgId),
         eq(schema.leads.assigneeId, userId),
+        ...(categoryLeadIds ? [inArray(schema.leads.id, categoryLeadIds)] : []),
       ),
     );
 

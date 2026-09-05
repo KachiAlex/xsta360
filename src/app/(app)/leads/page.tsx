@@ -140,6 +140,9 @@ export default async function LeadsPage(props: {
                 categories: l.categories,
               }))}
               categories={categoryOptions}
+              members={members.map((m) => ({ userId: m.userId, name: m.name }))}
+              stages={stages.map((s) => ({ id: s.id, name: s.name }))}
+              canDelete={ctx.role === "admin" || ctx.role === "manager"}
             />
           </Panel>
         )}

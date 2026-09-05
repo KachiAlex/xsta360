@@ -1,6 +1,7 @@
 import { requireAuth } from "@/lib/dal";
 import { getOrgStages, getOrgMembers } from "@/lib/queries";
 import { getPulseLeads, getUpcomingReminders } from "@/lib/dashboard";
+import { getOrgCategories } from "@/lib/category-queries";
 import { Topbar, ViewTab } from "@/components/app/topbar";
 import { AddLeadModal } from "@/components/app/add-lead-modal";
 import { MobileFab } from "@/components/app/fab";
@@ -47,12 +48,16 @@ const ACTIVITY_ICONS: Record<string, string> = {
   remark: "💬",
 };
 
-export default async function FollowUpsPage() {
+export default async function FollowUpsPage(props: {
+  searchParams: Promise<{ categoryId?: string }>;
+}) {
   const ctx = await requireAuth();
-  const [stages, members, pulse, upcomingReminders] = await Promise.all([
+  const filters = await props.searchParams;
+  const [stages, members, categories, pulse, upcomingReminders] = await Promise.all([
     getOrgStages(ctx.orgId),
     getOrgMembers(ctx.orgId),
-    getPulseLeads(ctx.orgId, ctx.userId),
+    getOrgCategories(ctx.orgId),
+    getPulseLeads(ctx.orgId, ctx.userId, filters.categoryId),
     getUpcomingReminders(ctx.orgId, ctx.userId),
   ]);
 
@@ -84,6 +89,33 @@ export default async function FollowUpsPage() {
 
       <div className="content flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-7 max-w-[1240px] w-full mx-auto">
         {addLeadFab}
+
+        {/* Category filter */}
+        {categories.length > 0 && (
+          <div className="mb-4">
+            <form method="get" className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-mono uppercase tracking-wider text-ink-soft">Category:</span>
+              <select
+                name="categoryId"
+                defaultValue={filters.categoryId ?? ""}
+                className="text-sm border border-rule bg-panel rounded px-3 py-2 min-h-[44px]"
+              >
+                <option value="">All categories</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                ))}
+              </select>
+              <button type="submit" className="text-sm font-semibold border border-ink rounded px-4 py-2 hover:bg-paper-2 min-h-[44px]">
+                Filter
+              </button>
+              {filters.categoryId && (
+                <a href="/follow-ups" className="text-sm text-ink-soft underline min-h-[44px] flex items-center px-2">
+                  Clear
+                </a>
+              )}
+            </form>
+          </div>
+        )}
 
         {/* Header row with view toggle */}
         <div className="flex items-center justify-between mb-4 sm:mb-5 flex-wrap gap-2">

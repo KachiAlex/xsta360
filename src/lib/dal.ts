@@ -121,12 +121,13 @@ export async function requireSuperadmin(): Promise<AuthContext> {
 }
 
 /** Role capability helper for guards inside server actions. */
-export function can(ctx: AuthContext, action: "manage_team" | "assign" | "configure"): boolean {
+export function can(ctx: AuthContext, action: "manage_team" | "assign" | "configure" | "delete"): boolean {
   switch (action) {
     case "manage_team":
     case "configure":
       return ctx.role === "admin";
     case "assign":
+    case "delete":
       return ctx.role === "admin" || ctx.role === "manager";
   }
 }

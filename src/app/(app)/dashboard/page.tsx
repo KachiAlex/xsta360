@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { eq, count } from "drizzle-orm";
 import { getOrgStages, getOrgMembers } from "@/lib/queries";
 import { getPulseLeads, getDashboardStats, getUpcomingReminders } from "@/lib/dashboard";
+import { getOrgCategories } from "@/lib/category-queries";
 import { getTaskSummary } from "@/lib/tasks";
 import { TrialCardNudge } from "@/components/app/trial-card-nudge";
 import { OnboardingChecklist } from "@/components/app/onboarding-checklist";
@@ -26,12 +27,16 @@ const BUCKET_META = [
   { key: "quiet" as const, label: "Quiet", color: "text-ink-soft" },
 ];
 
-export default async function DashboardPage() {
+export default async function DashboardPage(props: {
+  searchParams: Promise<{ categoryId?: string }>;
+}) {
   const ctx = await requireAuth();
-  const [stages, members, pulse, stats, taskSummary, upcomingReminders, billing, subRow, leadCountRow, reminderCountRow, cardRow] = await Promise.all([
+  const filters = await props.searchParams;
+  const [stages, members, categories, pulse, stats, taskSummary, upcomingReminders, billing, subRow, leadCountRow, reminderCountRow, cardRow] = await Promise.all([
     getOrgStages(ctx.orgId),
     getOrgMembers(ctx.orgId),
-    getPulseLeads(ctx.orgId, ctx.userId),
+    getOrgCategories(ctx.orgId),
+    getPulseLeads(ctx.orgId, ctx.userId, filters.categoryId),
     getDashboardStats(ctx.orgId, ctx.userId),
     getTaskSummary(ctx.orgId, ctx.userId),
     getUpcomingReminders(ctx.orgId, ctx.userId),
@@ -82,6 +87,33 @@ export default async function DashboardPage() {
 
       <div className="content flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-7 max-w-[1240px] w-full mx-auto">
         {addLeadFab}
+
+        {/* Category filter */}
+        {categories.length > 0 && (
+          <div className="mb-4">
+            <form method="get" className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-mono uppercase tracking-wider text-ink-soft">Category:</span>
+              <select
+                name="categoryId"
+                defaultValue={filters.categoryId ?? ""}
+                className="text-sm border border-rule bg-panel rounded px-3 py-2 min-h-[44px]"
+              >
+                <option value="">All categories</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                ))}
+              </select>
+              <button type="submit" className="text-sm font-semibold border border-ink rounded px-4 py-2 hover:bg-paper-2 min-h-[44px]">
+                Filter
+              </button>
+              {filters.categoryId && (
+                <a href="/dashboard" className="text-sm text-ink-soft underline min-h-[44px] flex items-center px-2">
+                  Clear
+                </a>
+              )}
+            </form>
+          </div>
+        )}
         {ctx.role === "admin" &&
           billing.plan.status === "trialing" &&
           !subRow[0]?.auth &&
