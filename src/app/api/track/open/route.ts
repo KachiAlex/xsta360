@@ -1,5 +1,6 @@
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
+import { rateLimit, clientKey } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,18 @@ const TRACKING_PIXEL = Buffer.from(
  * Returns a 1x1 transparent pixel and records the open event.
  */
 export async function GET(request: Request) {
+  // Rate limit: 60 opens/min per IP (pixels are loaded in bulk by email clients)
+  const rl = rateLimit(clientKey(request, "open"), 60, 60_000);
+  if (!rl.allowed) {
+    return new Response(TRACKING_PIXEL, {
+      status: 429,
+      headers: {
+        "Content-Type": "image/gif",
+        "Retry-After": String(rl.retryAfterSeconds),
+      },
+    });
+  }
+
   const url = new URL(request.url);
   const eventId = url.searchParams.get("e");
 
@@ -27,14 +40,7 @@ export async function GET(request: Request) {
         .limit(1);
 
       if (event && event.eventType === "sent") {
-        // Record the open event (only once per enrollment+step to avoid duplicates).
-        const existingOpen = await db
-          .select({ id: schema.sequenceEmailEvents.id })
-          .from(schema.sequenceEmailEvents)
-          .where(eq(schema.sequenceEmailEvents.enrollmentId, event.enrollmentId))
-          .limit(1);
-
-        // Insert open event (we allow multiple opens for analytics but could dedupe)
+        // Insert open event (we allow multiple opens for analytics)
         await db.insert(schema.sequenceEmailEvents).values({
           orgId: event.orgId,
           enrollmentId: event.enrollmentId,

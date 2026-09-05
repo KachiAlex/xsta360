@@ -1,6 +1,18 @@
 import "server-only";
 import nodemailer from "nodemailer";
 
+/**
+ * Escape HTML special characters to prevent XSS in email templates.
+ */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 const from = process.env.EMAIL_FROM ?? "Xsta360 <noreply@xsta360.app>";
 const smtpHost = process.env.SMTP_HOST ?? "smtp-relay.brevo.com";
 const smtpPort = Number(process.env.SMTP_PORT ?? "587");
@@ -111,13 +123,16 @@ export interface ReminderEmailData {
  */
 export async function sendReminderEmail(data: ReminderEmailData): Promise<void> {
   const subject = `Follow-up reminder: ${data.leadName}`;
+  const leadName = escapeHtml(data.leadName);
+  const leadCompany = data.leadCompany ? escapeHtml(data.leadCompany) : "";
+  const note = data.note ? escapeHtml(data.note) : "";
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
       <h2 style="color: #1E2A22; font-family: 'IBM Plex Mono', monospace;">Follow-up reminder</h2>
       <p style="color: #4A5750; font-size: 15px;">
-        It's time to follow up with <strong>${data.leadName}</strong>${data.leadCompany ? ` from ${data.leadCompany}` : ""}.
+        It's time to follow up with <strong>${leadName}</strong>${leadCompany ? ` from ${leadCompany}` : ""}.
       </p>
-      ${data.note ? `<p style="color: #4A5750; font-size: 14px; padding: 12px; background: #F3F0E6; border-radius: 4px;">${data.note}</p>` : ""}
+      ${note ? `<p style="color: #4A5750; font-size: 14px; padding: 12px; background: #F3F0E6; border-radius: 4px;">${note}</p>` : ""}
       <p style="color: #4A5750; font-size: 13px; margin-top: 24px;">
         Due: ${data.dueAt.toLocaleString()}
       </p>
@@ -193,11 +208,15 @@ export async function sendDigestEmail(data: DigestEmailData): Promise<void> {
 
 export async function sendCardLeadEmail(data: CardLeadEmailData): Promise<void> {
   const subject = `New lead from your contact card — ${data.leadName}`;
+  const repName = escapeHtml(data.repName);
+  const leadName = escapeHtml(data.leadName);
+  const leadCompany = data.leadCompany ? escapeHtml(data.leadCompany) : "";
+  const cardName = escapeHtml(data.cardName);
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-      <h2 style="color: #1E2A22; font-family: 'IBM Plex Mono', monospace;">You scanned up a new lead, ${data.repName}</h2>
+      <h2 style="color: #1E2A22; font-family: 'IBM Plex Mono', monospace;">You scanned up a new lead, ${repName}</h2>
       <p style="color: #4A5750; font-size: 15px;">
-        <strong>${data.leadName}</strong>${data.leadCompany ? ` from ${data.leadCompany}` : ""} just submitted their info through your Xsta360 contact card (${data.cardName}).
+        <strong>${leadName}</strong>${leadCompany ? ` from ${leadCompany}` : ""} just submitted their info through your Xsta360 contact card (${cardName}).
       </p>
       <a href="${data.leadUrl}" style="display: inline-block; margin-top: 16px; padding: 10px 20px; background: #1E2A22; color: #F3F0E6; text-decoration: none; border-radius: 3px; font-weight: 600;">
         View lead
@@ -211,11 +230,14 @@ export async function sendCardLeadEmail(data: CardLeadEmailData): Promise<void> 
 
 export async function sendCardRescanEmail(data: CardRescanEmailData): Promise<void> {
   const subject = `${data.leadName} re-scanned your contact card`;
+  const leadName = escapeHtml(data.leadName);
+  const leadCompany = data.leadCompany ? escapeHtml(data.leadCompany) : "";
+  const cardName = escapeHtml(data.cardName);
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-      <h2 style="color: #1E2A22; font-family: 'IBM Plex Mono', monospace;">${data.leadName} scanned your card again</h2>
+      <h2 style="color: #1E2A22; font-family: 'IBM Plex Mono', monospace;">${leadName} scanned your card again</h2>
       <p style="color: #4A5750; font-size: 15px;">
-        <strong>${data.leadName}</strong>${data.leadCompany ? ` from ${data.leadCompany}` : ""} re-scanned your contact card (${data.cardName}). A note has been added to their existing lead record.
+        <strong>${leadName}</strong>${leadCompany ? ` from ${leadCompany}` : ""} re-scanned your contact card (${cardName}). A note has been added to their existing lead record.
       </p>
       <a href="${data.leadUrl}" style="display: inline-block; margin-top: 16px; padding: 10px 20px; background: #1E2A22; color: #F3F0E6; text-decoration: none; border-radius: 3px; font-weight: 600;">
         View lead
@@ -231,9 +253,9 @@ export async function sendContactSavedEmail(data: ContactSavedEmailData): Promis
   const subject = `Someone saved your contact — ${data.cardName}`;
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-      <h2 style="color: #1E2A22; font-family: 'IBM Plex Mono', monospace;">Hi ${data.repName}, your contact was saved</h2>
+      <h2 style="color: #1E2A22; font-family: 'IBM Plex Mono', monospace;">Hi ${escapeHtml(data.repName)}, your contact was saved</h2>
       <p style="color: #4A5750; font-size: 15px;">
-        Someone just saved your contact card (${data.cardName}) to their phone. You may hear from them soon.
+        Someone just saved your contact card (${escapeHtml(data.cardName)}) to their phone. You may hear from them soon.
       </p>
       <a href="${data.cardUrl}" style="display: inline-block; margin-top: 16px; padding: 10px 20px; background: #1E2A22; color: #F3F0E6; text-decoration: none; border-radius: 3px; font-weight: 600;">
         View your card
@@ -259,11 +281,14 @@ export interface LeadAssignedEmailData {
 
 export async function sendLeadAssignedEmail(data: LeadAssignedEmailData): Promise<void> {
   const subject = `New lead assigned: ${data.leadName}`;
+  const userName = escapeHtml(data.userName);
+  const leadName = escapeHtml(data.leadName);
+  const leadCompany = data.leadCompany ? escapeHtml(data.leadCompany) : "";
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
       <h2 style="color: #1E2A22; font-family: 'IBM Plex Mono', monospace;">A new lead has been assigned to you</h2>
       <p style="color: #4A5750; font-size: 15px;">
-        Hi ${data.userName}, <strong>${data.leadName}</strong>${data.leadCompany ? ` from ${data.leadCompany}` : ""} was just assigned to you in Xsta360.
+        Hi ${userName}, <strong>${leadName}</strong>${leadCompany ? ` from ${leadCompany}` : ""} was just assigned to you in Xsta360.
       </p>
       <a href="${data.appUrl}/leads" style="display: inline-block; margin-top: 16px; padding: 10px 20px; background: #1E2A22; color: #F3F0E6; text-decoration: none; border-radius: 3px; font-weight: 600;">
         View leads

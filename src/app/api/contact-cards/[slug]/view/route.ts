@@ -25,7 +25,7 @@ export async function POST(
   }
 
   // Fire-and-forget: don't await if possible.
-  recordCardView(card.id, deviceType).catch(() => {
+  recordCardView(card.id, card.orgId, deviceType).catch(() => {
     // ignore analytics failures
   });
 

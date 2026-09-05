@@ -125,11 +125,16 @@ function buildEmailWrapper(
 /**
  * Rewrite all href links in HTML to go through our click tracking endpoint.
  * The original URL is preserved as a query parameter and the user is redirected.
+ * Supports double-quoted, single-quoted, and protocol-relative URLs.
  */
 function rewriteLinksForTracking(html: string, eventId: string, appUrl: string): string {
-  return html.replace(/href="(https?:\/\/[^"]+)"/g, (match, url) => {
-    const trackedUrl = `${appUrl}/api/track/click?e=${eventId}&u=${encodeURIComponent(url)}`;
-    return `href="${trackedUrl}"`;
+  // Match href with double or single quotes, capturing the URL.
+  // Supports http://, https://, and protocol-relative // URLs.
+  return html.replace(/href=(["'])(https?:\/\/[^"']+|\/\/[^"']+)\1/gi, (match, quote, url) => {
+    // Normalize protocol-relative URLs to https
+    const fullUrl = url.startsWith("//") ? `https:${url}` : url;
+    const trackedUrl = `${appUrl}/api/track/click?e=${eventId}&u=${encodeURIComponent(fullUrl)}`;
+    return `href=${quote}${trackedUrl}${quote}`;
   });
 }
 

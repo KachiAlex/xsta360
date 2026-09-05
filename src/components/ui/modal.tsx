@@ -34,6 +34,8 @@ export function Modal({
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
         className="bg-panel w-full sm:w-[420px] max-w-[90vw] rounded-t-lg sm:rounded-md border border-rule shadow-[0_30px_60px_-20px_rgba(30,42,34,0.4)] max-h-[92vh] sm:max-h-[90vh] overflow-y-auto flex flex-col"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >

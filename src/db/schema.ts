@@ -379,6 +379,9 @@ export const leads = pgTable(
     orgUpdatedIdx: index("leads_org_updated_idx").on(t.orgId, t.updatedAt),
     orgCreatedIdx: index("leads_org_created_idx").on(t.orgId, t.createdAt),
     contactCardIdx: index("leads_contact_card_idx").on(t.contactCardId),
+    // Standalone FK indexes for cross-org lookups (e.g. reassignment, stage moves).
+    assigneeIdx: index("leads_assignee_idx").on(t.assigneeId),
+    stageIdx: index("leads_stage_idx").on(t.stageId),
   }),
 );
 
@@ -445,6 +448,7 @@ export const cardViews = pgTable(
   "card_views",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
     contactCardId: uuid("contact_card_id")
       .notNull()
       .references(() => contactCards.id, { onDelete: "cascade" }),
@@ -453,6 +457,9 @@ export const cardViews = pgTable(
   },
   (t) => ({
     cardViewedIdx: index("card_views_card_viewed_idx").on(t.contactCardId, t.viewedAt),
+    // Standalone FK index for per-card view counts.
+    cardIdx: index("card_views_card_idx").on(t.contactCardId),
+    orgIdx: index("card_views_org_idx").on(t.orgId),
   }),
 );
 
@@ -515,6 +522,10 @@ export const reminders = pgTable(
     assigneeDueIdx: index("reminders_assignee_due_idx").on(t.assigneeId, t.dueAt),
     statusDueIdx: index("reminders_status_due_idx").on(t.status, t.dueAt),
     orgIdx: index("reminders_org_idx").on(t.orgId),
+    // Standalone indexes for cron scans and per-assignee filters.
+    assigneeIdx: index("reminders_assignee_idx").on(t.assigneeId),
+    statusIdx: index("reminders_status_idx").on(t.status),
+    dueIdx: index("reminders_due_idx").on(t.dueAt),
   }),
 );
 
@@ -717,6 +728,9 @@ export const sequenceEnrollments = pgTable(
     seqLeadIdx: index("sequence_enrollments_seq_lead_idx").on(t.sequenceId, t.leadId),
     orgStatusIdx: index("sequence_enrollments_org_status_idx").on(t.orgId, t.status),
     leadIdx: index("sequence_enrollments_lead_idx").on(t.leadId),
+    // Standalone indexes for sequence-scoped and status-scoped queries.
+    sequenceIdx: index("sequence_enrollments_sequence_idx").on(t.sequenceId),
+    statusIdx: index("sequence_enrollments_status_idx").on(t.status),
   }),
 );
 
@@ -755,6 +769,8 @@ export const sequenceEmailEvents = pgTable(
     enrollmentIdx: index("seq_email_events_enrollment_idx").on(t.enrollmentId),
     stepIdx: index("seq_email_events_step_idx").on(t.stepId),
     orgTypeIdx: index("seq_email_events_org_type_idx").on(t.orgId, t.eventType),
+    // Standalone index for event-type analytics across an org.
+    typeIdx: index("seq_email_events_type_idx").on(t.eventType),
   }),
 );
 
@@ -911,5 +927,8 @@ export const auditEvents = pgTable(
     orgCreatedIdx: index("audit_events_org_created_idx").on(t.orgId, t.createdAt),
     leadCreatedIdx: index("audit_events_lead_created_idx").on(t.leadId, t.createdAt),
     orgTypeIdx: index("audit_events_org_type_idx").on(t.orgId, t.type),
+    // Standalone indexes for org-scoped and type-scoped event queries.
+    orgIdx: index("audit_events_org_idx").on(t.orgId),
+    typeIdx: index("audit_events_type_idx").on(t.type),
   }),
 );

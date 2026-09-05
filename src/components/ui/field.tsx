@@ -1,6 +1,12 @@
-export function Label({ children }: { children: React.ReactNode }) {
+export function Label({
+  children,
+  htmlFor,
+}: {
+  children: React.ReactNode;
+  htmlFor?: string;
+}) {
   return (
-    <label className="block text-xs font-semibold mb-1.5 text-ink-soft">
+    <label htmlFor={htmlFor} className="block text-xs font-semibold mb-1.5 text-ink-soft">
       {children}
     </label>
   );

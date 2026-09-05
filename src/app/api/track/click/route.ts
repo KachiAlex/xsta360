@@ -1,13 +1,36 @@
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
+import { rateLimit, clientKey } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Validate that a URL is safe to redirect to.
+ * Only allows http/https schemes to prevent javascript: or data: redirects.
+ */
+function isSafeRedirectUrl(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Email click tracking endpoint.
  * Records the click event and redirects to the original URL.
  */
 export async function GET(request: Request) {
+  // Rate limit: 30 clicks/min per IP
+  const rl = rateLimit(clientKey(request, "click"), 30, 60_000);
+  if (!rl.allowed) {
+    return new Response("Too Many Requests", {
+      status: 429,
+      headers: { "Retry-After": String(rl.retryAfterSeconds) },
+    });
+  }
+
   const url = new URL(request.url);
   const eventId = url.searchParams.get("e");
   const originalUrl = url.searchParams.get("u");
@@ -38,8 +61,8 @@ export async function GET(request: Request) {
     }
   }
 
-  // Redirect to original URL (or home if missing)
-  if (originalUrl) {
+  // Redirect to original URL if it's safe, otherwise home
+  if (originalUrl && isSafeRedirectUrl(originalUrl)) {
     return Response.redirect(originalUrl, 302);
   }
   return Response.redirect(new URL("/", request.url), 302);

@@ -92,7 +92,7 @@ export async function updateStage(
   await db
     .update(schema.pipelineStages)
     .set({ name: parsed.data.name })
-    .where(eq(schema.pipelineStages.id, stage.id));
+    .where(and(eq(schema.pipelineStages.id, stage.id), eq(schema.pipelineStages.orgId, ctx.orgId)));
 
   await logEvent(ctx.orgId, "stage_updated", {
     actorId: ctx.userId,
@@ -113,6 +113,7 @@ export async function deleteStage(
   if (!can(ctx, "configure")) return { message: "Only admins can configure stages" };
 
   const stageId = String(formData.get("stageId"));
+  if (!z.string().uuid().safeParse(stageId).success) return { message: "Invalid ID" };
   const [stage] = await db
     .select()
     .from(schema.pipelineStages)
@@ -131,7 +132,7 @@ export async function deleteStage(
     return { message: `Cannot delete: ${leadCount} lead(s) are in this stage. Move them first.` };
   }
 
-  await db.delete(schema.pipelineStages).where(eq(schema.pipelineStages.id, stage.id));
+  await db.delete(schema.pipelineStages).where(and(eq(schema.pipelineStages.id, stage.id), eq(schema.pipelineStages.orgId, ctx.orgId)));
 
   await logEvent(ctx.orgId, "stage_deleted", {
     actorId: ctx.userId,
@@ -156,6 +157,7 @@ export async function updateStageProbability(
   if (!can(ctx, "configure")) return { message: "Only admins can configure stages" };
 
   const stageId = String(formData.get("stageId"));
+  if (!z.string().uuid().safeParse(stageId).success) return { message: "Invalid ID" };
   const probabilityStr = String(formData.get("probability") || "0");
   const probability = Math.max(0, Math.min(100, parseInt(probabilityStr) || 0));
 
@@ -171,7 +173,7 @@ export async function updateStageProbability(
   await db
     .update(schema.pipelineStages)
     .set({ probability })
-    .where(eq(schema.pipelineStages.id, stage.id));
+    .where(and(eq(schema.pipelineStages.id, stage.id), eq(schema.pipelineStages.orgId, ctx.orgId)));
 
   await logEvent(ctx.orgId, "stage_probability_updated", {
     actorId: ctx.userId,

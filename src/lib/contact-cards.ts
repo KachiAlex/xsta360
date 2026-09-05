@@ -66,8 +66,9 @@ export const getContactCardBySlug = unstable_cache(getContactCardBySlugUncached,
 });
 
 /** Record a card view for analytics. */
-export async function recordCardView(contactCardId: string, deviceType?: string) {
+export async function recordCardView(contactCardId: string, orgId: string, deviceType?: string) {
   await db.insert(schema.cardViews).values({
+    orgId,
     contactCardId,
     deviceType: deviceType ?? null,
   });

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, ilike, or, inArray } from "drizzle-orm";
+import { and, desc, eq, ilike, or, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 
 export interface LeadListItem {
@@ -30,9 +30,28 @@ export interface LeadListFilters {
   source?: string;
   assigneeId?: string;
   categoryId?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface PaginatedLeads {
+  leads: LeadListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 export async function getLeads(orgId: string, filters: LeadListFilters = {}): Promise<LeadListItem[]> {
+  const result = await getLeadsPaginated(orgId, filters);
+  return result.leads;
+}
+
+export async function getLeadsPaginated(orgId: string, filters: LeadListFilters = {}): Promise<PaginatedLeads> {
+  const page = Math.max(1, filters.page ?? 1);
+  const pageSize = Math.min(100, Math.max(1, filters.pageSize ?? 50));
+  const offset = (page - 1) * pageSize;
+
   const conditions = [eq(schema.leads.orgId, orgId)];
 
   if (filters.q) {
@@ -63,7 +82,7 @@ export async function getLeads(orgId: string, filters: LeadListFilters = {}): Pr
         ),
       );
     categoryFilteredLeadIds = assignments.map((a) => a.leadId);
-    if (categoryFilteredLeadIds.length === 0) return [];
+    if (categoryFilteredLeadIds.length === 0) return { leads: [], total: 0, page, pageSize, totalPages: 0 };
     conditions.push(inArray(schema.leads.id, categoryFilteredLeadIds));
   }
 
@@ -92,9 +111,18 @@ export async function getLeads(orgId: string, filters: LeadListFilters = {}): Pr
     .leftJoin(schema.pipelineStages, eq(schema.leads.stageId, schema.pipelineStages.id))
     .leftJoin(schema.users, eq(schema.leads.assigneeId, schema.users.id))
     .where(and(...conditions))
-    .orderBy(desc(schema.leads.updatedAt));
+    .orderBy(desc(schema.leads.updatedAt))
+    .limit(pageSize)
+    .offset(offset);
 
-  if (rows.length === 0) return [];
+  // Count total matching rows for pagination metadata.
+  const [countRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(schema.leads)
+    .where(and(...conditions));
+  const total = countRow?.count ?? 0;
+
+  if (rows.length === 0) return { leads: [], total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
 
   // Fetch categories for all returned leads.
   const leadIds = rows.map((r) => r.id);
@@ -123,8 +151,16 @@ export async function getLeads(orgId: string, filters: LeadListFilters = {}): Pr
     catMap.set(a.leadId, arr);
   }
 
-  return rows.map((r) => ({
+  const leads = rows.map((r) => ({
     ...r,
     categories: catMap.get(r.id) ?? [],
   }));
+
+  return {
+    leads,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.ceil(total / pageSize),
+  };
 }

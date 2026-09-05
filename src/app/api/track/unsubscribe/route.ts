@@ -1,5 +1,6 @@
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
+import { rateLimit, clientKey } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,15 @@ async function handleUnsubscribe(token: string): Promise<boolean> {
 }
 
 export async function GET(request: Request) {
+  // Rate limit: 10/min per IP (humans click unsubscribe rarely)
+  const rl = rateLimit(clientKey(request, "unsub"), 10, 60_000);
+  if (!rl.allowed) {
+    return new Response("Too Many Requests", {
+      status: 429,
+      headers: { "Retry-After": String(rl.retryAfterSeconds) },
+    });
+  }
+
   const url = new URL(request.url);
   const token = url.searchParams.get("token");
 
@@ -54,7 +64,12 @@ export async function GET(request: Request) {
     return new Response("Invalid unsubscribe link", { status: 400 });
   }
 
-  const success = await handleUnsubscribe(token);
+  let success = false;
+  try {
+    success = await handleUnsubscribe(token);
+  } catch (err) {
+    console.error("Unsubscribe error:", err);
+  }
 
   const html = success
     ? `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Unsubscribed</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f5f5f0;color:#1E2A22}.card{max-width:400px;padding:40px;text-align:center}h1{font-size:24px;margin-bottom:12px}p{color:#4A5750;font-size:15px;line-height:1.6}</style></head><body><div class="card"><h1>You're unsubscribed</h1><p>You will no longer receive automated sequence emails from us. If this was a mistake, contact the sender directly.</p></div></body></html>`

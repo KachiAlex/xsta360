@@ -449,18 +449,20 @@ export async function getDashboardStats(orgId: string, userId: string): Promise<
     );
 
   // Win rate over last 7 days.
-  const wonStage = db
+  const wonStageRows = await db
     .select({ id: schema.pipelineStages.id })
     .from(schema.pipelineStages)
     .where(
       and(eq(schema.pipelineStages.orgId, orgId), eq(schema.pipelineStages.kind, "won")),
     );
-  const lostStage = db
+  const lostStageRows = await db
     .select({ id: schema.pipelineStages.id })
     .from(schema.pipelineStages)
     .where(
       and(eq(schema.pipelineStages.orgId, orgId), eq(schema.pipelineStages.kind, "lost")),
     );
+  const wonStageIds = wonStageRows.map((s) => s.id);
+  const lostStageIds = lostStageRows.map((s) => s.id);
 
   const [wonCount] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -469,7 +471,7 @@ export async function getDashboardStats(orgId: string, userId: string): Promise<
       and(
         eq(schema.leads.orgId, orgId),
         eq(schema.leads.assigneeId, userId),
-        sql`${schema.leads.stageId} IN (${wonStage})`,
+        ...(wonStageIds.length > 0 ? [inArray(schema.leads.stageId, wonStageIds)] : [sql`false`]),
         gte(schema.leads.updatedAt, sevenDaysAgo),
       ),
     );
@@ -481,7 +483,7 @@ export async function getDashboardStats(orgId: string, userId: string): Promise<
       and(
         eq(schema.leads.orgId, orgId),
         eq(schema.leads.assigneeId, userId),
-        sql`${schema.leads.stageId} IN (${lostStage})`,
+        ...(lostStageIds.length > 0 ? [inArray(schema.leads.stageId, lostStageIds)] : [sql`false`]),
         gte(schema.leads.updatedAt, sevenDaysAgo),
       ),
     );

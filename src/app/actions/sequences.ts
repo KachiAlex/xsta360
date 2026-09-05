@@ -88,11 +88,13 @@ export async function deleteSequence(
   if (!ctx) return { message: "Not signed in" };
 
   const id = String(formData.get("id"));
+  if (!z.string().uuid().safeParse(id).success) return { message: "Invalid ID" };
   await db
     .delete(schema.sequences)
     .where(and(eq(schema.sequences.id, id), eq(schema.sequences.orgId, ctx.orgId)));
 
   revalidatePath("/sequences");
+  revalidatePath(`/sequences/${id}`);
   return { ok: true };
 }
 
@@ -106,6 +108,7 @@ export async function toggleSequenceActive(
   if (gate) return gate;
 
   const id = String(formData.get("id"));
+  if (!z.string().uuid().safeParse(id).success) return { message: "Invalid ID" };
   const [seq] = await db
     .select()
     .from(schema.sequences)
@@ -117,9 +120,10 @@ export async function toggleSequenceActive(
   await db
     .update(schema.sequences)
     .set({ active: !seq.active, updatedAt: new Date() })
-    .where(eq(schema.sequences.id, id));
+    .where(and(eq(schema.sequences.id, id), eq(schema.sequences.orgId, ctx.orgId)));
 
   revalidatePath("/sequences");
+  revalidatePath(`/sequences/${id}`);
   return { ok: true };
 }
 
@@ -192,6 +196,7 @@ export async function addSequenceStep(
   });
 
   revalidatePath("/sequences");
+  revalidatePath(`/sequences/${parsed.data.sequenceId}`);
   return { ok: true };
 }
 
@@ -203,11 +208,19 @@ export async function deleteSequenceStep(
   if (!ctx) return { message: "Not signed in" };
 
   const id = String(formData.get("id"));
+  if (!z.string().uuid().safeParse(id).success) return { message: "Invalid ID" };
+  const [step] = await db
+    .select({ sequenceId: schema.sequenceSteps.sequenceId })
+    .from(schema.sequenceSteps)
+    .where(and(eq(schema.sequenceSteps.id, id), eq(schema.sequenceSteps.orgId, ctx.orgId)))
+    .limit(1);
+
   await db
     .delete(schema.sequenceSteps)
     .where(and(eq(schema.sequenceSteps.id, id), eq(schema.sequenceSteps.orgId, ctx.orgId)));
 
   revalidatePath("/sequences");
+  if (step) revalidatePath(`/sequences/${step.sequenceId}`);
   return { ok: true };
 }
 
@@ -258,6 +271,7 @@ export async function unenrollLead(
   if (!ctx) return { message: "Not signed in" };
 
   const enrollmentId = String(formData.get("enrollmentId") ?? formData.get("id"));
+  if (!z.string().uuid().safeParse(enrollmentId).success) return { message: "Invalid ID" };
   await db
     .update(schema.sequenceEnrollments)
     .set({ status: "cancelled", updatedAt: new Date() })
@@ -316,7 +330,7 @@ export async function updateSequenceStep(
 
   // Verify step belongs to org.
   const [step] = await db
-    .select({ id: schema.sequenceSteps.id })
+    .select({ id: schema.sequenceSteps.id, sequenceId: schema.sequenceSteps.sequenceId })
     .from(schema.sequenceSteps)
     .where(
       and(
@@ -347,9 +361,10 @@ export async function updateSequenceStep(
       senderName: parsed.data.senderName || null,
       attachments: attachmentIds,
     })
-    .where(eq(schema.sequenceSteps.id, parsed.data.stepId));
+    .where(and(eq(schema.sequenceSteps.id, parsed.data.stepId), eq(schema.sequenceSteps.orgId, ctx.orgId)));
 
   revalidatePath("/sequences");
+  revalidatePath(`/sequences/${step.sequenceId}`);
   return { ok: true };
 }
 
@@ -407,9 +422,10 @@ export async function updateSequenceSettings(
       timezone: parsed.data.timezone,
       updatedAt: new Date(),
     })
-    .where(eq(schema.sequences.id, parsed.data.sequenceId));
+    .where(and(eq(schema.sequences.id, parsed.data.sequenceId), eq(schema.sequences.orgId, ctx.orgId)));
 
   revalidatePath("/sequences");
+  revalidatePath(`/sequences/${parsed.data.sequenceId}`);
   return { ok: true };
 }
 
@@ -484,6 +500,7 @@ export async function pauseEnrollment(
   if (!ctx) return { message: "Not signed in" };
 
   const enrollmentId = String(formData.get("enrollmentId"));
+  if (!z.string().uuid().safeParse(enrollmentId).success) return { message: "Invalid ID" };
   await db
     .update(schema.sequenceEnrollments)
     .set({ status: "paused", pausedReason: "manual", pausedAt: new Date(), updatedAt: new Date() })
@@ -506,6 +523,7 @@ export async function resumeEnrollment(
   if (!ctx) return { message: "Not signed in" };
 
   const enrollmentId = String(formData.get("enrollmentId"));
+  if (!z.string().uuid().safeParse(enrollmentId).success) return { message: "Invalid ID" };
   await db
     .update(schema.sequenceEnrollments)
     .set({ status: "active", pausedReason: null, pausedAt: null, updatedAt: new Date() })
@@ -582,6 +600,7 @@ export async function deleteSequenceTemplate(
   if (!ctx) return { message: "Not signed in" };
 
   const id = String(formData.get("id"));
+  if (!z.string().uuid().safeParse(id).success) return { message: "Invalid ID" };
   await db
     .delete(schema.sequenceTemplates)
     .where(
@@ -605,6 +624,7 @@ export async function createSequenceFromTemplate(
   if (gate) return gate;
 
   const templateId = String(formData.get("templateId"));
+  if (!z.string().uuid().safeParse(templateId).success) return { message: "Invalid ID" };
   const [template] = await db
     .select()
     .from(schema.sequenceTemplates)

@@ -592,6 +592,7 @@ export async function completeReminder(
   if (!ctx) return { message: "Not signed in" };
 
   const reminderId = String(formData.get("reminderId"));
+  if (!z.string().uuid().safeParse(reminderId).success) return { message: "Invalid ID" };
   const [reminder] = await db
     .update(schema.reminders)
     .set({ status: "completed", updatedAt: new Date() })
@@ -686,6 +687,7 @@ export async function assignLead(
   if (!can(ctx, "assign")) return { message: "Not allowed" };
 
   const leadId = String(formData.get("leadId"));
+  if (!z.string().uuid().safeParse(leadId).success) return { message: "Invalid ID" };
   const assigneeId = String(formData.get("assigneeId") || "");
 
   const lead = await loadOrgLead(ctx, leadId);
@@ -819,7 +821,7 @@ export async function bulkDeleteLeads(
   await db.delete(schema.reminders).where(inArray(schema.reminders.leadId, validIds));
   await db.delete(schema.remarks).where(inArray(schema.remarks.leadId, validIds));
   await db.delete(schema.sequenceEnrollments).where(inArray(schema.sequenceEnrollments.leadId, validIds));
-  await db.delete(schema.documents).where(inArray(schema.documents.leadId, validIds));
+  await db.delete(schema.leadDocuments).where(inArray(schema.leadDocuments.leadId, validIds));
   await db.delete(schema.leads).where(and(eq(schema.leads.orgId, ctx.orgId), inArray(schema.leads.id, validIds)));
 
   for (const id of validIds) {
@@ -882,6 +884,7 @@ export async function bulkMoveStage(
   const stageId = String(formData.get("stageId") ?? "").trim() || null;
   if (leadIds.length === 0) return { message: "No leads selected" };
   if (!stageId) return { message: "No stage selected" };
+  if (!z.string().uuid().safeParse(stageId).success) return { message: "Invalid stage ID" };
 
   // Verify stage belongs to org.
   const [stage] = await db

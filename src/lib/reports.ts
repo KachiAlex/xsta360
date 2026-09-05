@@ -97,58 +97,78 @@ export async function getRepReport(orgId: string): Promise<RepStat[]> {
 
   const result: RepStat[] = [];
 
+  // Single GROUP BY query for total leads per rep.
+  const totalRows = await db
+    .select({
+      assigneeId: schema.leads.assigneeId,
+      total: count(),
+    })
+    .from(schema.leads)
+    .where(eq(schema.leads.orgId, orgId))
+    .groupBy(schema.leads.assigneeId);
+  const totalMap = new Map(totalRows.map((r) => [r.assigneeId, r.total]));
+
+  // Single GROUP BY query for overdue reminders per rep.
+  const overdueRows = await db
+    .select({
+      assigneeId: schema.reminders.assigneeId,
+      overdue: count(),
+    })
+    .from(schema.reminders)
+    .where(
+      and(
+        eq(schema.reminders.orgId, orgId),
+        eq(schema.reminders.status, "pending"),
+        sql`${schema.reminders.dueAt} < NOW()`,
+      ),
+    )
+    .groupBy(schema.reminders.assigneeId);
+  const overdueMap = new Map(overdueRows.map((r) => [r.assigneeId, r.overdue]));
+
+  // Won/lost per rep via filtered GROUP BY.
+  const wonRows = wonIds.length
+    ? await db
+        .select({
+          assigneeId: schema.leads.assigneeId,
+          won: count(),
+        })
+        .from(schema.leads)
+        .where(
+          and(
+            eq(schema.leads.orgId, orgId),
+            inArray(schema.leads.stageId, wonIds),
+          ),
+        )
+        .groupBy(schema.leads.assigneeId)
+    : [];
+  const wonMap = new Map(wonRows.map((r) => [r.assigneeId, r.won]));
+
+  const lostRows = lostIds.length
+    ? await db
+        .select({
+          assigneeId: schema.leads.assigneeId,
+          lost: count(),
+        })
+        .from(schema.leads)
+        .where(
+          and(
+            eq(schema.leads.orgId, orgId),
+            inArray(schema.leads.stageId, lostIds),
+          ),
+        )
+        .groupBy(schema.leads.assigneeId)
+    : [];
+  const lostMap = new Map(lostRows.map((r) => [r.assigneeId, r.lost]));
+
   for (const m of members) {
-    const [totalRow] = await db
-      .select({ count: count() })
-      .from(schema.leads)
-      .where(
-        and(eq(schema.leads.orgId, orgId), eq(schema.leads.assigneeId, m.userId)),
-      );
-
-    const [overdueRow] = await db
-      .select({ count: count() })
-      .from(schema.reminders)
-      .where(
-        and(
-          eq(schema.reminders.orgId, orgId),
-          eq(schema.reminders.assigneeId, m.userId),
-          eq(schema.reminders.status, "pending"),
-          sql`${schema.reminders.dueAt} < NOW()`,
-        ),
-      );
-
-    const won = wonIds.length
-      ? (await db
-          .select({ count: count() })
-          .from(schema.leads)
-          .where(
-            and(
-              eq(schema.leads.orgId, orgId),
-              eq(schema.leads.assigneeId, m.userId),
-              inArray(schema.leads.stageId, wonIds),
-            ),
-          ))[0].count
-      : 0;
-
-    const lost = lostIds.length
-      ? (await db
-          .select({ count: count() })
-          .from(schema.leads)
-          .where(
-            and(
-              eq(schema.leads.orgId, orgId),
-              eq(schema.leads.assigneeId, m.userId),
-              inArray(schema.leads.stageId, lostIds),
-            ),
-          ))[0].count
-      : 0;
-
+    const won = wonMap.get(m.userId) ?? 0;
+    const lost = lostMap.get(m.userId) ?? 0;
     const decided = won + lost;
     result.push({
       userId: m.userId,
       name: m.name,
-      totalLeads: totalRow.count,
-      overdue: overdueRow.count,
+      totalLeads: totalMap.get(m.userId) ?? 0,
+      overdue: overdueMap.get(m.userId) ?? 0,
       won,
       lost,
       winRate: decided > 0 ? Math.round((won / decided) * 100) : 0,

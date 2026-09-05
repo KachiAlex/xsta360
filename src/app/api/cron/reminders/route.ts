@@ -24,9 +24,10 @@ export async function GET(request: Request) {
   const appUrl = process.env.APP_URL ?? "http://localhost:3000";
   const now = new Date();
 
-  // Process sequence steps FIRST, so newly-created reminders (e.g. delayDays: 0)
-  // are picked up in the same cron run, not the next one.
-  const seqResult = await processSequenceSteps();
+  try {
+    // Process sequence steps FIRST, so newly-created reminders (e.g. delayDays: 0)
+    // are picked up in the same cron run, not the next one.
+    const seqResult = await processSequenceSteps();
 
   // Find pending reminders due now or earlier that haven't been sent.
   const due = await db
@@ -141,4 +142,8 @@ export async function GET(request: Request) {
     sequenceSkippedWindow: seqResult.skippedWindow,
     scoresUpdated,
   });
+  } catch (err) {
+    console.error("Cron reminders error:", err);
+    return Response.json({ error: "Cron processing failed" }, { status: 500 });
+  }
 }

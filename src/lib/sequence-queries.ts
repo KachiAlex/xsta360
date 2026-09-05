@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, count } from "drizzle-orm";
 import { db, schema } from "@/db";
 
 export interface SequenceWithSteps {
@@ -128,15 +128,20 @@ export async function getLeadEnrollments(orgId: string, leadId: string): Promise
     )
     .orderBy(asc(schema.sequenceEnrollments.enrolledAt));
 
-  // Fetch step counts per sequence.
+  // Fetch step counts per sequence in a single GROUP BY query.
+  const sequenceIds = [...new Set(enrollments.map((e) => e.sequenceId))];
   const stepCounts = new Map<string, number>();
-  for (const e of enrollments) {
-    if (!stepCounts.has(e.sequenceId)) {
-      const steps = await db
-        .select({ id: schema.sequenceSteps.id })
-        .from(schema.sequenceSteps)
-        .where(eq(schema.sequenceSteps.sequenceId, e.sequenceId));
-      stepCounts.set(e.sequenceId, steps.length);
+  if (sequenceIds.length > 0) {
+    const stepCountRows = await db
+      .select({
+        sequenceId: schema.sequenceSteps.sequenceId,
+        count: count(),
+      })
+      .from(schema.sequenceSteps)
+      .where(inArray(schema.sequenceSteps.sequenceId, sequenceIds))
+      .groupBy(schema.sequenceSteps.sequenceId);
+    for (const r of stepCountRows) {
+      stepCounts.set(r.sequenceId, r.count);
     }
   }
 

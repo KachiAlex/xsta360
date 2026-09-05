@@ -72,6 +72,7 @@ export async function createCategory(
   });
 
   revalidatePath("/categories");
+  revalidatePath("/leads");
   return { ok: true, message: "Category created" };
 }
 
@@ -90,6 +91,7 @@ export async function updateCategory(
 
   const id = String(formData.get("id"));
   if (!id) return { message: "Category ID is required" };
+  if (!z.string().uuid().safeParse(id).success) return { message: "Invalid ID" };
 
   const parsed = CreateCategorySchema.safeParse({
     name: formData.get("name"),
@@ -122,6 +124,7 @@ export async function updateCategory(
     );
 
   revalidatePath("/categories");
+  revalidatePath("/leads");
   return { ok: true, message: "Category updated" };
 }
 
@@ -140,6 +143,7 @@ export async function deleteCategory(
 
   const id = String(formData.get("id"));
   if (!id) return { message: "Category ID is required" };
+  if (!z.string().uuid().safeParse(id).success) return { message: "Invalid ID" };
 
   // Cascade delete handles assignments.
   await db
@@ -167,6 +171,8 @@ export async function assignLeadToCategory(
   const leadId = String(formData.get("leadId"));
   const categoryId = String(formData.get("categoryId"));
   if (!leadId || !categoryId) return { message: "leadId and categoryId are required" };
+  if (!z.string().uuid().safeParse(leadId).success) return { message: "Invalid lead ID" };
+  if (!z.string().uuid().safeParse(categoryId).success) return { message: "Invalid category ID" };
 
   // Verify lead belongs to org.
   const [lead] = await db
@@ -221,7 +227,7 @@ export async function assignLeadToCategory(
     await db
       .update(schema.leads)
       .set({ assigneeId: cat.defaultAssigneeId, updatedAt: new Date() })
-      .where(eq(schema.leads.id, leadId));
+      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, ctx.orgId)));
   }
 
   // 3. Auto-schedule follow-up based on cadence.
@@ -263,6 +269,8 @@ export async function removeLeadFromCategory(
   const leadId = String(formData.get("leadId"));
   const categoryId = String(formData.get("categoryId"));
   if (!leadId || !categoryId) return { message: "leadId and categoryId are required" };
+  if (!z.string().uuid().safeParse(leadId).success) return { message: "Invalid lead ID" };
+  if (!z.string().uuid().safeParse(categoryId).success) return { message: "Invalid category ID" };
 
   // Get the category to find linked sequence.
   const [cat] = await db
@@ -294,6 +302,7 @@ export async function removeLeadFromCategory(
           eq(schema.sequenceEnrollments.leadId, leadId),
           eq(schema.sequenceEnrollments.sequenceId, cat.linkedSequenceId),
           eq(schema.sequenceEnrollments.status, "active"),
+          eq(schema.sequenceEnrollments.orgId, ctx.orgId),
         ),
       );
   }
@@ -320,6 +329,7 @@ export async function bulkAssignCategory(
   if (!categoryId || leadIds.length === 0) {
     return { message: "categoryId and leadIds are required" };
   }
+  if (!z.string().uuid().safeParse(categoryId).success) return { message: "Invalid category ID" };
 
   // Verify category.
   const [cat] = await db
@@ -363,7 +373,7 @@ export async function bulkAssignCategory(
       await db
         .update(schema.leads)
         .set({ assigneeId: cat.defaultAssigneeId, updatedAt: new Date() })
-        .where(eq(schema.leads.id, leadId));
+        .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, ctx.orgId)));
     }
 
     // Auto-schedule follow-up.

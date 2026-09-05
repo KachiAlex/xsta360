@@ -3,6 +3,7 @@ import { getSequenceAnalytics } from "@/lib/sequence-analytics";
 import { Topbar } from "@/components/app/topbar";
 import { Panel, PanelHead } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
+import { UpgradePrompt } from "@/components/app/upgrade-prompt";
 import Link from "next/link";
 
 export default async function SequenceAnalyticsPage({
@@ -13,7 +14,7 @@ export default async function SequenceAnalyticsPage({
   const ctx = await requireAuth();
   const plan = await getOrgPlan(ctx.orgId);
   if (!planHasFeature(plan, "sequences")) {
-    return <div>Sequences not available on your plan</div>;
+    return <UpgradePrompt feature="sequences" plan={plan} />;
   }
 
   const { id } = await params;

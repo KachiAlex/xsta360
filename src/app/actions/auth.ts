@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { eq, sql } from "drizzle-orm";
+import { eq, isNull, sql, and } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { createSession, deleteSession } from "@/lib/session";
 import { logEvent } from "@/lib/audit";
@@ -250,7 +250,12 @@ export async function signupAndJoin(
       await tx
         .update(schema.invitations)
         .set({ acceptedAt: new Date() })
-        .where(eq(schema.invitations.id, invite.id));
+        .where(
+          and(
+            eq(schema.invitations.id, invite.id),
+            isNull(schema.invitations.acceptedAt),
+          ),
+        );
       return [{ user, orgId: invite.orgId, role: invite.role }] as const;
     });
 
@@ -478,7 +483,12 @@ export async function resetPassword(
       await tx
         .update(schema.passwordResetTokens)
         .set({ usedAt: new Date() })
-        .where(eq(schema.passwordResetTokens.id, record.id));
+        .where(
+          and(
+            eq(schema.passwordResetTokens.id, record.id),
+            isNull(schema.passwordResetTokens.usedAt),
+          ),
+        );
     });
 
     redirect("/login?reset=1");

@@ -214,7 +214,7 @@ export async function createOrUpdateContactCard(
         qrCodeSvg,
         updatedAt: new Date(),
       })
-      .where(eq(schema.contactCards.id, existing.id));
+      .where(and(eq(schema.contactCards.id, existing.id), eq(schema.contactCards.userId, ctx.userId)));
 
     revalidatePath("/contact-card");
     revalidatePath(`/c/${existing.slug}`);

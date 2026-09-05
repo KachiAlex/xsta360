@@ -39,6 +39,7 @@ const UpdateNoteSchema = z.object({
   title: z.string().min(1).trim().optional(),
   body: z.string().trim().optional(),
   pinned: z.boolean().optional(),
+  leadId: z.string().uuid().optional().or(z.literal("")),
 });
 
 export type TaskFormState = {
@@ -124,6 +125,7 @@ export async function completeTodo(
   if (!ctx) return { message: "Not signed in" };
 
   const todoId = String(formData.get("id"));
+  if (!z.string().uuid().safeParse(todoId).success) return { message: "Invalid ID" };
   const [todo] = await db
     .update(schema.todos)
     .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
@@ -154,6 +156,7 @@ export async function reopenTodo(
   if (!ctx) return { message: "Not signed in" };
 
   const todoId = String(formData.get("id"));
+  if (!z.string().uuid().safeParse(todoId).success) return { message: "Invalid ID" };
   const [todo] = await db
     .update(schema.todos)
     .set({ status: "pending", completedAt: null, updatedAt: new Date() })
@@ -177,6 +180,7 @@ export async function deleteTodo(
   if (!ctx) return { message: "Not signed in" };
 
   const todoId = String(formData.get("id"));
+  if (!z.string().uuid().safeParse(todoId).success) return { message: "Invalid ID" };
   await db
     .delete(schema.todos)
     .where(
@@ -256,16 +260,33 @@ export async function updateNote(
   const ctx = await verifySession();
   if (!ctx) return { message: "Not signed in" };
 
-  const id = String(formData.get("id"));
-  const title = String(formData.get("title") || "");
-  const body = String(formData.get("body") || "");
-  const pinned = formData.get("pinned") === "true";
+  const parsed = UpdateNoteSchema.safeParse({
+    id: formData.get("id"),
+    title: formData.get("title") || undefined,
+    body: formData.get("body") || undefined,
+    pinned: formData.get("pinned") === "true" ? true : undefined,
+    leadId: formData.get("leadId"),
+  });
+  if (!parsed.success) {
+    return {
+      errors: parsed.error.issues.reduce<Record<string, string[]>>((acc, i) => {
+        const key = i.path[0]?.toString() ?? "_";
+        (acc[key] ??= []).push(i.message);
+        return acc;
+      }, {}),
+    };
+  }
 
-  if (!title) return { errors: { title: ["Title is required"] } };
+  const { id, title, body, pinned, leadId } = parsed.data;
 
   const [note] = await db
     .update(schema.notes)
-    .set({ title, body, pinned, updatedAt: new Date() })
+    .set({
+      ...(title !== undefined && { title }),
+      ...(body !== undefined && { body }),
+      ...(pinned !== undefined && { pinned }),
+      updatedAt: new Date(),
+    })
     .where(
       and(eq(schema.notes.id, id), eq(schema.notes.orgId, ctx.orgId), eq(schema.notes.userId, ctx.userId)),
     )
@@ -275,6 +296,7 @@ export async function updateNote(
 
   revalidatePath("/tasks");
   revalidatePath("/dashboard");
+  if (leadId) revalidatePath(`/leads/${leadId}`);
   return { ok: true };
 }
 
@@ -286,6 +308,15 @@ export async function deleteNote(
   if (!ctx) return { message: "Not signed in" };
 
   const noteId = String(formData.get("id"));
+  if (!z.string().uuid().safeParse(noteId).success) return { message: "Invalid ID" };
+  const [note] = await db
+    .select({ leadId: schema.notes.leadId })
+    .from(schema.notes)
+    .where(
+      and(eq(schema.notes.id, noteId), eq(schema.notes.orgId, ctx.orgId), eq(schema.notes.userId, ctx.userId)),
+    )
+    .limit(1);
+
   await db
     .delete(schema.notes)
     .where(
@@ -294,6 +325,7 @@ export async function deleteNote(
 
   revalidatePath("/tasks");
   revalidatePath("/dashboard");
+  if (note?.leadId) revalidatePath(`/leads/${note.leadId}`);
   return { ok: true };
 }
 
@@ -304,7 +336,18 @@ export async function toggleNotePin(
   const ctx = await verifySession();
   if (!ctx) return { message: "Not signed in" };
 
-  const noteId = String(formData.get("id"));
+  const parsed = UpdateNoteSchema.safeParse({ id: formData.get("id") });
+  if (!parsed.success) {
+    return {
+      errors: parsed.error.issues.reduce<Record<string, string[]>>((acc, i) => {
+        const key = i.path[0]?.toString() ?? "_";
+        (acc[key] ??= []).push(i.message);
+        return acc;
+      }, {}),
+    };
+  }
+
+  const noteId = parsed.data.id;
   const [note] = await db
     .select()
     .from(schema.notes)
@@ -318,9 +361,10 @@ export async function toggleNotePin(
   await db
     .update(schema.notes)
     .set({ pinned: !note.pinned, updatedAt: new Date() })
-    .where(eq(schema.notes.id, noteId));
+    .where(and(eq(schema.notes.id, noteId), eq(schema.notes.orgId, ctx.orgId)));
 
   revalidatePath("/tasks");
   revalidatePath("/dashboard");
+  if (note.leadId) revalidatePath(`/leads/${note.leadId}`);
   return { ok: true };
 }

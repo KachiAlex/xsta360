@@ -212,7 +212,7 @@ export async function revokeInvite(
   if (!invitation) return { message: "Invitation not found" };
   if (invitation.acceptedAt) return { message: "Invitation already accepted" };
 
-  await db.delete(schema.invitations).where(eq(schema.invitations.id, invitation.id));
+  await db.delete(schema.invitations).where(and(eq(schema.invitations.id, invitation.id), eq(schema.invitations.orgId, ctx.orgId)));
 
   revalidatePath("/settings");
   return { ok: true };
@@ -261,7 +261,7 @@ export async function changeRole(
   await db
     .update(schema.memberships)
     .set({ role: parsed.data.role })
-    .where(eq(schema.memberships.id, membership.id));
+    .where(and(eq(schema.memberships.id, membership.id), eq(schema.memberships.orgId, ctx.orgId)));
 
   await logEvent(ctx.orgId, "role_changed", {
     actorId: ctx.userId,
@@ -285,6 +285,7 @@ export async function removeMember(
   if (!can(ctx, "manage_team")) return { message: "Only admins can remove members" };
 
   const membershipId = String(formData.get("membershipId"));
+  if (!z.string().uuid().safeParse(membershipId).success) return { message: "Invalid ID" };
 
   const [membership] = await db
     .select()
@@ -303,7 +304,7 @@ export async function removeMember(
     }
   }
 
-  await db.delete(schema.memberships).where(eq(schema.memberships.id, membership.id));
+  await db.delete(schema.memberships).where(and(eq(schema.memberships.id, membership.id), eq(schema.memberships.orgId, ctx.orgId)));
 
   await logEvent(ctx.orgId, "member_removed", {
     actorId: ctx.userId,

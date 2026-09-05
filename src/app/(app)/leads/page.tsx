@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAuth } from "@/lib/dal";
 import { getOrgStages, getOrgMembers } from "@/lib/queries";
-import { getLeads } from "@/lib/leads";
+import { getLeadsPaginated } from "@/lib/leads";
 import { getOrgCategories } from "@/lib/category-queries";
 import { getOrgSequences } from "@/lib/sequence-queries";
 import { Topbar } from "@/components/app/topbar";
@@ -25,17 +25,20 @@ const SOURCE_LABELS: Record<string, string> = {
 const SOURCES = Object.entries(SOURCE_LABELS);
 
 export default async function LeadsPage(props: {
-  searchParams: Promise<{ q?: string; stageId?: string; source?: string; assigneeId?: string; categoryId?: string }>;
+  searchParams: Promise<{ q?: string; stageId?: string; source?: string; assigneeId?: string; categoryId?: string; page?: string }>;
 }) {
   const ctx = await requireAuth();
-  const filters = await props.searchParams;
-  const [stages, members, leads, categories, sequences] = await Promise.all([
+  const rawFilters = await props.searchParams;
+  const page = Math.max(1, parseInt(rawFilters.page ?? "1", 10) || 1);
+  const filters = { ...rawFilters, page, pageSize: 50 };
+  const [stages, members, leadsResult, categories, sequences] = await Promise.all([
     getOrgStages(ctx.orgId),
     getOrgMembers(ctx.orgId),
-    getLeads(ctx.orgId, filters),
+    getLeadsPaginated(ctx.orgId, filters),
     getOrgCategories(ctx.orgId),
     getOrgSequences(ctx.orgId),
   ]);
+  const { leads, total, totalPages } = leadsResult;
 
   const categoryOptions = categories.map((c) => ({ id: c.id, name: c.name, icon: c.icon, color: c.color }));
 
@@ -123,7 +126,7 @@ export default async function LeadsPage(props: {
           />
         ) : (
           <Panel>
-            <PanelHead title="Leads" sub={`${leads.length} total`} />
+            <PanelHead title="Leads" sub={`${total} total`} />
             <LeadsList
               leads={leads.map((l) => ({
                 id: l.id,
@@ -147,6 +150,31 @@ export default async function LeadsPage(props: {
               sequences={sequences.map((s) => ({ id: s.id, name: s.name, active: s.active }))}
               canDelete={ctx.role === "admin" || ctx.role === "manager"}
             />
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-rule text-sm">
+                <span className="text-ink-soft">
+                  Page {page} of {totalPages}
+                </span>
+                <div className="flex gap-2">
+                  {page > 1 && (
+                    <Link
+                      href={`/leads?${new URLSearchParams({ ...rawFilters, page: String(page - 1) }).toString()}`}
+                      className="px-3 py-1.5 border border-rule rounded hover:bg-paper-2 min-h-[36px] flex items-center"
+                    >
+                      ← Prev
+                    </Link>
+                  )}
+                  {page < totalPages && (
+                    <Link
+                      href={`/leads?${new URLSearchParams({ ...rawFilters, page: String(page + 1) }).toString()}`}
+                      className="px-3 py-1.5 border border-rule rounded hover:bg-paper-2 min-h-[36px] flex items-center"
+                    >
+                      Next →
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
           </Panel>
         )}
       </div>

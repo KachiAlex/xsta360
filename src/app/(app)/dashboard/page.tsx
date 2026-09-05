@@ -1,6 +1,6 @@
 import { requireAuth, getOrgBilling } from "@/lib/dal";
 import { db, schema } from "@/db";
-import { eq, count } from "drizzle-orm";
+import { eq, count, and } from "drizzle-orm";
 import { getOrgStages, getOrgMembers } from "@/lib/queries";
 import { getPulseLeads, getDashboardStats, getUpcomingReminders } from "@/lib/dashboard";
 import { getOrgCategories } from "@/lib/category-queries";
@@ -57,7 +57,7 @@ export default async function DashboardPage(props: {
     db
       .select({ value: count() })
       .from(schema.contactCards)
-      .where(eq(schema.contactCards.userId, ctx.userId)),
+      .where(and(eq(schema.contactCards.userId, ctx.userId), eq(schema.contactCards.orgId, ctx.orgId))),
   ]);
 
   const totalCount =

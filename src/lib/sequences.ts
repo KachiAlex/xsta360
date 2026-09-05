@@ -151,13 +151,36 @@ export async function processSequenceSteps(): Promise<{
     .from(schema.sequenceEnrollments)
     .where(eq(schema.sequenceEnrollments.status, "active"));
 
+  // Prefetch all steps and leads in bulk to avoid N+1 queries.
+  const sequenceIds = [...new Set(enrollments.map((e) => e.sequenceId))];
+  const leadIds = [...new Set(enrollments.map((e) => e.leadId))];
+
+  const allSteps = sequenceIds.length
+    ? await db
+        .select()
+        .from(schema.sequenceSteps)
+        .where(inArray(schema.sequenceSteps.sequenceId, sequenceIds))
+        .orderBy(asc(schema.sequenceSteps.position))
+    : [];
+  // Group steps by sequenceId.
+  const stepsBySeq = new Map<string, typeof allSteps>();
+  for (const s of allSteps) {
+    const arr = stepsBySeq.get(s.sequenceId) ?? [];
+    arr.push(s);
+    stepsBySeq.set(s.sequenceId, arr);
+  }
+
+  const allLeads = leadIds.length
+    ? await db
+        .select()
+        .from(schema.leads)
+        .where(inArray(schema.leads.id, leadIds))
+    : [];
+  const leadsById = new Map(allLeads.map((l) => [l.id, l]));
+
   for (const enrollment of enrollments) {
-    // Get the next step (currentStep index, ordered by position).
-    const steps = await db
-      .select()
-      .from(schema.sequenceSteps)
-      .where(eq(schema.sequenceSteps.sequenceId, enrollment.sequenceId))
-      .orderBy(asc(schema.sequenceSteps.position));
+    // Use prefetched steps (already ordered by position).
+    const steps = stepsBySeq.get(enrollment.sequenceId) ?? [];
 
     const nextStepIndex = enrollment.currentStep;
     if (nextStepIndex >= steps.length) {
@@ -176,12 +199,8 @@ export async function processSequenceSteps(): Promise<{
     const dueDate = new Date(enrollment.enrolledAt.getTime() + nextStep.delayDays * 86_400_000);
     if (now < dueDate) continue;
 
-    // Load the lead.
-    const [lead] = await db
-      .select()
-      .from(schema.leads)
-      .where(eq(schema.leads.id, enrollment.leadId))
-      .limit(1);
+    // Use prefetched lead.
+    const lead = leadsById.get(enrollment.leadId);
 
     if (!lead) {
       // Lead was deleted — cancel enrollment.
@@ -273,6 +292,8 @@ export async function processSequenceSteps(): Promise<{
       case "email": {
         // Send email directly to the lead.
         if (lead.email) {
+          let emailSent = false;
+          let emailEventId: string | undefined;
           try {
             const personalizedBody = replacePlaceholders(stepBody, msgCtx);
             const personalizedSubject = replacePlaceholders(
@@ -292,10 +313,11 @@ export async function processSequenceSteps(): Promise<{
                 variant,
               })
               .returning();
+            emailEventId = emailEvent.id;
 
             const appUrl = process.env.APP_URL ?? "https://xsta360.com.ng";
             const tracking = {
-              eventId: emailEvent.id,
+              eventId: emailEventId,
               appUrl,
               unsubscribeToken: enrollment.unsubscribeToken || "",
             };
@@ -348,21 +370,36 @@ export async function processSequenceSteps(): Promise<{
               },
             );
             emailsSent++;
+            emailSent = true;
           } catch (err) {
             console.error(`Sequence email failed for lead ${lead.id}:`, err);
+            // Mark the pre-created "sent" event as "failed" so analytics
+            // don't count unsuccessful SMTP sends as delivered.
+            try {
+              if (emailEventId) {
+                await db
+                  .update(schema.sequenceEmailEvents)
+                  .set({ eventType: "failed" })
+                  .where(eq(schema.sequenceEmailEvents.id, emailEventId));
+              }
+            } catch {
+              // best-effort cleanup
+            }
+          }
+          // Create a reminder record for tracking (only if email was actually sent).
+          if (emailSent) {
+            await db.insert(schema.reminders).values({
+              leadId: enrollment.leadId,
+              orgId: enrollment.orgId,
+              assigneeId: lead.assigneeId,
+              dueAt: now,
+              note: `[Sequence] Email sent to lead: ${reminderNote}`,
+              status: "sent",
+              sequenceStepId: nextStep.id,
+              channel: "email",
+            });
           }
         }
-        // Also create a reminder record for tracking.
-        await db.insert(schema.reminders).values({
-          leadId: enrollment.leadId,
-          orgId: enrollment.orgId,
-          assigneeId: lead.assigneeId,
-          dueAt: now,
-          note: `[Sequence] Email sent to lead: ${reminderNote}`,
-          status: "sent",
-          sequenceStepId: nextStep.id,
-          channel: "email",
-        });
         break;
       }
 
@@ -371,15 +408,25 @@ export async function processSequenceSteps(): Promise<{
         const whatsappConfig = org?.whatsappConfig as
           | { enabled?: boolean; phoneNumberId?: string; apiKey?: string }
           | undefined;
+        let whatsappSuccess = false;
+        let whatsappError: string | undefined;
         if (whatsappConfig?.enabled && whatsappConfig.phoneNumberId && whatsappConfig.apiKey && lead.phone) {
           const personalizedBody = replacePlaceholders(stepBody, msgCtx);
           const msg = formatWhatsAppMessage(personalizedBody, orgName);
           const result = await sendWhatsAppMessage(whatsappConfig, lead.phone, msg);
           if (result.success) {
             whatsappSent++;
+            whatsappSuccess = true;
           } else {
+            whatsappError = result.error || "WhatsApp send failed";
             console.error(`Sequence WhatsApp failed for lead ${lead.id}:`, result.error);
           }
+        } else {
+          whatsappError = !whatsappConfig?.enabled
+            ? "WhatsApp not configured"
+            : !lead.phone
+              ? "No phone number"
+              : "Missing WhatsApp config";
         }
         // Create a reminder record for tracking.
         await db.insert(schema.reminders).values({
@@ -388,10 +435,10 @@ export async function processSequenceSteps(): Promise<{
           assigneeId: lead.assigneeId,
           dueAt: now,
           note: `[Sequence] WhatsApp sent to lead: ${reminderNote}`,
-          status: whatsappConfig?.enabled && lead.phone ? "sent" : "failed",
+          status: whatsappSuccess ? "sent" : "failed",
           sequenceStepId: nextStep.id,
           channel: "whatsapp",
-          lastError: !whatsappConfig?.enabled ? "WhatsApp not configured" : !lead.phone ? "No phone number" : undefined,
+          lastError: whatsappError,
         });
         break;
       }

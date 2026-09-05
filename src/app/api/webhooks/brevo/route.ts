@@ -1,5 +1,6 @@
 import { db, schema } from "@/db";
 import { eq } from "drizzle-orm";
+import { rateLimit, clientKey } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -15,13 +16,23 @@ export const dynamic = "force-dynamic";
  *   Events: delivered, hard_bounce, soft_bounce, spam, blocked, reply
  */
 export async function POST(request: Request) {
-  // Verify webhook secret if configured
+  // Rate limit: 120 webhook events/min per IP (Brevo batches events)
+  const rl = rateLimit(clientKey(request, "brevo"), 120, 60_000);
+  if (!rl.allowed) {
+    return new Response("Too Many Requests", {
+      status: 429,
+      headers: { "Retry-After": String(rl.retryAfterSeconds) },
+    });
+  }
+
+  // Webhook secret is mandatory — reject all requests if not configured
   const webhookSecret = process.env.BREVO_WEBHOOK_SECRET;
-  if (webhookSecret) {
-    const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${webhookSecret}`) {
-      return new Response("Unauthorized", { status: 401 });
-    }
+  if (!webhookSecret) {
+    return new Response("Webhook not configured", { status: 503 });
+  }
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${webhookSecret}`) {
+    return new Response("Unauthorized", { status: 401 });
   }
 
   let payload: any;
