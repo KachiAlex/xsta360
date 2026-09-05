@@ -57,38 +57,63 @@ export function LeadsList({
     });
   }
 
+  function clearSelection() {
+    setSelected(new Set());
+  }
+
   const leadIds = leads.map((l) => l.id);
   const allSelected = selected.size === leads.length && leads.length > 0;
+  const hasCategories = categories.length > 0;
 
   return (
     <div>
-      {/* Bulk category bar */}
-      {categories.length > 0 && (
-        <BulkCategoryBar
-          leadIds={leadIds}
-          categories={categories}
-        />
+      {/* Bulk category bar — shared selection state */}
+      <BulkCategoryBar
+        leadIds={leadIds}
+        categories={categories}
+        selected={selected}
+        onClear={clearSelection}
+      />
+
+      {/* Select all toggle (always visible when there are leads) */}
+      {leads.length > 0 && (
+        <div className="mb-2 flex items-center gap-3">
+          <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft cursor-pointer min-h-[36px]">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={toggleAll}
+              className="w-4 h-4 accent-ink cursor-pointer"
+            />
+            {allSelected ? "Deselect all" : `Select all (${leads.length})`}
+          </label>
+          {selected.size > 0 && (
+            <span className="text-xs text-ink-soft">
+              {selected.size} selected
+            </span>
+          )}
+        </div>
       )}
 
       {/* Desktop: table */}
       <table className="w-full border-collapse hidden md:table">
         <thead>
           <tr>
-            {categories.length > 0 && (
-              <th className="px-3 py-3 border-b border-rule w-10">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={toggleAll}
-                  className="w-4 h-4 accent-ink cursor-pointer"
-                  aria-label="Select all leads"
-                />
-              </th>
-            )}
+            <th className="px-3 py-3 border-b border-rule w-10">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleAll}
+                className="w-4 h-4 accent-ink cursor-pointer"
+                aria-label="Select all leads"
+              />
+            </th>
             <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Lead</th>
             <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Stage</th>
             <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Source</th>
-            <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Categories</th>
+            {hasCategories && (
+              <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Categories</th>
+            )}
             <th className="text-right font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Value</th>
             <th className="text-right font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Score</th>
             <th className="text-left font-mono text-[11px] uppercase tracking-wider text-ink-soft px-5 py-3 border-b border-rule font-semibold">Assignee</th>
@@ -98,15 +123,13 @@ export function LeadsList({
         <tbody>
           {leads.map((lead) => (
             <tr key={lead.id} className="hover:bg-paper-2">
-              {categories.length > 0 && (
-                <td className="px-3 py-3.5 border-b border-dashed border-rule">
-                  <LeadCheckbox
-                    leadId={lead.id}
-                    selected={selected.has(lead.id)}
-                    onToggle={toggle}
-                  />
-                </td>
-              )}
+              <td className="px-3 py-3.5 border-b border-dashed border-rule">
+                <LeadCheckbox
+                  leadId={lead.id}
+                  selected={selected.has(lead.id)}
+                  onToggle={toggle}
+                />
+              </td>
               <td className="px-5 py-3.5 border-b border-dashed border-rule">
                 <Link href={`/leads/${lead.id}`} className="font-semibold hover:underline">
                   {lead.name}
@@ -128,20 +151,22 @@ export function LeadsList({
                 {SOURCE_LABELS[lead.source] ?? lead.source}
                 {lead.campaign && <div className="text-xs text-ink-soft">{lead.campaign}</div>}
               </td>
-              <td className="px-5 py-3.5 border-b border-dashed border-rule">
-                <div className="flex flex-wrap gap-1">
-                  {lead.categories.map((cat) => (
-                    <span
-                      key={cat.id}
-                      className="text-[10px] font-mono px-1.5 py-0.5 rounded"
-                      style={{ backgroundColor: `${cat.color}18`, color: cat.color }}
-                    >
-                      {cat.icon} {cat.name}
-                    </span>
-                  ))}
-                  {lead.categories.length === 0 && <span className="text-xs text-ink-soft">—</span>}
-                </div>
-              </td>
+              {hasCategories && (
+                <td className="px-5 py-3.5 border-b border-dashed border-rule">
+                  <div className="flex flex-wrap gap-1">
+                    {lead.categories.map((cat) => (
+                      <span
+                        key={cat.id}
+                        className="text-[10px] font-mono px-1.5 py-0.5 rounded"
+                        style={{ backgroundColor: `${cat.color}18`, color: cat.color }}
+                      >
+                        {cat.icon} {cat.name}
+                      </span>
+                    ))}
+                    {lead.categories.length === 0 && <span className="text-xs text-ink-soft">—</span>}
+                  </div>
+                </td>
+              )}
               <td className="px-5 py-3.5 border-b border-dashed border-rule text-sm font-mono text-right">
                 {lead.value ? `₦${parseFloat(lead.value).toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—"}
               </td>
@@ -171,15 +196,13 @@ export function LeadsList({
       <div className="md:hidden divide-y divide-dashed divide-rule">
         {leads.map((lead) => (
           <div key={lead.id} className="flex items-start gap-2 px-4 py-3 active:bg-paper-2/50 transition-colors">
-            {categories.length > 0 && (
-              <div className="pt-1">
-                <LeadCheckbox
-                  leadId={lead.id}
-                  selected={selected.has(lead.id)}
-                  onToggle={toggle}
-                />
-              </div>
-            )}
+            <div className="pt-1">
+              <LeadCheckbox
+                leadId={lead.id}
+                selected={selected.has(lead.id)}
+                onToggle={toggle}
+              />
+            </div>
             <Link href={`/leads/${lead.id}`} className="block flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2 mb-1.5">
                 <div className="min-w-0">

@@ -89,7 +89,10 @@ export function ImportClient({
                 <span className="text-sm font-mono w-40 truncate">{h}</span>
                 <Select
                   value={mapping[h] ?? ""}
-                  onChange={(e) => setMapping((m) => ({ ...m, [h]: e.currentTarget.value as Field | "" }))}
+                  onChange={(e) => {
+                    const value = e.currentTarget.value as Field | "";
+                    setMapping((m) => ({ ...m, [h]: value }));
+                  }}
                   className="w-auto"
                 >
                   <option value="">— Skip —</option>
