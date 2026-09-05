@@ -60,6 +60,9 @@ export function ImportClient({
     });
   }
 
+  // True if any CSV column has been mapped to the "name" field.
+  const hasNameMapping = Object.values(mapping).includes("name");
+
   return (
     <div className="content flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-7 max-w-[1240px] w-full mx-auto">
       <Link href="/leads" className="text-sm text-ink-soft hover:text-ink mb-4 inline-block">
@@ -124,10 +127,10 @@ export function ImportClient({
             </div>
           )}
 
-          <Button type="submit" size="lg" disabled={pending || !mapping.name}>
+          <Button type="submit" size="lg" disabled={pending || !hasNameMapping}>
             {pending ? "Importing…" : `Import ${rows.length} leads`}
           </Button>
-          {!mapping.name && (
+          {!hasNameMapping && (
             <p className="text-xs text-stamp mt-2">Map a column to &quot;name&quot; to enable import.</p>
           )}
         </form>
