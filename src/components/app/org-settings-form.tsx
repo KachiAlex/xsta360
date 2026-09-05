@@ -14,10 +14,12 @@ interface CustomFieldDef {
 
 export function OrgSettingsForm({
   currency,
+  replyToEmail,
   whatsappConfig,
   customFieldDefs,
 }: {
   currency: string;
+  replyToEmail: string | null;
   whatsappConfig: { enabled?: boolean; phoneNumberId?: string; apiKey?: string } | null;
   customFieldDefs: CustomFieldDef[];
 }) {
@@ -43,6 +45,13 @@ export function OrgSettingsForm({
       <div>
         <Label>Currency symbol</Label>
         <Input name="currency" defaultValue={currency} placeholder="₦" className="max-w-[100px]" />
+      </div>
+
+      {/* Reply-to email for sequence emails */}
+      <div>
+        <Label>Reply-to email (for sequence emails)</Label>
+        <Input name="replyToEmail" type="email" defaultValue={replyToEmail ?? ""} placeholder="replies@yourcompany.com" className="max-w-sm" />
+        <p className="text-xs text-ink-soft mt-1">When leads reply to automated sequence emails, their reply goes to this address. Use a shared inbox if multiple reps should see replies.</p>
       </div>
 
       {/* WhatsApp config */}

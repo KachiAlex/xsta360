@@ -82,6 +82,17 @@ export function buildEmailHtml(body: string, orgName: string): string {
 }
 
 /**
+ * Build a styled HTML email body from rich text editor content (already HTML).
+ * Wraps the rich content in the email template with org signature.
+ */
+export function buildEmailHtmlFromRich(body: string, orgName: string): string {
+  return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #1E2A22;">
+  <div style="font-size: 15px; line-height: 1.6; white-space: normal;">${body}</div>
+  <p style="color: #4A5750; font-size: 13px; margin-top: 32px; border-top: 1px solid #E5E0D8; padding-top: 16px;">— ${orgName}</p>
+</div>`;
+}
+
+/**
  * Format a WhatsApp message with lead-facing content.
  * WhatsApp supports its own markdown:
  * - *bold*

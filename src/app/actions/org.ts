@@ -197,6 +197,7 @@ export async function updateOrgSettings(
   if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
 
   const currency = String(formData.get("currency") || "₦");
+  const replyToEmail = String(formData.get("replyToEmail") || "").trim() || null;
   const whatsappEnabled = formData.get("whatsappEnabled") === "true";
   const whatsappPhoneNumberId = String(formData.get("whatsappPhoneNumberId") || "");
   const whatsappApiKey = String(formData.get("whatsappApiKey") || "");
@@ -221,6 +222,7 @@ export async function updateOrgSettings(
     .update(schema.organizations)
     .set({
       currency,
+      replyToEmail,
       customFieldDefs: customFieldDefs as any,
       whatsappConfig: whatsappConfig as any,
       updatedAt: new Date(),
@@ -229,7 +231,7 @@ export async function updateOrgSettings(
 
   await logEvent(ctx.orgId, "org_settings_updated", {
     actorId: ctx.userId,
-    meta: { currency, whatsappEnabled },
+    meta: { currency, whatsappEnabled, replyToEmail },
   });
 
   revalidatePath("/settings");

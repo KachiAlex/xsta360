@@ -4,7 +4,7 @@ import { db, schema } from "@/db";
 import { logEvent } from "@/lib/audit";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { sendMail } from "@/lib/email";
-import { replacePlaceholders, buildEmailHtml, formatWhatsAppMessage } from "@/lib/message-format";
+import { replacePlaceholders, buildEmailHtml, buildEmailHtmlFromRich, formatWhatsAppMessage } from "@/lib/message-format";
 
 /**
  * Enroll a lead in a sequence. Creates the enrollment record.
@@ -132,11 +132,12 @@ export async function processSequenceSteps(): Promise<{
       continue;
     }
 
-    // Load the org for WhatsApp config and org name.
+    // Load the org for WhatsApp config, org name, and reply-to email.
     const [org] = await db
       .select({
         name: schema.organizations.name,
         whatsappConfig: schema.organizations.whatsappConfig,
+        replyToEmail: schema.organizations.replyToEmail,
       })
       .from(schema.organizations)
       .where(eq(schema.organizations.id, enrollment.orgId))
@@ -178,10 +179,21 @@ export async function processSequenceSteps(): Promise<{
               nextStep.subject || `Message from ${orgName}`,
               msgCtx,
             );
+            // If body is already HTML (from rich text editor), use it directly.
+            // Otherwise, convert markdown to HTML.
+            const isHtml = /<[a-z][\s\S]*>/i.test(nextStep.body);
+            const emailHtml = isHtml
+              ? buildEmailHtmlFromRich(personalizedBody, orgName)
+              : buildEmailHtml(personalizedBody, orgName);
+
             await sendMail(
               lead.email,
               personalizedSubject,
-              buildEmailHtml(personalizedBody, orgName),
+              emailHtml,
+              {
+                senderName: nextStep.senderName || orgName,
+                replyTo: org?.replyToEmail || undefined,
+              },
             );
             emailsSent++;
           } catch (err) {

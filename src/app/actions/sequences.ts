@@ -33,7 +33,8 @@ const CreateStepSchema = z.object({
   delayDays: z.string().or(z.number()),
   action: z.string().default("reminder"),
   subject: z.string().trim().optional().or(z.literal("")),
-  body: z.string().min(1, "Content is required").trim(),
+  body: z.string().min(1, "Content is required"),
+  senderName: z.string().trim().optional().or(z.literal("")),
 });
 
 const EnrollSchema = z.object({
@@ -136,6 +137,7 @@ export async function addSequenceStep(
     action: formData.get("action") || "reminder",
     subject: formData.get("subject"),
     body: formData.get("body"),
+    senderName: formData.get("senderName"),
   });
   if (!parsed.success) {
     return {
@@ -172,6 +174,7 @@ export async function addSequenceStep(
     action: parsed.data.action,
     subject: parsed.data.subject || null,
     body: parsed.data.body,
+    senderName: parsed.data.senderName || null,
   });
 
   revalidatePath("/sequences");

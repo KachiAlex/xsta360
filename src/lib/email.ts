@@ -15,18 +15,36 @@ const transport = nodemailer.createTransport({
   auth: smtpUser && smtpPass ? { user: smtpUser, pass: smtpPass } : undefined,
 });
 
-export async function sendMail(to: string, subject: string, html: string): Promise<void> {
+export async function sendMail(
+  to: string,
+  subject: string,
+  html: string,
+  options?: { senderName?: string; replyTo?: string },
+): Promise<void> {
   if (!smtpUser || !smtpPass) {
-    console.log(`[email/dev] To: ${to} | Subject: ${subject}`);
+    console.log(`[email/dev] To: ${to} | Subject: ${subject}${options?.senderName ? ` | From: ${options.senderName}` : ""}`);
     return;
   }
 
+  // Build the From header: "Sender Name <noreply@...>" or default.
+  const fromAddress = from;
+  const fromHeader = options?.senderName
+    ? `${options.senderName} <${extractEmail(fromAddress)}>`
+    : fromAddress;
+
   await transport.sendMail({
-    from,
+    from: fromHeader,
     to,
     subject,
     html,
+    replyTo: options?.replyTo || undefined,
   });
+}
+
+/** Extract the email address from a "Name <email>" string. */
+function extractEmail(s: string): string {
+  const match = s.match(/<([^>]+)>/);
+  return match ? match[1] : s;
 }
 
 export interface CardLeadEmailData {

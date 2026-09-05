@@ -128,6 +128,7 @@ export default async function SettingsPage() {
             <PanelHead title="Organization settings" sub="WhatsApp, custom fields, currency" />
             <OrgSettingsForm
               currency={org[0].currency}
+              replyToEmail={org[0].replyToEmail}
               whatsappConfig={org[0].whatsappConfig as any}
               customFieldDefs={org[0].customFieldDefs as any}
             />

@@ -134,6 +134,8 @@ export const organizations = pgTable("organizations", {
   whatsappConfig: jsonb("whatsapp_config"),
   // Currency symbol for deal values (e.g. "₦", "$", "€")
   currency: text("currency").notNull().default("₦"),
+  // Default reply-to email for sequence emails (shared inbox, etc.)
+  replyToEmail: text("reply_to_email"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -654,6 +656,8 @@ export const sequenceSteps = pgTable(
     // The template/content for the step.
     subject: text("subject"),
     body: text("body").notNull(),
+    // Sender display name for email steps (e.g. "Tunde from Kreatix").
+    senderName: text("sender_name"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({

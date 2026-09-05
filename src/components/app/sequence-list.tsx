@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Label, Input, Textarea, Select } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import { PlaceholderHelp } from "@/components/app/placeholder-help";
+import { RichTextEditor } from "@/components/app/rich-text-editor";
 
 interface Step {
   id: string;
@@ -21,6 +22,7 @@ interface Step {
   action: string;
   subject: string | null;
   body: string;
+  senderName: string | null;
 }
 
 interface Sequence {
@@ -84,6 +86,7 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
   const [, startTransition] = useTransition();
   const [showStepForm, setShowStepForm] = useState(false);
   const [stepState, stepAction, stepPending] = useActionState<SequenceFormState, FormData>(addSequenceStep, {});
+  const [stepActionType, setStepActionType] = useState<string>("reminder");
   // Close on success: reset showStepForm so the form can be reopened.
   const stepVisible = showStepForm;
   useEffect(() => {
@@ -152,7 +155,10 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
                   <Badge tone="neutral">{step.action}</Badge>
                   {step.subject && <span className="text-xs font-semibold">{step.subject}</span>}
                 </div>
-                <div className="text-xs text-ink-soft mt-0.5">{step.body}</div>
+                {step.action === "email" && step.senderName && (
+                  <div className="text-[11px] text-ink-soft mt-0.5">From: {step.senderName}</div>
+                )}
+                <div className="text-xs text-ink-soft mt-0.5 line-clamp-2">{stripHtml(step.body)}</div>
               </div>
               <button
                 type="button"
@@ -174,7 +180,7 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
 
       {/* Add step form */}
       {stepVisible ? (
-        <form action={stepAction} className="bg-paper-2 rounded p-3 space-y-2 ml-4">
+        <form action={stepAction} className="bg-paper-2 rounded p-3 space-y-3 ml-4">
           <input type="hidden" name="sequenceId" value={sequence.id} />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
@@ -183,25 +189,51 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
             </div>
             <div>
               <Label>Action</Label>
-              <Select name="action" defaultValue="reminder">
+              <Select
+                name="action"
+                defaultValue="reminder"
+                onChange={(e) => {
+                  const v = e.currentTarget.value;
+                  setStepActionType(v);
+                }}
+              >
                 <option value="reminder">Create reminder</option>
                 <option value="email">Send email</option>
                 <option value="whatsapp">WhatsApp message</option>
               </Select>
             </div>
             <div>
-              <Label>Subject (optional)</Label>
-              <Input name="subject" placeholder="Follow-up call" />
+              <Label>Subject {stepActionType === "email" ? "" : "(optional)"}</Label>
+              <Input name="subject" placeholder={stepActionType === "email" ? "Welcome to Xsta360" : "Follow-up call"} />
             </div>
           </div>
+
+          {/* Sender name — only for email steps */}
+          {stepActionType === "email" && (
+            <div>
+              <Label>Sender name (displayed to recipient)</Label>
+              <Input name="senderName" placeholder="e.g. Tunde from Kreatix" />
+              <p className="text-[11px] text-ink-soft mt-1">This appears as the sender's display name in the recipient's inbox. Defaults to your org name if left blank.</p>
+            </div>
+          )}
+
           <div>
-            <Label>Content</Label>
-            <Textarea name="body" rows={3} placeholder="Hi {{first_name}}, this is {{rep_name}} from {{org_name}}. Following up on our conversation..." />
+            <Label>Content {stepActionType === "email" ? "(rich text)" : ""}</Label>
+            {stepActionType === "email" ? (
+              <RichTextEditor
+                name="body"
+                placeholder="Hi {{first_name}}, this is {{rep_name}} from {{org_name}}. Following up on our conversation..."
+                rows={6}
+              />
+            ) : (
+              <Textarea name="body" rows={3} placeholder="Hi {{first_name}}, this is {{rep_name}} from {{org_name}}. Following up on our conversation..." />
+            )}
             {stepState.errors?.body && <p className="text-xs text-stamp mt-1">{stepState.errors.body[0]}</p>}
             <div className="mt-1.5">
               <PlaceholderHelp />
             </div>
           </div>
+
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={() => setShowStepForm(false)}>Cancel</Button>
             <Button type="submit" size="sm" disabled={stepPending}>{stepPending ? "Adding…" : "Add step"}</Button>
@@ -218,4 +250,9 @@ function SequenceItem({ sequence }: { sequence: Sequence }) {
       )}
     </div>
   );
+}
+
+/** Strip HTML tags for preview display. */
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, "").trim();
 }
