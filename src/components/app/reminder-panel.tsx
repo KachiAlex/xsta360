@@ -150,40 +150,46 @@ function ReminderItem({ reminder }: { reminder: ReminderRow }) {
   }
 
   return (
-    <div className="px-3 sm:px-4 py-3 sm:py-2.5 flex items-center gap-2 sm:gap-3 hover:bg-paper-2/30 flex-wrap sm:flex-nowrap active:bg-paper-2/50 transition-colors">
-      {/* Due badge */}
-      <Badge tone={reminder.bucket === "overdue" ? "overdue" : reminder.bucket === "today" ? "today" : "later"}>
-        {formatDue(reminder.dueAt)}
-      </Badge>
-
-      {/* Lead info */}
-      <div className="flex-1 min-w-0 order-3 sm:order-none w-full sm:w-auto">
-        <Link
-          href={`/leads/${reminder.leadId}`}
-          className="text-sm font-semibold hover:underline truncate active:text-ink"
-        >
-          {reminder.leadName}
-        </Link>
-        {reminder.leadCompany && (
-          <span className="text-xs text-ink-soft ml-1.5 truncate">· {reminder.leadCompany}</span>
-        )}
-        {reminder.note && (
-          <div className="text-xs text-ink-soft truncate mt-0.5">{reminder.note}</div>
-        )}
+    <div className="px-3 sm:px-4 py-3 hover:bg-paper-2/30 active:bg-paper-2/50 transition-colors">
+      {/* Top row: badge + lead name + company */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        <Badge tone={reminder.bucket === "overdue" ? "overdue" : reminder.bucket === "today" ? "today" : "later"}>
+          {formatDue(reminder.dueAt)}
+        </Badge>
+        <div className="flex-1 min-w-0">
+          <Link
+            href={`/leads/${reminder.leadId}`}
+            className="text-sm font-semibold hover:underline truncate active:text-ink block"
+          >
+            {reminder.leadName}
+          </Link>
+          {reminder.leadCompany && (
+            <span className="text-xs text-ink-soft truncate block leading-tight">
+              {reminder.leadCompany}
+            </span>
+          )}
+        </div>
       </div>
 
+      {/* Note (if exists) */}
+      {reminder.note && (
+        <div className="text-xs text-ink-soft truncate mt-1.5 pl-1">
+          {reminder.note}
+        </div>
+      )}
+
       {/* Quick actions */}
-      <div className="flex items-center gap-0.5 sm:gap-1.5 shrink-0 ml-auto sm:ml-0">
+      <div className="flex items-center gap-1 sm:gap-2 mt-2 -ml-1">
         {reminder.leadPhone && (
           <a
             href={whatsappClickToChat(reminder.leadPhone, `Hi ${reminder.leadName}, following up.`)}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-[#075E54] hover:text-[#128C7E] px-2 py-2 min-w-[40px] min-h-[40px] flex items-center justify-center active:bg-[#128C7E]/10 rounded"
+            className="text-xs text-[#075E54] hover:text-[#128C7E] px-2 py-1.5 min-h-[36px] flex items-center gap-1.5 active:bg-[#128C7E]/10 rounded"
             title="WhatsApp"
           >
+            <span>💬</span>
             <span className="hidden sm:inline">WhatsApp</span>
-            <span className="sm:hidden">💬</span>
           </a>
         )}
         <a
@@ -196,32 +202,34 @@ function ReminderItem({ reminder }: { reminder: ReminderRow }) {
           })}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs text-ink-soft hover:text-ink px-2 py-2 min-w-[40px] min-h-[40px] flex items-center justify-center active:bg-paper-2 rounded"
+          className="text-xs text-ink-soft hover:text-ink px-2 py-1.5 min-h-[36px] flex items-center gap-1.5 active:bg-paper-2 rounded"
           title="Add to Google Calendar"
         >
+          <span>📅</span>
           <span className="hidden sm:inline">Calendar</span>
-          <span className="sm:hidden">📅</span>
         </a>
         <button
           type="button"
           onClick={handleComplete}
-          className="text-sm font-semibold text-register hover:underline px-2 py-2 min-w-[40px] min-h-[40px] flex items-center justify-center active:bg-register/10 rounded"
+          className="text-sm font-semibold text-register hover:underline px-2 py-1.5 min-h-[36px] flex items-center gap-1.5 active:bg-register/10 rounded"
           title="Mark done"
         >
           ✓
+          <span className="hidden sm:inline text-xs">Done</span>
         </button>
         <button
           type="button"
           onClick={handleSnooze}
-          className="text-sm text-ink-soft hover:text-ink px-2 py-2 min-w-[40px] min-h-[40px] flex items-center justify-center active:bg-paper-2 rounded"
+          className="text-sm text-ink-soft hover:text-ink px-2 py-1.5 min-h-[36px] flex items-center gap-1.5 active:bg-paper-2 rounded"
           title="Snooze"
         >
           ⏰
+          <span className="hidden sm:inline text-xs">Snooze</span>
         </button>
         <button
           type="button"
           onClick={handleDelete}
-          className="text-sm text-ink-soft hover:text-stamp px-2 py-2 min-w-[40px] min-h-[40px] flex items-center justify-center active:bg-stamp/10 rounded"
+          className="text-sm text-ink-soft hover:text-stamp px-2 py-1.5 min-h-[36px] flex items-center gap-1.5 active:bg-stamp/10 rounded ml-auto"
           title="Delete"
         >
           ✕
