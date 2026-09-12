@@ -295,10 +295,11 @@ export async function processSequenceSteps(): Promise<{
     const stepSenderName = useVariantB ? (nextStep.variantBSenderName || nextStep.senderName) : nextStep.senderName;
     const variant = useVariantB ? "b" : "a";
 
-    // Track whether this step was actually delivered so we only advance
-    // currentStep on success. On failure we leave currentStep unchanged so
-    // the cron retries on the next run.
-    let didDeliver = false;
+    // Track the outcome so we only advance currentStep when appropriate.
+    // - "delivered": sent successfully → advance
+    // - "skipped": permanent condition (no email/phone/config) → advance (retrying won't help)
+    // - "failed": transient error (SMTP/WhatsApp API) → don't advance, retry next run
+    let stepOutcome: "delivered" | "skipped" | "failed" = "skipped";
 
     switch (action) {
       case "email": {
@@ -306,6 +307,7 @@ export async function processSequenceSteps(): Promise<{
         if (lead.email) {
           let emailSent = false;
           let emailEventId: string | undefined;
+          stepOutcome = "failed"; // default to failed; set to delivered on success
           try {
             const personalizedBody = replacePlaceholders(stepBody, msgCtx);
             const personalizedSubject = replacePlaceholders(
@@ -400,7 +402,7 @@ export async function processSequenceSteps(): Promise<{
           }
           // Create a reminder record for tracking (only if email was actually sent).
           if (emailSent) {
-            didDeliver = true;
+            stepOutcome = "delivered";
             await db.insert(schema.reminders).values({
               leadId: enrollment.leadId,
               orgId: enrollment.orgId,
@@ -424,13 +426,16 @@ export async function processSequenceSteps(): Promise<{
           | undefined;
         let whatsappSuccess = false;
         let whatsappError: string | undefined;
+        stepOutcome = "skipped"; // default: permanent skip if no config/phone
         if (whatsappConfig?.enabled && whatsappConfig.phoneNumberId && whatsappConfig.apiKey && lead.phone) {
+          stepOutcome = "failed"; // has config+phone; failed unless send succeeds
           const personalizedBody = replacePlaceholders(stepBody, msgCtx);
           const msg = formatWhatsAppMessage(personalizedBody, orgName);
           const result = await sendWhatsAppMessage(whatsappConfig, lead.phone, msg);
           if (result.success) {
             whatsappSent++;
             whatsappSuccess = true;
+            stepOutcome = "delivered";
           } else {
             whatsappError = result.error || "WhatsApp send failed";
             console.error(`Sequence WhatsApp failed for lead ${lead.id}:`, result.error);
@@ -443,9 +448,6 @@ export async function processSequenceSteps(): Promise<{
               : "Missing WhatsApp config";
         }
         // Create a reminder record for tracking.
-        if (whatsappSuccess) {
-          didDeliver = true;
-        }
         await db.insert(schema.reminders).values({
           leadId: enrollment.leadId,
           orgId: enrollment.orgId,
@@ -472,15 +474,15 @@ export async function processSequenceSteps(): Promise<{
           sequenceStepId: nextStep.id,
           channel: "reminder",
         });
-        didDeliver = true;
+        stepOutcome = "delivered";
         remindersCreated++;
         break;
       }
     }
 
-    // Only log and advance when the step was actually delivered. On failure
-    // we leave currentStep unchanged so the cron retries on the next run.
-    if (!didDeliver) continue;
+    // Only log and advance when the step was delivered or permanently skipped.
+    // On transient failure we leave currentStep unchanged so the cron retries.
+    if (stepOutcome === "failed") continue;
 
     await logEvent(enrollment.orgId, "sequence_step_sent", {
       leadId: enrollment.leadId,
