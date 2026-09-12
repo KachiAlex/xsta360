@@ -51,8 +51,8 @@ const StageChangeSchema = z.object({
   leadId: z.string().uuid(),
   toStageId: z.string().uuid(),
   // Required when moving to a Lost stage.
-  lostReasonId: z.string().uuid().optional().or(z.literal("")),
-  lostReasonText: z.string().trim().optional(),
+  lostReasonId: z.string().uuid().nullish().or(z.literal("")),
+  lostReasonText: z.string().trim().nullish(),
 });
 
 const SnoozeSchema = z.object({
