@@ -53,6 +53,18 @@ export const DictationButton = forwardRef<DictationButtonHandle, DictationButton
 
     async function startRecording() {
       setError(null);
+
+      // getUserMedia requires a secure context (HTTPS or localhost).
+      if (typeof window !== "undefined" && !window.isSecureContext) {
+        setError("Microphone requires HTTPS. Use https://xsta360.67-211-210-8.sslip.io");
+        return;
+      }
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError("Microphone not supported in this browser.");
+        return;
+      }
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
