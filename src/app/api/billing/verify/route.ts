@@ -97,64 +97,75 @@ export async function POST(request: Request) {
       if (existingSub.lastPaymentReference === reference) {
         return NextResponse.json({ success: true, alreadyApplied: true });
       }
-      // Extend from max(now, existingPeriodEnd) to not lose early payments.
-      const baseDate = existingSub.currentPeriodEnd && existingSub.currentPeriodEnd > now
-        ? existingSub.currentPeriodEnd
-        : now;
-      const periodEnd = addMonths(baseDate, 1);
-
-      await db
-        .update(schema.subscriptions)
-        .set({
-          status: "active",
-          // Apply plan change if this was an upgrade checkout.
-          ...(isPlanUpgrade && txnPlanId ? { planId: txnPlanId } : {}),
-          paystackCustomerCode: txn.customer.customer_code,
-          paystackAuthorizationCode: txn.authorization?.authorization_code ?? null,
-          paystackCustomerEmail: txn.customer.email,
-          lastPaymentAt: now,
-          lastPaymentAmount: txn.amount, // in kobo
-          lastPaymentReference: reference,
-          currentPeriodStart: now,
-          currentPeriodEnd: periodEnd,
-          updatedAt: now,
-        })
-        .where(eq(schema.subscriptions.id, existingSub.id));
-    } else {
-      // Create subscription if none exists.
-      const periodEnd = addMonths(now, 1);
-      const planId = billing.plan.planId !== "none"
-        ? billing.plan.planId
-        : (await db.select().from(schema.plans).limit(1))[0]?.id;
-
-      if (!planId) {
-        return NextResponse.json({ error: "No plan configured" }, { status: 500 });
-      }
-
-      await db.insert(schema.subscriptions).values({
-        orgId: ctx.orgId,
-        planId,
-        status: "active",
-        paystackCustomerCode: txn.customer.customer_code,
-        paystackAuthorizationCode: txn.authorization?.authorization_code ?? null,
-        paystackCustomerEmail: txn.customer.email,
-        lastPaymentAt: now,
-        lastPaymentAmount: txn.amount,
-        lastPaymentReference: reference,
-        currentPeriodStart: now,
-        currentPeriodEnd: periodEnd,
-      });
     }
 
+    // Wrap the subscription update/insert and the idempotency record in a
+    // single transaction so they're atomic.
     try {
-      await db.insert(schema.processedReferences).values({
-        orgId: ctx.orgId,
-        reference,
-        purpose: isPlanUpgrade ? "plan_upgrade" : "subscription",
+      await db.transaction(async (tx) => {
+        if (existingSub) {
+          // Extend from max(now, existingPeriodEnd) to not lose early payments.
+          const baseDate = existingSub.currentPeriodEnd && existingSub.currentPeriodEnd > now
+            ? existingSub.currentPeriodEnd
+            : now;
+          const periodEnd = addMonths(baseDate, 1);
+
+          await tx
+            .update(schema.subscriptions)
+            .set({
+              status: "active",
+              // Apply plan change if this was an upgrade checkout.
+              ...(isPlanUpgrade && txnPlanId ? { planId: txnPlanId } : {}),
+              paystackCustomerCode: txn.customer.customer_code,
+              paystackAuthorizationCode: txn.authorization?.authorization_code ?? null,
+              paystackCustomerEmail: txn.customer.email,
+              lastPaymentAt: now,
+              lastPaymentAmount: txn.amount, // in kobo
+              lastPaymentReference: reference,
+              currentPeriodStart: now,
+              currentPeriodEnd: periodEnd,
+              updatedAt: now,
+            })
+            .where(eq(schema.subscriptions.id, existingSub.id));
+        } else {
+          // Create subscription if none exists.
+          const periodEnd = addMonths(now, 1);
+          const planId = billing.plan.planId !== "none"
+            ? billing.plan.planId
+            : (await tx.select().from(schema.plans).limit(1))[0]?.id;
+
+          if (!planId) {
+            throw new Error("No plan configured");
+          }
+
+          await tx.insert(schema.subscriptions).values({
+            orgId: ctx.orgId,
+            planId,
+            status: "active",
+            paystackCustomerCode: txn.customer.customer_code,
+            paystackAuthorizationCode: txn.authorization?.authorization_code ?? null,
+            paystackCustomerEmail: txn.customer.email,
+            lastPaymentAt: now,
+            lastPaymentAmount: txn.amount,
+            lastPaymentReference: reference,
+            currentPeriodStart: now,
+            currentPeriodEnd: periodEnd,
+          });
+        }
+
+        // Record the processed reference — unique constraint prevents duplicates.
+        await tx.insert(schema.processedReferences).values({
+          orgId: ctx.orgId,
+          reference,
+          purpose: isPlanUpgrade ? "plan_upgrade" : "subscription",
+        });
       });
-    } catch {
-      // Unique constraint violation — already processed.
-      return NextResponse.json({ success: true, alreadyApplied: true });
+    } catch (err) {
+      // Unique constraint violation means a concurrent request already applied it.
+      if (err instanceof Error && err.message.includes("unique")) {
+        return NextResponse.json({ success: true, alreadyApplied: true });
+      }
+      throw err;
     }
 
     await logEvent(ctx.orgId, "subscription_updated", {

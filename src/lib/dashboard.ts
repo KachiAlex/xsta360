@@ -55,16 +55,6 @@ export interface DashboardStats {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function startOfDay(d = new Date()): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-function endOfDay(d = new Date()): Date {
-  const x = new Date(d);
-  x.setHours(23, 59, 59, 999);
-  return x;
-}
 function daysBetween(from: Date, to: Date): number {
   return Math.max(0, Math.floor((to.getTime() - from.getTime()) / 86_400_000));
 }
@@ -93,7 +83,6 @@ export async function getPulseLeads(orgId: string, userId: string, categoryId?: 
   const sod = startOfDayInZone(tz);
   const eod = endOfDayInZone(tz);
   const sevenDaysAhead = new Date(now.getTime() + 7 * 86_400_000);
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000);
 
   // If filtering by category, find lead IDs in that category first.
   let categoryLeadIds: string[] | null = null;

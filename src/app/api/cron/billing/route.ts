@@ -97,6 +97,7 @@ export async function GET(request: Request) {
       periodEnd: schema.subscriptions.currentPeriodEnd,
       trialEndsAt: schema.subscriptions.trialEndsAt,
       trialNoticeAt: schema.subscriptions.trialNoticeAt,
+      graceEndsAt: schema.subscriptions.graceEndsAt,
       basePrice: schema.plans.basePriceMonthly,
       perSeat: schema.plans.perSeatPriceMonthly,
       currency: schema.plans.currency,
@@ -158,7 +159,7 @@ export async function GET(request: Request) {
   // 2. Convert expired trials: charge if a card is on file, else past_due
   //    (trial expiry is a hard block — no grace).
   // ---------------------------------------------------------------------
-  const trialsDue = trialingSubs.filter((s) => s.trialEndsAt && s.trialEndsAt <= now);
+  const trialsDue = trialingSubs.filter((s) => s.trialEndsAt && s.trialEndsAt <= now && (!s.graceEndsAt || s.graceEndsAt <= now));
 
   for (const sub of trialsDue) {
     if (!sub.authCode || !sub.email) {
@@ -177,22 +178,6 @@ export async function GET(request: Request) {
     try {
       const { memberCount, amount: amountNaira } = await orgMonthlyAmount(sub.orgId, sub.basePrice, sub.perSeat);
       const reference = generateReference("xsta_trial");
-
-      // Check if this reference was already processed.
-      const [existing] = await db
-        .select({ id: schema.processedReferences.id })
-        .from(schema.processedReferences)
-        .where(
-          and(
-            eq(schema.processedReferences.orgId, sub.orgId),
-            eq(schema.processedReferences.reference, reference),
-          ),
-        )
-        .limit(1);
-      if (existing) {
-        results.push({ orgId: sub.orgId, status: "already_processed" });
-        continue;
-      }
 
       const chargeResult = await chargeAuthorization({
         authorizationCode: sub.authCode,
@@ -250,7 +235,12 @@ export async function GET(request: Request) {
 
         results.push({ orgId: sub.orgId, status: "trial_charged", amount: amountNaira });
       } else if (chargeResult.status === "pending") {
-        // Don't change subscription status — wait for the charge.success/charge.failed webhook.
+        // Set a 24h grace window so the cron doesn't re-charge before the webhook resolves.
+        await db
+          .update(schema.subscriptions)
+          .set({ graceEndsAt: new Date(now.getTime() + 24 * 60 * 60 * 1000), updatedAt: now })
+          .where(eq(schema.subscriptions.id, sub.id));
+        results.push({ orgId: sub.orgId, status: "pending" });
         continue;
       } else {
         await db
@@ -287,6 +277,7 @@ export async function GET(request: Request) {
       authCode: schema.subscriptions.paystackAuthorizationCode,
       email: schema.subscriptions.paystackCustomerEmail,
       periodEnd: schema.subscriptions.currentPeriodEnd,
+      graceEndsAt: schema.subscriptions.graceEndsAt,
       basePrice: schema.plans.basePriceMonthly,
       perSeat: schema.plans.perSeatPriceMonthly,
       currency: schema.plans.currency,
@@ -297,29 +288,13 @@ export async function GET(request: Request) {
     .where(eq(schema.subscriptions.status, "active"));
 
   const chargeable = dueSubs.filter(
-    (s) => s.authCode && s.email && s.periodEnd && s.periodEnd <= now,
+    (s) => s.authCode && s.email && s.periodEnd && s.periodEnd <= now && (!s.graceEndsAt || s.graceEndsAt <= now),
   );
 
   for (const sub of chargeable) {
     try {
       const { memberCount, amount: amountNaira } = await orgMonthlyAmount(sub.orgId, sub.basePrice, sub.perSeat);
       const reference = generateReference("xsta_renew");
-
-      // Check if this reference was already processed.
-      const [existing] = await db
-        .select({ id: schema.processedReferences.id })
-        .from(schema.processedReferences)
-        .where(
-          and(
-            eq(schema.processedReferences.orgId, sub.orgId),
-            eq(schema.processedReferences.reference, reference),
-          ),
-        )
-        .limit(1);
-      if (existing) {
-        results.push({ orgId: sub.orgId, status: "already_processed" });
-        continue;
-      }
 
       const chargeResult = await chargeAuthorization({
         authorizationCode: sub.authCode!,
@@ -378,7 +353,12 @@ export async function GET(request: Request) {
 
         results.push({ orgId: sub.orgId, status: "charged", amount: amountNaira });
       } else if (chargeResult.status === "pending") {
-        // Don't change subscription status — wait for the charge.success/charge.failed webhook.
+        // Set a 24h grace window so the cron doesn't re-charge before the webhook resolves.
+        await db
+          .update(schema.subscriptions)
+          .set({ graceEndsAt: new Date(now.getTime() + 24 * 60 * 60 * 1000), updatedAt: now })
+          .where(eq(schema.subscriptions.id, sub.id));
+        results.push({ orgId: sub.orgId, status: "pending" });
         continue;
       } else {
         // Charge failed — past_due with a grace window, then dunning email.

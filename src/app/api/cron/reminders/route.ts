@@ -96,6 +96,16 @@ export async function GET(request: Request) {
   let whatsappSent = 0;
 
   for (const r of claimed) {
+    // Skip if the reminder has no assignee.
+    if (!r.assigneeId) {
+      await db
+        .update(schema.reminders)
+        .set({ status: "failed", lastError: "Reminder has no assignee", updatedAt: now })
+        .where(eq(schema.reminders.id, r.reminderId));
+      failed++;
+      continue;
+    }
+
     // Skip if the assignee is no longer a member of this org.
     if (!r.memberActive) {
       await db

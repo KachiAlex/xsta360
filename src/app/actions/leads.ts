@@ -433,8 +433,12 @@ export async function updateLead(
       customFields: parsedCustomFields,
       lostReasonId: lostReasonIdUpdate,
       lostReasonText: lostReasonTextUpdate,
-      wonAt: targetStageKind === "won" ? new Date() : (stageId && existing.stageId !== newStageId ? null : undefined),
-      lostAt: targetStageKind === "lost" ? new Date() : (stageId && existing.stageId !== newStageId ? null : undefined),
+      wonAt: stageId && existing.stageId !== newStageId
+        ? (targetStageKind === "won" ? new Date() : null)
+        : undefined,
+      lostAt: stageId && existing.stageId !== newStageId
+        ? (targetStageKind === "lost" ? new Date() : null)
+        : undefined,
       updatedAt: new Date(),
     })
     .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, ctx.orgId)));
@@ -1013,6 +1017,18 @@ export async function bulkMoveStage(
     return { message: "A reason is required when moving leads to a lost stage" };
   }
 
+  // Validate lostReasonId belongs to org if provided.
+  let validatedLostReasonId = lostReasonId;
+  if (stage.kind === "lost" && lostReasonId) {
+    const [reason] = await db
+      .select({ id: schema.lostReasons.id })
+      .from(schema.lostReasons)
+      .where(and(eq(schema.lostReasons.id, lostReasonId), eq(schema.lostReasons.orgId, ctx.orgId)))
+      .limit(1);
+    if (!reason) return { message: "Lost reason not found" };
+    validatedLostReasonId = reason.id;
+  }
+
   // Verify leads belong to org.
   const leads = await db
     .select({ id: schema.leads.id })
@@ -1026,7 +1042,7 @@ export async function bulkMoveStage(
     .set({
       stageId,
       updatedAt: new Date(),
-      lostReasonId: stage.kind === "lost" ? (lostReasonId || null) : null,
+      lostReasonId: stage.kind === "lost" ? (validatedLostReasonId || null) : null,
       lostReasonText: stage.kind === "lost" ? (lostReasonText || null) : null,
       wonAt: stage.kind === "won" ? new Date() : null,
       lostAt: stage.kind === "lost" ? new Date() : null,

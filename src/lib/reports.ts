@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, sql, count } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { startOfDayInZone } from "@/lib/timezone";
 
