@@ -21,10 +21,12 @@ export async function GET(request: Request) {
     return new Response("CRON_SECRET not configured", { status: 500 });
   }
   const expected = `Bearer ${cronSecret}`;
+  const authBuf = Buffer.from(authHeader ?? "");
+  const expBuf = Buffer.from(expected);
   if (
     typeof authHeader !== "string" ||
-    authHeader.length !== expected.length ||
-    !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))
+    authBuf.length !== expBuf.length ||
+    !timingSafeEqual(authBuf, expBuf)
   ) {
     return new Response("Unauthorized", { status: 401 });
   }

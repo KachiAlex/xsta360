@@ -122,7 +122,6 @@ export async function POST(request: Request) {
             }
 
             results.push(`processed:${mappedType}`);
-            break;
           }
         }
       }

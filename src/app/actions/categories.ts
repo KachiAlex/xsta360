@@ -345,7 +345,7 @@ export async function bulkAssignCategory(
   for (const rawLeadId of leadIds) {
     if (!z.string().uuid().safeParse(rawLeadId).success) continue;
     const [lead] = await db
-      .select({ id: schema.leads.id })
+      .select({ id: schema.leads.id, assigneeId: schema.leads.assigneeId })
       .from(schema.leads)
       .where(and(eq(schema.leads.id, rawLeadId), eq(schema.leads.orgId, ctx.orgId)))
       .limit(1);
@@ -390,7 +390,7 @@ export async function bulkAssignCategory(
       await db.insert(schema.reminders).values({
         leadId: rawLeadId,
         orgId: ctx.orgId,
-        assigneeId: cat.defaultAssigneeId,
+        assigneeId: cat.defaultAssigneeId ?? lead.assigneeId,
         dueAt,
         note: `[Category: ${cat.name}] Follow-up scheduled by category cadence`,
         channel: "reminder",

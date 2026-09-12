@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { and, count, eq, isNull } from "drizzle-orm";
+import { and, count, eq, isNull, gt } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { verifySession, can, getOrgBilling, getPlanMaxMembers } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
@@ -176,9 +176,15 @@ export async function acceptInvite(
     const [updated] = await tx
       .update(schema.invitations)
       .set({ acceptedAt: new Date() })
-      .where(and(eq(schema.invitations.id, invite.id), isNull(schema.invitations.acceptedAt)))
+      .where(
+        and(
+          eq(schema.invitations.id, invite.id),
+          isNull(schema.invitations.acceptedAt),
+          gt(schema.invitations.expiresAt, new Date()),
+        ),
+      )
       .returning();
-    if (!updated) throw new Error("Invitation already used");
+    if (!updated) throw new Error("Invitation already used or expired");
 
     await tx.insert(schema.memberships).values({
       orgId: invite.orgId,
@@ -313,26 +319,32 @@ export async function removeMember(
   if (!membership) return { message: "Membership not found" };
   if (membership.userId === ctx.userId) return { message: "You can't remove yourself" };
 
-  if (membership.role === "admin") {
-    const admins = await adminCount(db, ctx.orgId);
-    if (admins <= 1) {
-      return { message: "You need at least one admin in the workspace" };
-    }
+  try {
+    await db.transaction(async (tx) => {
+      if (membership.role === "admin") {
+        const admins = await adminCount(tx, ctx.orgId);
+        if (admins <= 1) {
+          throw new Error("You need at least one admin in the workspace");
+        }
+      }
+
+      // Clear lead assignments before removing the membership (prevents orphaned assigneeId).
+      await tx
+        .update(schema.leads)
+        .set({ assigneeId: null, updatedAt: new Date() })
+        .where(and(eq(schema.leads.orgId, ctx.orgId), eq(schema.leads.assigneeId, membership.userId)));
+
+      // Also clear reminder assignments.
+      await tx
+        .update(schema.reminders)
+        .set({ assigneeId: null, updatedAt: new Date() })
+        .where(and(eq(schema.reminders.orgId, ctx.orgId), eq(schema.reminders.assigneeId, membership.userId)));
+
+      await tx.delete(schema.memberships).where(and(eq(schema.memberships.id, membership.id), eq(schema.memberships.orgId, ctx.orgId)));
+    });
+  } catch (err) {
+    return { message: err instanceof Error ? err.message : "Failed to remove member" };
   }
-
-  // Clear lead assignments before removing the membership (prevents orphaned assigneeId).
-  await db
-    .update(schema.leads)
-    .set({ assigneeId: null, updatedAt: new Date() })
-    .where(and(eq(schema.leads.orgId, ctx.orgId), eq(schema.leads.assigneeId, membership.userId)));
-
-  // Also clear reminder assignments.
-  await db
-    .update(schema.reminders)
-    .set({ assigneeId: null })
-    .where(and(eq(schema.reminders.orgId, ctx.orgId), eq(schema.reminders.assigneeId, membership.userId)));
-
-  await db.delete(schema.memberships).where(and(eq(schema.memberships.id, membership.id), eq(schema.memberships.orgId, ctx.orgId)));
 
   await logEvent(ctx.orgId, "member_removed", {
     actorId: ctx.userId,

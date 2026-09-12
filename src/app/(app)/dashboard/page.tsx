@@ -1,6 +1,6 @@
 import { requireAuth, getOrgBilling } from "@/lib/dal";
 import { db, schema } from "@/db";
-import { eq, count, and } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import { getOrgStages, getOrgMembers } from "@/lib/queries";
 import { getPulseLeads, getDashboardStats, getUpcomingReminders } from "@/lib/dashboard";
 import { getOrgCategories } from "@/lib/category-queries";
@@ -47,15 +47,15 @@ export default async function DashboardPage(props: {
       .where(eq(schema.subscriptions.orgId, ctx.orgId))
       .limit(1),
     db
-      .select({ value: count() })
+      .select({ value: sql<number>`count(*)::int` })
       .from(schema.leads)
       .where(eq(schema.leads.orgId, ctx.orgId)),
     db
-      .select({ value: count() })
+      .select({ value: sql<number>`count(*)::int` })
       .from(schema.reminders)
       .where(eq(schema.reminders.orgId, ctx.orgId)),
     db
-      .select({ value: count() })
+      .select({ value: sql<number>`count(*)::int` })
       .from(schema.contactCards)
       .where(and(eq(schema.contactCards.userId, ctx.userId), eq(schema.contactCards.orgId, ctx.orgId))),
   ]);

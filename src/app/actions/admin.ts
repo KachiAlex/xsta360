@@ -9,6 +9,18 @@ import { logEvent } from "@/lib/audit";
 
 export type SubFormState = { message?: string; error?: boolean };
 
+/** Safely add months to a date, handling month-end rollover. */
+function addMonths(date: Date, months: number): Date {
+  const d = new Date(date);
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + months);
+  // If the day rolled over (e.g. Jan 31 + 1 = Mar 3), clamp to last day of target month.
+  if (d.getDate() < day) {
+    d.setDate(0); // Last day of previous month
+  }
+  return d;
+}
+
 // ---------------------------------------------------------------------------
 // Plans CRUD
 // ---------------------------------------------------------------------------
@@ -97,7 +109,7 @@ export async function updatePlan(
     return { message: parsed.error.issues[0]?.message ?? "Invalid input", error: true };
   }
 
-  let features = {};
+  let features: Record<string, unknown> | undefined = undefined;
   if (parsed.data.features) {
     try {
       features = JSON.parse(parsed.data.features);
@@ -115,8 +127,8 @@ export async function updatePlan(
         perSeatPriceMonthly: parsed.data.perSeatPriceMonthly,
         trialDays: parsed.data.trialDays,
         currency: parsed.data.currency,
-        features,
         position: parsed.data.position,
+        ...(features !== undefined ? { features } : {}),
         updatedAt: new Date(),
       })
       .where(eq(schema.plans.id, planId));
@@ -207,18 +219,30 @@ export async function manageSubscription(
           .update(schema.subscriptions)
           .set({ planId, status, updatedAt: new Date() })
           .where(and(eq(schema.subscriptions.id, existing.id), eq(schema.subscriptions.orgId, orgId)));
+        await logEvent(null, "subscription_updated", {
+          actorId: ctx.userId,
+          meta: { orgId, planId, status },
+        });
       } else {
+        const [plan] = await db
+          .select({ trialDays: schema.plans.trialDays })
+          .from(schema.plans)
+          .where(eq(schema.plans.id, planId))
+          .limit(1);
+        const trialDays = plan?.trialDays ?? 14;
         await db.insert(schema.subscriptions).values({
           orgId,
           planId,
           status,
-          trialEndsAt: status === "trialing" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : null,
+          trialEndsAt: status === "trialing" ? new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000) : null,
+          currentPeriodStart: status === "active" ? new Date() : null,
+          currentPeriodEnd: status === "active" ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null,
+        });
+        await logEvent(null, "subscription_created", {
+          actorId: ctx.userId,
+          meta: { orgId, planId, status },
         });
       }
-      await logEvent(null, "subscription_created", {
-        actorId: ctx.userId,
-        meta: { orgId, planId, status },
-      });
     }
 
     revalidatePath(`/admin/orgs/${orgId}`);
@@ -295,8 +319,7 @@ export async function markSubscriptionPaid(
 
   try {
     const now = new Date();
-    const periodEnd = new Date(now);
-    periodEnd.setMonth(periodEnd.getMonth() + 1);
+    const periodEnd = addMonths(now, 1);
 
     await db
       .update(schema.subscriptions)

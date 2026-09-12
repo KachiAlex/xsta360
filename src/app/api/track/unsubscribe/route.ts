@@ -1,5 +1,5 @@
 import { db, schema } from "@/db";
-import { eq } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { rateLimit, clientKey } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -35,14 +35,28 @@ async function handleUnsubscribe(token: string): Promise<boolean> {
     })
     .where(eq(schema.sequenceEnrollments.id, enrollment.id));
 
-  // Record unsubscribe event
-  await db.insert(schema.sequenceEmailEvents).values({
-    orgId: enrollment.orgId,
-    enrollmentId: enrollment.id,
-    stepId: "00000000-0000-0000-0000-000000000000", // not step-specific
-    leadId: enrollment.leadId,
-    eventType: "unsubscribed",
-  });
+  // Find the most recent sent event to get the stepId.
+  const [sentEvent] = await db
+    .select({ stepId: schema.sequenceEmailEvents.stepId })
+    .from(schema.sequenceEmailEvents)
+    .where(
+      and(
+        eq(schema.sequenceEmailEvents.enrollmentId, enrollment.id),
+        eq(schema.sequenceEmailEvents.eventType, "sent"),
+      ),
+    )
+    .orderBy(desc(schema.sequenceEmailEvents.createdAt))
+    .limit(1);
+
+  if (sentEvent) {
+    await db.insert(schema.sequenceEmailEvents).values({
+      orgId: enrollment.orgId,
+      enrollmentId: enrollment.id,
+      stepId: sentEvent.stepId,
+      leadId: enrollment.leadId,
+      eventType: "unsubscribed",
+    });
+  }
 
   return true;
 }

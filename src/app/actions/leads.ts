@@ -195,7 +195,12 @@ export async function createLead(
   }
 
   // Sanitize numeric value (strip currency symbols, commas).
-  const numericValue = value ? value.replace(/[^\d.-]/g, "") || null : null;
+  const numericValue = (() => {
+    if (!value) return null;
+    const sanitized = value.replace(/[^\d.-]/g, "");
+    const n = Number(sanitized);
+    return sanitized && Number.isFinite(n) ? n.toFixed(2) : null;
+  })();
 
   const [lead] = await db
     .insert(schema.leads)
@@ -252,7 +257,7 @@ export async function createLead(
           await db
             .update(schema.leads)
             .set({ assigneeId: cat.defaultAssigneeId, updatedAt: new Date() })
-            .where(eq(schema.leads.id, lead.id));
+            .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.orgId, ctx.orgId)));
         }
 
         // Auto-schedule follow-up.
@@ -295,6 +300,8 @@ const UpdateLeadSchema = z.object({
   value: z.string().trim().nullish().or(z.literal("")),
   expectedCloseDate: z.string().trim().nullish().or(z.literal("")),
   customFields: z.string().trim().nullish().or(z.literal("")),
+  lostReasonId: z.string().uuid().nullish().or(z.literal("")),
+  lostReasonText: z.string().trim().nullish(),
 });
 
 export async function updateLead(
@@ -318,6 +325,8 @@ export async function updateLead(
     value: formData.get("value"),
     expectedCloseDate: formData.get("expectedCloseDate"),
     customFields: formData.get("customFields"),
+    lostReasonId: formData.get("lostReasonId"),
+    lostReasonText: formData.get("lostReasonText"),
   });
 
   if (!parsed.success) {
@@ -330,7 +339,7 @@ export async function updateLead(
     };
   }
 
-  const { leadId, assigneeId, stageId, value, expectedCloseDate, customFields, ...rest } = parsed.data;
+  const { leadId, assigneeId, stageId, value, expectedCloseDate, customFields, lostReasonId, lostReasonText, ...rest } = parsed.data;
 
   // Verify lead belongs to org.
   const existing = await loadOrgLead(ctx, leadId);
@@ -377,17 +386,33 @@ export async function updateLead(
   const newAssigneeId = assigneeId || null;
 
   // Sanitize numeric value (strip currency symbols, commas).
-  const numericValue = value ? value.replace(/[^\d.-]/g, "") || null : null;
+  const numericValue = (() => {
+    if (!value) return null;
+    const sanitized = value.replace(/[^\d.-]/g, "");
+    const n = Number(sanitized);
+    return sanitized && Number.isFinite(n) ? n.toFixed(2) : null;
+  })();
 
   // Handle lost-reason logic when stage changes.
   let lostReasonIdUpdate: string | null = null;
   let lostReasonTextUpdate: string | null = null;
   if (targetStageKind === "lost") {
-    if (!existing.lostReasonId && !existing.lostReasonText) {
+    // Validate lostReasonId if provided.
+    let reasonId = existing.lostReasonId;
+    if (lostReasonId) {
+      const [reason] = await db
+        .select({ id: schema.lostReasons.id })
+        .from(schema.lostReasons)
+        .where(and(eq(schema.lostReasons.id, lostReasonId), eq(schema.lostReasons.orgId, ctx.orgId)))
+        .limit(1);
+      if (!reason) return { message: "Lost reason not found" };
+      reasonId = reason.id;
+    }
+    if (!reasonId && !lostReasonText && !existing.lostReasonText) {
       return { errors: { lostReasonText: ["A reason is required when marking a lead lost"] } };
     }
-    lostReasonIdUpdate = existing.lostReasonId;
-    lostReasonTextUpdate = existing.lostReasonText;
+    lostReasonIdUpdate = reasonId;
+    lostReasonTextUpdate = lostReasonText || existing.lostReasonText;
   } else if (stageId && existing.stageId !== newStageId) {
     // Moving away from lost — clear reason.
     lostReasonIdUpdate = null;
@@ -475,6 +500,9 @@ export async function addRemark(
   if (reminderDue) {
     const dueAt = new Date(reminderDue);
     if (!isNaN(dueAt.getTime())) {
+      if (dueAt <= new Date()) {
+        return { errors: { reminderDue: ["Pick a future date"] } };
+      }
       const [reminder] = await db
         .insert(schema.reminders)
         .values({
@@ -625,7 +653,7 @@ export async function snoozeReminder(
       and(
         eq(schema.reminders.id, parsed.data.reminderId),
         eq(schema.reminders.orgId, ctx.orgId),
-        inArray(schema.reminders.status, ["pending", "snoozed"]),
+        inArray(schema.reminders.status, ["pending", "processing", "snoozed"]),
       ),
     )
     .returning();
@@ -658,6 +686,7 @@ export async function completeReminder(
       and(
         eq(schema.reminders.id, reminderId),
         eq(schema.reminders.orgId, ctx.orgId),
+        inArray(schema.reminders.status, ["pending", "processing", "snoozed"]),
       ),
     )
     .returning();
@@ -886,11 +915,11 @@ export async function bulkDeleteLeads(
   if (validIds.length === 0) return { message: "No valid leads found" };
 
   // Delete related records first.
-  await db.delete(schema.leadCategoryAssignments).where(inArray(schema.leadCategoryAssignments.leadId, validIds));
-  await db.delete(schema.reminders).where(inArray(schema.reminders.leadId, validIds));
-  await db.delete(schema.remarks).where(inArray(schema.remarks.leadId, validIds));
-  await db.delete(schema.sequenceEnrollments).where(inArray(schema.sequenceEnrollments.leadId, validIds));
-  await db.delete(schema.leadDocuments).where(inArray(schema.leadDocuments.leadId, validIds));
+  await db.delete(schema.leadCategoryAssignments).where(and(eq(schema.leadCategoryAssignments.orgId, ctx.orgId), inArray(schema.leadCategoryAssignments.leadId, validIds)));
+  await db.delete(schema.reminders).where(and(eq(schema.reminders.orgId, ctx.orgId), inArray(schema.reminders.leadId, validIds)));
+  await db.delete(schema.remarks).where(and(eq(schema.remarks.orgId, ctx.orgId), inArray(schema.remarks.leadId, validIds)));
+  await db.delete(schema.sequenceEnrollments).where(and(eq(schema.sequenceEnrollments.orgId, ctx.orgId), inArray(schema.sequenceEnrollments.leadId, validIds)));
+  await db.delete(schema.leadDocuments).where(and(eq(schema.leadDocuments.orgId, ctx.orgId), inArray(schema.leadDocuments.leadId, validIds)));
   await db.delete(schema.leads).where(and(eq(schema.leads.orgId, ctx.orgId), inArray(schema.leads.id, validIds)));
 
   for (const id of validIds) {
@@ -957,6 +986,7 @@ export async function bulkMoveStage(
 ): Promise<BulkFormState> {
   const ctx = await verifySession();
   if (!ctx) return { message: "Not signed in" };
+  if (!can(ctx, "assign")) return { message: "Not allowed" };
 
   const leadIdsRaw = String(formData.get("leadIds") ?? "");
   const leadIds = leadIdsRaw.split(",").map((s) => s.trim()).filter(Boolean);
@@ -973,6 +1003,12 @@ export async function bulkMoveStage(
     .limit(1);
   if (!stage) return { message: "Stage not found" };
 
+  const lostReasonId = String(formData.get("lostReasonId") ?? "").trim() || null;
+  const lostReasonText = String(formData.get("lostReasonText") ?? "").trim() || null;
+  if (stage.kind === "lost" && !lostReasonId && !lostReasonText) {
+    return { message: "A reason is required when moving leads to a lost stage" };
+  }
+
   // Verify leads belong to org.
   const leads = await db
     .select({ id: schema.leads.id })
@@ -986,9 +1022,8 @@ export async function bulkMoveStage(
     .set({
       stageId,
       updatedAt: new Date(),
-      // Clear lost reason when moving away from a lost stage.
-      lostReasonId: stage.kind === "lost" ? undefined : null,
-      lostReasonText: stage.kind === "lost" ? undefined : null,
+      lostReasonId: stage.kind === "lost" ? (lostReasonId || null) : null,
+      lostReasonText: stage.kind === "lost" ? (lostReasonText || null) : null,
     })
     .where(and(eq(schema.leads.orgId, ctx.orgId), inArray(schema.leads.id, validIds)));
 

@@ -88,6 +88,9 @@ export async function logActivity(
   if (reminderDue) {
     const dueAt = new Date(reminderDue);
     if (!isNaN(dueAt.getTime())) {
+      if (dueAt <= new Date()) {
+        return { errors: { reminderDue: ["Pick a future date"] } };
+      }
       const note = reminderType ? `${reminderType}: ${body}` : body;
       const [reminder] = await db
         .insert(schema.reminders)
@@ -193,7 +196,7 @@ export async function snoozeReminderFromDashboard(
       and(
         eq(schema.reminders.id, reminderId),
         eq(schema.reminders.orgId, ctx.orgId),
-        inArray(schema.reminders.status, ["pending", "snoozed"]),
+        inArray(schema.reminders.status, ["pending", "processing", "snoozed"]),
       ),
     )
     .returning();
@@ -249,6 +252,9 @@ export async function setReminder(
   const due = new Date(dueAt);
   if (isNaN(due.getTime())) {
     return { errors: { dueAt: ["Invalid date"] } };
+  }
+  if (due <= new Date()) {
+    return { errors: { dueAt: ["Pick a future date"] } };
   }
 
   const [reminder] = await db

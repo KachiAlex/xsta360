@@ -66,7 +66,10 @@ export async function getLeadsPaginated(orgId: string, filters: LeadListFilters 
     );
   }
   if (filters.stageId) conditions.push(eq(schema.leads.stageId, filters.stageId));
-  if (filters.source) conditions.push(eq(schema.leads.source, filters.source as never));
+  const validSources = ["referral", "social", "ad", "walk_in", "embedded_form", "contact_card_scan", "other"];
+  if (filters.source && validSources.includes(filters.source)) {
+    conditions.push(eq(schema.leads.source, filters.source as never));
+  }
   if (filters.assigneeId) conditions.push(eq(schema.leads.assigneeId, filters.assigneeId));
 
   // Category filter: find lead IDs in that category first, then filter.

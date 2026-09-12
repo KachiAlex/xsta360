@@ -77,11 +77,8 @@ export async function verifySession(): Promise<AuthContext | null> {
   // Reject if token version is stale (password changed or suspended since).
   if (membership.tokenVersion !== payload.tokenVersion) return null;
 
-  // Keep the session role in sync with the DB in case it changed.
-  if (membership.role !== payload.role) {
-    const { setOrg } = await import("@/lib/session");
-    await setOrg(payload.orgId, membership.role);
-  }
+  // Cookie may be stale; the authoritative value is the DB role returned below.
+  // Don't set cookies from a Server Component — only Server Actions can write cookies.
 
   return {
     session: payload,

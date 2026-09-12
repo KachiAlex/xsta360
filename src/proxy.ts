@@ -23,19 +23,10 @@ async function isValidSession(token: string | undefined): Promise<boolean> {
 
 // Routes that require a session. Anything else is public (homepage, login,
 // signup, the embedded form endpoint, the cron route).
-const PROTECTED = ["/dashboard", "/leads", "/pipeline", "/reports", "/settings", "/team", "/tasks", "/sequences", "/follow-ups", "/billing", "/contact-card", "/admin"];
+const PROTECTED = ["/dashboard", "/leads", "/pipeline", "/reports", "/settings", "/team", "/tasks", "/sequences", "/follow-ups", "/billing", "/contact-card", "/admin", "/categories", "/documents"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-
-  // If already logged in and hitting /login or /signup, bounce to the app.
-  if (pathname === "/login" || pathname === "/signup") {
-    const token = request.cookies.get(SESSION_COOKIE)?.value;
-    if (await isValidSession(token)) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
-    return NextResponse.next();
-  }
 
   const isProtected = PROTECTED.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),

@@ -1,4 +1,4 @@
-import { and, eq, lte } from "drizzle-orm";
+import { and, eq, lte, or } from "drizzle-orm";
 import { timingSafeEqual } from "crypto";
 import { db, schema } from "@/db";
 import { sendReminderEmail } from "@/lib/email";
@@ -18,10 +18,12 @@ export async function GET(request: Request) {
     return new Response("CRON_SECRET not configured", { status: 500 });
   }
   const expected = `Bearer ${cronSecret}`;
+  const authBuf = Buffer.from(authHeader ?? "");
+  const expBuf = Buffer.from(expected);
   if (
     typeof authHeader !== "string" ||
-    authHeader.length !== expected.length ||
-    !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))
+    authBuf.length !== expBuf.length ||
+    !timingSafeEqual(authBuf, expBuf)
   ) {
     return new Response("Unauthorized", { status: 401 });
   }
@@ -55,9 +57,12 @@ export async function GET(request: Request) {
     .leftJoin(schema.users, eq(schema.reminders.assigneeId, schema.users.id))
     .leftJoin(schema.organizations, eq(schema.reminders.orgId, schema.organizations.id))
     .where(
-      and(
-        eq(schema.reminders.status, "pending"),
-        lte(schema.reminders.dueAt, now),
+      or(
+        and(eq(schema.reminders.status, "pending"), lte(schema.reminders.dueAt, now)),
+        and(
+          eq(schema.reminders.status, "processing"),
+          lte(schema.reminders.updatedAt, new Date(now.getTime() - 10 * 60 * 1000)),
+        ),
       ),
     )
     .limit(100);
@@ -138,7 +143,7 @@ export async function GET(request: Request) {
     } else if (!r.assigneeEmail) {
       await db
         .update(schema.reminders)
-        .set({ status: "pending", lastError: "Assignee has no email and WhatsApp not configured", updatedAt: now })
+        .set({ status: "failed", lastError: "Assignee has no email and WhatsApp not configured", updatedAt: now })
         .where(eq(schema.reminders.id, r.reminderId));
       failed++;
     }

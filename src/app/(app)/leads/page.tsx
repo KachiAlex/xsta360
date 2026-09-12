@@ -156,22 +156,36 @@ export default async function LeadsPage(props: {
                   Page {page} of {totalPages}
                 </span>
                 <div className="flex gap-2">
-                  {page > 1 && (
-                    <Link
-                      href={`/leads?${new URLSearchParams({ ...rawFilters, page: String(page - 1) }).toString()}`}
-                      className="px-3 py-1.5 border border-rule rounded hover:bg-paper-2 min-h-[36px] flex items-center"
-                    >
-                      ← Prev
-                    </Link>
-                  )}
-                  {page < totalPages && (
-                    <Link
-                      href={`/leads?${new URLSearchParams({ ...rawFilters, page: String(page + 1) }).toString()}`}
-                      className="px-3 py-1.5 border border-rule rounded hover:bg-paper-2 min-h-[36px] flex items-center"
-                    >
-                      Next →
-                    </Link>
-                  )}
+                  {(() => {
+                    const buildPageUrl = (page: number) => {
+                      const params = new URLSearchParams();
+                      for (const [k, v] of Object.entries(rawFilters)) {
+                        if (v) params.set(k, v);
+                      }
+                      params.set("page", String(page));
+                      return `/leads?${params.toString()}`;
+                    };
+                    return (
+                      <>
+                        {page > 1 && (
+                          <Link
+                            href={buildPageUrl(page - 1)}
+                            className="px-3 py-1.5 border border-rule rounded hover:bg-paper-2 min-h-[36px] flex items-center"
+                          >
+                            ← Prev
+                          </Link>
+                        )}
+                        {page < totalPages && (
+                          <Link
+                            href={buildPageUrl(page + 1)}
+                            className="px-3 py-1.5 border border-rule rounded hover:bg-paper-2 min-h-[36px] flex items-center"
+                          >
+                            Next →
+                          </Link>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             )}

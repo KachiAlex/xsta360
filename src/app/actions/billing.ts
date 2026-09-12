@@ -12,6 +12,18 @@ import {
   generateReference,
 } from "@/lib/paystack";
 
+/** Safely add months to a date, handling month-end rollover. */
+function addMonths(date: Date, months: number): Date {
+  const d = new Date(date);
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + months);
+  // If the day rolled over (e.g. Jan 31 + 1 = Mar 3), clamp to last day of target month.
+  if (d.getDate() < day) {
+    d.setDate(0); // Last day of previous month
+  }
+  return d;
+}
+
 /** Revalidate all app pages so plan/status changes reflect immediately. */
 function revalidateAppPaths() {
   revalidatePath("/billing");
@@ -140,11 +152,14 @@ export async function changePlan(
       if (charge.status === "success") {
         // Charge succeeded — switch the plan now.
         const now = new Date();
+        const baseDate = sub.currentPeriodEnd && sub.currentPeriodEnd > now ? sub.currentPeriodEnd : now;
         await db
           .update(schema.subscriptions)
           .set({
             planId,
             status: "active",
+            currentPeriodStart: now,
+            currentPeriodEnd: addMonths(baseDate, 1),
             lastPaymentAt: now,
             lastPaymentAmount: nairaToKobo(newMonthly),
             lastPaymentReference: reference,

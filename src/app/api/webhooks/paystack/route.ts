@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { db, schema } from "@/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { logEvent } from "@/lib/audit";
 import { sendReceiptEmail, sendPaymentFailedEmail } from "@/lib/email";
 import { getOrgBilling } from "@/lib/dal";
@@ -30,7 +30,7 @@ async function getOrgAdmin(orgId: string) {
     })
     .from(schema.memberships)
     .innerJoin(schema.users, eq(schema.memberships.userId, schema.users.id))
-    .where(eq(schema.memberships.orgId, orgId))
+    .where(and(eq(schema.memberships.orgId, orgId), eq(schema.memberships.role, "admin")))
     .limit(1);
   return admin;
 }
@@ -89,8 +89,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   }
 
-  // Only process charge.success for subscription extension.
-  if (event.event !== "charge.success") {
+  // Only process the three handled events.
+  if (!["charge.success", "charge.failed", "subscription.disable"].includes(eventType)) {
     return NextResponse.json({ received: true, skipped: true });
   }
 

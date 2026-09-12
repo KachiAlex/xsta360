@@ -89,7 +89,15 @@ export async function setOrg(orgId: string, role: SessionPayload["role"]) {
 
 export async function deleteSession() {
   const cookieStore = await cookies();
-  cookieStore.delete(COOKIE);
+  cookieStore.set({
+    name: COOKIE,
+    value: "",
+    path: "/",
+    httpOnly: true,
+    secure: isHttps(),
+    sameSite: "lax",
+    expires: new Date(0),
+  });
 }
 
 /** Read + verify the session payload from the cookie (no DB hit). */

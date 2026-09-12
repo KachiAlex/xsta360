@@ -45,7 +45,11 @@ export async function sendMail(
   },
 ): Promise<void> {
   if (!smtpUser || !smtpPass) {
-    throw new Error("SMTP not configured — email not sent");
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("SMTP not configured — email not sent");
+    }
+    console.log(`[dev email] To: ${to} | Subject: ${subject}`);
+    return;
   }
 
   // Build the From header: "Sender Name <noreply@...>" or default.

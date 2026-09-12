@@ -1,7 +1,7 @@
 import { requireAuth, can } from "@/lib/dal";
 import { getOrgStages, getOrgMembers } from "@/lib/queries";
 import { db, schema } from "@/db";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { Topbar } from "@/components/app/topbar";
 import { Panel, PanelHead } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,12 @@ export default async function SettingsPage() {
     getOrgStages(ctx.orgId),
     getOrgMembers(ctx.orgId),
     isAdmin
-      ? db.select().from(schema.invitations).where(eq(schema.invitations.orgId, ctx.orgId))
+      ? db.select().from(schema.invitations).where(
+          and(
+            eq(schema.invitations.orgId, ctx.orgId),
+            isNull(schema.invitations.acceptedAt),
+          ),
+        )
       : Promise.resolve([]),
     db.select().from(schema.organizations).where(eq(schema.organizations.id, ctx.orgId)).limit(1),
   ]);

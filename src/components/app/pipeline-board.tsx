@@ -25,7 +25,7 @@ export function PipelineBoard({ initialColumns }: { initialColumns: PipelineColu
   columnsRef.current = columns;
 
   function onDrop(targetStageId: string) {
-    if (!draggedId) return;
+    if (!draggedId || targetStageId === "unassigned") return;
     setDragOverCol(null);
     moveLead(draggedId, targetStageId);
     setDraggedId(null);
@@ -141,7 +141,9 @@ export function PipelineBoard({ initialColumns }: { initialColumns: PipelineColu
                   {isMoving && (
                     <div className="md:hidden mt-1.5 bg-panel border border-ink rounded p-2 space-y-1 shadow-lg">
                       <div className="text-[10px] font-mono uppercase tracking-wider text-ink-soft px-1">Move to:</div>
-                      {columns.map((targetCol) => (
+                      {columns
+                        .filter((targetCol) => targetCol.id !== "unassigned")
+                        .map((targetCol) => (
                         <button
                           key={targetCol.id}
                           type="button"

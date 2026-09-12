@@ -395,6 +395,7 @@ export async function processSequenceSteps(): Promise<{
               dueAt: now,
               note: `[Sequence] Email sent to lead: ${reminderNote}`,
               status: "sent",
+              sentAt: now,
               sequenceStepId: nextStep.id,
               channel: "email",
             });
@@ -436,6 +437,7 @@ export async function processSequenceSteps(): Promise<{
           dueAt: now,
           note: `[Sequence] WhatsApp sent to lead: ${reminderNote}`,
           status: whatsappSuccess ? "sent" : "failed",
+          sentAt: whatsappSuccess ? now : null,
           sequenceStepId: nextStep.id,
           channel: "whatsapp",
           lastError: whatsappError,
