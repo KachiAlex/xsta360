@@ -93,6 +93,25 @@ function isInternalPath(value?: string): value is string {
   return typeof value === "string" && value.startsWith("/") && !value.startsWith("//");
 }
 
+// Sentinel error thrown inside the signup transaction when the email is taken.
+class EmailAlreadyRegisteredError extends Error {
+  constructor() {
+    super("Email already registered");
+    this.name = "EmailAlreadyRegisteredError";
+  }
+}
+
+// Detect a Postgres unique-constraint violation (SQLSTATE 23505), which can
+// still occur if two concurrent signups race past the in-transaction check.
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code: unknown }).code === "23505"
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Signup — creates user + org + admin membership + default config in one tx
 // ---------------------------------------------------------------------------
@@ -123,19 +142,20 @@ export async function signup(
   const { name, email, orgName, password } = parsed.data;
 
   try {
-    // Reject if email already in use.
-    const [existing] = await db
-      .select({ id: schema.users.id })
-      .from(schema.users)
-      .where(eq(schema.users.email, email))
-      .limit(1);
-    if (existing) {
-      return { errors: { email: ["An account with this email already exists"] } };
-    }
-
     const passwordHash = await bcrypt.hash(password, 10);
 
     const [created] = await db.transaction(async (tx) => {
+      // Reject if email already in use — checked inside the transaction to
+      // avoid a race where two concurrent signups both pass the check.
+      const [existing] = await tx
+        .select({ id: schema.users.id })
+        .from(schema.users)
+        .where(eq(schema.users.email, email))
+        .limit(1);
+      if (existing) {
+        throw new EmailAlreadyRegisteredError();
+      }
+
       const [org] = await tx
         .insert(schema.organizations)
         .values({ name: orgName, formToken: nanoid(24) })
@@ -189,6 +209,10 @@ export async function signup(
   } catch (err) {
     // redirect() throws a special error — re-throw it so Next.js handles it.
     if (isRedirectError(err)) throw err;
+    // Race lost: another concurrent signup inserted the email first.
+    if (err instanceof EmailAlreadyRegisteredError || isUniqueViolation(err)) {
+      return { errors: { email: ["An account with this email already exists"] } };
+    }
     const message = err instanceof Error ? err.message : "Something went wrong";
     return { message: `Signup failed: ${message}` };
   }
@@ -483,20 +507,28 @@ export async function resetPassword(
     const passwordHash = await bcrypt.hash(password, 10);
 
     await db.transaction(async (tx) => {
-      await tx
-        .update(schema.users)
-        .set({ passwordHash, tokenVersion: sql`${schema.users.tokenVersion} + 1`, updatedAt: new Date() })
-        .where(eq(schema.users.id, user.id));
-      // Invalidate ALL unused reset tokens for this email, not just the consumed one.
-      await tx
+      // Atomically consume THIS token. If another request already consumed
+      // it, the UPDATE matches 0 rows and we throw — rolling back the password
+      // change.
+      const [consumed] = await tx
         .update(schema.passwordResetTokens)
         .set({ usedAt: new Date() })
         .where(
           and(
-            eq(schema.passwordResetTokens.email, record.email),
+            eq(schema.passwordResetTokens.id, record.id),
             isNull(schema.passwordResetTokens.usedAt),
           ),
-        );
+        )
+        .returning();
+
+      if (!consumed) {
+        throw new Error("Token already used");
+      }
+
+      await tx
+        .update(schema.users)
+        .set({ passwordHash, tokenVersion: sql`${schema.users.tokenVersion} + 1`, updatedAt: new Date() })
+        .where(eq(schema.users.id, user.id));
     });
 
     redirect("/login?reset=1");

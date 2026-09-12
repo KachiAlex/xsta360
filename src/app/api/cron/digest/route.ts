@@ -32,11 +32,6 @@ export async function GET(request: Request) {
   }
 
   const appUrl = process.env.APP_URL ?? "http://localhost:3000";
-  const now = new Date();
-  const sod = new Date(now);
-  sod.setHours(0, 0, 0, 0);
-  const eod = new Date(now);
-  eod.setHours(23, 59, 59, 999);
 
   // Get all users with memberships (active org members).
   const members = await db

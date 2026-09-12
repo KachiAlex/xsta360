@@ -179,7 +179,9 @@ export async function manageSubscription(
   const orgId = formData.get("orgId") as string;
   const subId = (formData.get("subId") as string) || null;
   const planId = (formData.get("planId") as string) || null;
-  const status = (formData.get("status") as string) as "trialing" | "active" | "past_due" | "canceled";
+  const statusResult = z.enum(["trialing", "active", "past_due", "canceled"]).safeParse(formData.get("status"));
+  if (!statusResult.success) return { message: "Invalid status", error: true };
+  const status = statusResult.data;
 
   if (!orgId) return { message: "Missing org ID", error: true };
 
@@ -285,10 +287,12 @@ export async function extendTrial(
     const base = sub.trialEndsAt && sub.trialEndsAt > new Date() ? sub.trialEndsAt : new Date();
     const newEnd = new Date(base.getTime() + days * 24 * 60 * 60 * 1000);
 
-    await db
+    const [updated] = await db
       .update(schema.subscriptions)
       .set({ trialEndsAt: newEnd, currentPeriodEnd: newEnd, updatedAt: new Date() })
-      .where(and(eq(schema.subscriptions.id, subId), eq(schema.subscriptions.orgId, orgId)));
+      .where(and(eq(schema.subscriptions.id, subId), eq(schema.subscriptions.orgId, orgId)))
+      .returning();
+    if (!updated) return { message: "Subscription not found", error: true };
 
     await logEvent(null, "subscription_updated", {
       actorId: ctx.userId,
@@ -321,7 +325,7 @@ export async function markSubscriptionPaid(
     const now = new Date();
     const periodEnd = addMonths(now, 1);
 
-    await db
+    const [updated] = await db
       .update(schema.subscriptions)
       .set({
         status: "active",
@@ -331,7 +335,9 @@ export async function markSubscriptionPaid(
         graceEndsAt: null,
         updatedAt: now,
       })
-      .where(and(eq(schema.subscriptions.id, subId), eq(schema.subscriptions.orgId, orgId)));
+      .where(and(eq(schema.subscriptions.id, subId), eq(schema.subscriptions.orgId, orgId)))
+      .returning();
+    if (!updated) return { message: "Subscription not found", error: true };
 
     await logEvent(null, "subscription_updated", {
       actorId: ctx.userId,
@@ -400,6 +406,10 @@ export async function suspendUser(
   const ctx = await requireSuperadmin();
   const userId = formData.get("userId") as string;
   if (!userId) return { message: "Missing user ID", error: true };
+
+  if (userId === ctx.userId) {
+    return { message: "You cannot suspend your own account", error: true };
+  }
 
   try {
     await db

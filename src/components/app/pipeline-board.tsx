@@ -26,6 +26,8 @@ export function PipelineBoard({ initialColumns }: { initialColumns: PipelineColu
 
   function onDrop(targetStageId: string) {
     if (!draggedId || targetStageId === "unassigned") return;
+    const sourceStageId = getLeadStageId(draggedId);
+    if (sourceStageId === targetStageId) return;
     setDragOverCol(null);
     moveLead(draggedId, targetStageId);
     setDraggedId(null);

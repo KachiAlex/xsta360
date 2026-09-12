@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { submitCardLead, CardLeadError } from "@/lib/contact-cards";
+import { rateLimit, clientKey } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -11,20 +12,18 @@ const CardLeadSchema = z.object({
   company: z.string().trim().optional().or(z.literal("")),
 });
 
-// Simple per-IP rate limit: 10 submissions per minute.
-const rateLimitMap = new Map<string, number[]>();
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 10;
-
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params;
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 
-  if (isRateLimited(ip)) {
-    return NextResponse.json({ error: "Too many submissions. Try again later." }, { status: 429 });
+  const rl = await rateLimit(clientKey(request, `card:${slug}`), 20, 60_000);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many submissions. Try again later." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } },
+    );
   }
 
   let body: unknown;
@@ -57,14 +56,4 @@ export async function POST(
     console.error("Card lead submission failed:", err);
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }
-}
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const timestamps = rateLimitMap.get(ip) ?? [];
-  const windowStart = now - RATE_LIMIT_WINDOW_MS;
-  const recent = timestamps.filter((t) => t > windowStart);
-  recent.push(now);
-  rateLimitMap.set(ip, recent);
-  return recent.length > RATE_LIMIT_MAX;
 }

@@ -491,6 +491,15 @@ export async function addRemark(
   const lead = await loadOrgLead(ctx, leadId);
   if (!lead) return { message: "Lead not found" };
 
+  // Validate the optional reminder due date BEFORE inserting the remark so
+  // that an invalid date short-circuits without persisting anything.
+  if (reminderDue) {
+    const dueAt = new Date(reminderDue);
+    if (!isNaN(dueAt.getTime()) && dueAt <= new Date()) {
+      return { errors: { reminderDue: ["Pick a future date"] } };
+    }
+  }
+
   const [remark] = await db
     .insert(schema.remarks)
     .values({ leadId, orgId: ctx.orgId, authorId: ctx.userId, body })
@@ -506,9 +515,6 @@ export async function addRemark(
   if (reminderDue) {
     const dueAt = new Date(reminderDue);
     if (!isNaN(dueAt.getTime())) {
-      if (dueAt <= new Date()) {
-        return { errors: { reminderDue: ["Pick a future date"] } };
-      }
       const [reminder] = await db
         .insert(schema.reminders)
         .values({
@@ -567,6 +573,13 @@ export async function changeStage(
   const target = await loadOrgStage(ctx, toStageId);
   if (!target) return { message: "Stage not found" };
 
+  // No-op if the lead is already in the target stage (prevents overwriting wonAt/lostAt).
+  // Checked before lost-reason validation so a re-submit of the current stage
+  // doesn't require a reason.
+  if (lead.stageId === target.id) {
+    return { ok: true };
+  }
+
   // Lost requires a reason.
   if (target.kind === "lost" && !lostReasonId && !lostReasonText) {
     return { errors: { lostReasonText: ["A reason is required when marking a lead lost"] } };
@@ -584,11 +597,6 @@ export async function changeStage(
     if (!reason) return { message: "Lost reason not found" };
     finalLostReasonId = reason.id;
     lostReasonLabel = reason.label;
-  }
-
-  // No-op if the lead is already in the target stage (prevents overwriting wonAt/lostAt).
-  if (lead.stageId === target.id) {
-    return { ok: true };
   }
 
   await db

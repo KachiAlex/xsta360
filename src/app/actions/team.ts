@@ -99,6 +99,26 @@ export async function inviteMember(
     }
   }
 
+  // Prevent duplicate pending invitations to the same email.
+  const [existingInvite] = await db
+    .select()
+    .from(schema.invitations)
+    .where(
+      and(
+        eq(schema.invitations.orgId, ctx.orgId),
+        eq(schema.invitations.email, email),
+        isNull(schema.invitations.acceptedAt),
+      ),
+    )
+    .limit(1);
+
+  if (existingInvite) {
+    // If it's still valid, don't create a new one.
+    if (existingInvite.expiresAt && existingInvite.expiresAt > new Date()) {
+      return { message: "An invitation has already been sent to this email" };
+    }
+  }
+
   const token = nanoid(32);
   const inviteUrl = `${appUrl()}/join/${token}`;
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -339,6 +359,16 @@ export async function removeMember(
         .update(schema.reminders)
         .set({ assigneeId: null, updatedAt: new Date() })
         .where(and(eq(schema.reminders.orgId, ctx.orgId), eq(schema.reminders.assigneeId, membership.userId)));
+
+      // Delete the user's todos in this org.
+      await tx
+        .delete(schema.todos)
+        .where(and(eq(schema.todos.orgId, ctx.orgId), eq(schema.todos.userId, membership.userId)));
+
+      // Delete the user's notes in this org.
+      await tx
+        .delete(schema.notes)
+        .where(and(eq(schema.notes.orgId, ctx.orgId), eq(schema.notes.userId, membership.userId)));
 
       await tx.delete(schema.memberships).where(and(eq(schema.memberships.id, membership.id), eq(schema.memberships.orgId, ctx.orgId)));
     });

@@ -22,18 +22,6 @@ export async function getPipelineBoard(orgId: string, categoryId?: string): Prom
     .where(eq(schema.pipelineStages.orgId, orgId))
     .orderBy(asc(schema.pipelineStages.position));
 
-  let leadQuery = db
-    .select({
-      id: schema.leads.id,
-      name: schema.leads.name,
-      company: schema.leads.company,
-      source: schema.leads.source,
-      stageId: schema.leads.stageId,
-    })
-    .from(schema.leads)
-    .where(eq(schema.leads.orgId, orgId))
-    .as("leadQuery");
-
   let leads;
 
   if (categoryId) {

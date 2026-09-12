@@ -49,7 +49,7 @@ export async function GET(request: Request) {
           eventType: "opened",
           variant: event.variant,
           userAgent: request.headers.get("user-agent") || null,
-          ipAddress: request.headers.get("x-forwarded-for")?.split(",")[0] || null,
+          ipAddress: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null,
         });
       }
     } catch {

@@ -107,6 +107,24 @@ export async function POST(request: Request) {
                 .where(eq(schema.sequenceEnrollments.id, sentEvent.enrollmentId));
             }
 
+            // Handle unsubscribe / spam: mark lead unsubscribed + pause enrollment
+            if (mappedType === "unsubscribed") {
+              await db
+                .update(schema.leads)
+                .set({ unsubscribedAt: new Date(), updatedAt: new Date() })
+                .where(eq(schema.leads.id, lead.id));
+
+              await db
+                .update(schema.sequenceEnrollments)
+                .set({
+                  status: "paused",
+                  pausedReason: "unsubscribed",
+                  pausedAt: new Date(),
+                  updatedAt: new Date(),
+                })
+                .where(eq(schema.sequenceEnrollments.id, sentEvent.enrollmentId));
+            }
+
             // Handle reply: pause enrollment
             if (mappedType === "replied") {
               await db

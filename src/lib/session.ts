@@ -51,11 +51,9 @@ export async function decrypt(
 
 /** Whether the app is served over HTTPS (determines cookie `secure` flag). */
 function isHttps(): boolean {
-  // Derive from APP_URL so HTTP deployments (e.g. VPS without TLS) still work.
   const appUrl = process.env.APP_URL ?? "";
   if (appUrl) return appUrl.startsWith("https://");
-  // Fallback: assume production is HTTPS unless explicitly HTTP.
-  return process.env.NODE_ENV === "production";
+  return false;
 }
 
 /** Create a session cookie for the given user + org + role. */

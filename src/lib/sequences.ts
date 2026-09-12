@@ -47,6 +47,7 @@ export async function enrollLeadInSequence(
     .from(schema.sequenceEnrollments)
     .where(
       and(
+        eq(schema.sequenceEnrollments.orgId, orgId),
         eq(schema.sequenceEnrollments.sequenceId, sequenceId),
         eq(schema.sequenceEnrollments.leadId, leadId),
         eq(schema.sequenceEnrollments.status, "active"),
@@ -86,36 +87,42 @@ function isWithinSendWindow(
   seq: { sendWindowStart: string | null; sendWindowEnd: string | null; skipWeekends: boolean; timezone: string },
   now: Date,
 ): boolean {
-  // If no window configured, send anytime.
-  if (!seq.sendWindowStart || !seq.sendWindowEnd) return true;
+  try {
+    // If no window configured, send anytime.
+    if (!seq.sendWindowStart || !seq.sendWindowEnd) return true;
 
-  // Get current time in the sequence's timezone.
-  // We use Intl to format the time in the target timezone.
-  const tz = seq.timezone || "Africa/Lagos";
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    weekday: "short",
-  });
-  const parts = formatter.formatToParts(now);
-  const hourPart = parts.find((p) => p.type === "hour")?.value ?? "0";
-  const minutePart = parts.find((p) => p.type === "minute")?.value ?? "0";
-  const weekdayPart = parts.find((p) => p.type === "weekday")?.value ?? "";
+    // Get current time in the sequence's timezone.
+    // We use Intl to format the time in the target timezone.
+    const tz = seq.timezone || "Africa/Lagos";
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      weekday: "short",
+    });
+    const parts = formatter.formatToParts(now);
+    const hourPart = parts.find((p) => p.type === "hour")?.value ?? "0";
+    const minutePart = parts.find((p) => p.type === "minute")?.value ?? "0";
+    const weekdayPart = parts.find((p) => p.type === "weekday")?.value ?? "";
 
-  // Skip weekends if configured
-  if (seq.skipWeekends && (weekdayPart === "Sat" || weekdayPart === "Sun")) {
-    return false;
+    // Skip weekends if configured
+    if (seq.skipWeekends && (weekdayPart === "Sat" || weekdayPart === "Sun")) {
+      return false;
+    }
+
+    const currentMinutes = parseInt(hourPart) * 60 + parseInt(minutePart);
+    const [startH, startM] = seq.sendWindowStart.split(":").map(Number);
+    const [endH, endM] = seq.sendWindowEnd.split(":").map(Number);
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+
+    return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+  } catch {
+    // Invalid timezone or malformed window config — allow sending rather
+    // than crashing the cron. Bad config shouldn't block all sequences.
+    return true;
   }
-
-  const currentMinutes = parseInt(hourPart) * 60 + parseInt(minutePart);
-  const [startH, startM] = seq.sendWindowStart.split(":").map(Number);
-  const [endH, endM] = seq.sendWindowEnd.split(":").map(Number);
-  const startMinutes = startH * 60 + startM;
-  const endMinutes = endH * 60 + endM;
-
-  return currentMinutes >= startMinutes && currentMinutes < endMinutes;
 }
 
 /**
@@ -288,6 +295,11 @@ export async function processSequenceSteps(): Promise<{
     const stepSenderName = useVariantB ? (nextStep.variantBSenderName || nextStep.senderName) : nextStep.senderName;
     const variant = useVariantB ? "b" : "a";
 
+    // Track whether this step was actually delivered so we only advance
+    // currentStep on success. On failure we leave currentStep unchanged so
+    // the cron retries on the next run.
+    let didDeliver = false;
+
     switch (action) {
       case "email": {
         // Send email directly to the lead.
@@ -388,6 +400,7 @@ export async function processSequenceSteps(): Promise<{
           }
           // Create a reminder record for tracking (only if email was actually sent).
           if (emailSent) {
+            didDeliver = true;
             await db.insert(schema.reminders).values({
               leadId: enrollment.leadId,
               orgId: enrollment.orgId,
@@ -430,6 +443,9 @@ export async function processSequenceSteps(): Promise<{
               : "Missing WhatsApp config";
         }
         // Create a reminder record for tracking.
+        if (whatsappSuccess) {
+          didDeliver = true;
+        }
         await db.insert(schema.reminders).values({
           leadId: enrollment.leadId,
           orgId: enrollment.orgId,
@@ -456,10 +472,15 @@ export async function processSequenceSteps(): Promise<{
           sequenceStepId: nextStep.id,
           channel: "reminder",
         });
+        didDeliver = true;
         remindersCreated++;
         break;
       }
     }
+
+    // Only log and advance when the step was actually delivered. On failure
+    // we leave currentStep unchanged so the cron retries on the next run.
+    if (!didDeliver) continue;
 
     await logEvent(enrollment.orgId, "sequence_step_sent", {
       leadId: enrollment.leadId,

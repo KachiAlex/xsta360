@@ -169,7 +169,7 @@ export async function sendDigestEmail(data: DigestEmailData): Promise<void> {
   const subject = `Your daily digest — ${data.overdueCount} overdue, ${data.dueTodayCount} due today`;
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-      <h2 style="color: #1E2A22; font-family: 'IBM Plex Mono', monospace;">Hi ${data.userName}, here's your daily summary</h2>
+      <h2 style="color: #1E2A22; font-family: 'IBM Plex Mono', monospace;">Hi ${escapeHtml(data.userName)}, here's your daily summary</h2>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 24px 0;">
         <div style="padding: 16px; background: #F3F0E6; border-radius: 4px;">
@@ -324,7 +324,7 @@ export async function sendPasswordResetEmail(data: PasswordResetEmailData): Prom
         Reset password
       </a>
       <p style="color: #4A5750; font-size: 13px; margin-top: 24px; word-break: break-all;">
-        Or paste this URL in your browser:<br>${data.resetUrl}
+        Or paste this URL in your browser:<br>${escapeHtml(data.resetUrl)}
       </p>
       <p style="color: #9AA39A; font-size: 12px; margin-top: 32px;">— Xsta360 · Manage. Follow Up. Close.</p>
     </div>
@@ -354,7 +354,7 @@ export async function sendTrialEndingEmail(data: TrialEndingEmailData): Promise<
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
       <h2 style="color: #1E2A22; font-family: 'IBM Plex Mono', monospace;">Your trial ends in ${data.daysLeft} day${data.daysLeft !== 1 ? "s" : ""}</h2>
       <p style="color: #4A5750; font-size: 15px;">
-        Hi ${data.userName}, the free trial for <strong>${data.orgName}</strong> ends soon.
+        Hi ${escapeHtml(data.userName)}, the free trial for <strong>${escapeHtml(data.orgName)}</strong> ends soon.
         Add a payment method now to keep your leads, pipeline, and reminders running without interruption.
       </p>
       <p style="color: #4A5750; font-size: 14px;">
@@ -387,7 +387,7 @@ export async function sendPaymentFailedEmail(data: PaymentFailedEmailData): Prom
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
       <h2 style="color: #B23A2E; font-family: 'IBM Plex Mono', monospace;">Payment failed</h2>
       <p style="color: #4A5750; font-size: 15px;">
-        Hi ${data.userName}, we couldn't charge the card on file for <strong>${data.orgName}</strong>
+        Hi ${escapeHtml(data.userName)}, we couldn't charge the card on file for <strong>${escapeHtml(data.orgName)}</strong>
         (${data.currency}${data.amount.toLocaleString()}).
       </p>
       <p style="color: #4A5750; font-size: 15px;">
@@ -424,13 +424,13 @@ export async function sendReceiptEmail(data: ReceiptEmailData): Promise<void> {
     <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
       <h2 style="color: #2F7D5B; font-family: 'IBM Plex Mono', monospace;">Payment received</h2>
       <p style="color: #4A5750; font-size: 15px;">
-        Hi ${data.userName}, thanks! We've received your payment for <strong>${data.orgName}</strong>.
+        Hi ${escapeHtml(data.userName)}, thanks! We've received your payment for <strong>${escapeHtml(data.orgName)}</strong>.
       </p>
       <table style="width: 100%; font-size: 14px; color: #4A5750; margin: 16px 0; border-collapse: collapse;">
-        <tr><td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9;">Plan</td><td style="text-align: right; padding: 8px 0; border-bottom: 1px solid #E3DEC9;"><strong>${data.planName}</strong></td></tr>
+        <tr><td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9;">Plan</td><td style="text-align: right; padding: 8px 0; border-bottom: 1px solid #E3DEC9;"><strong>${escapeHtml(data.planName)}</strong></td></tr>
         <tr><td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9;">Members</td><td style="text-align: right; padding: 8px 0; border-bottom: 1px solid #E3DEC9;">${data.memberCount}</td></tr>
         <tr><td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9;">Amount</td><td style="text-align: right; padding: 8px 0; border-bottom: 1px solid #E3DEC9;"><strong>${data.currency}${data.amount.toLocaleString()}</strong></td></tr>
-        <tr><td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9;">Reference</td><td style="text-align: right; padding: 8px 0; border-bottom: 1px solid #E3DEC9; font-family: monospace; font-size: 12px;">${data.reference}</td></tr>
+        <tr><td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9;">Reference</td><td style="text-align: right; padding: 8px 0; border-bottom: 1px solid #E3DEC9; font-family: monospace; font-size: 12px;">${escapeHtml(data.reference)}</td></tr>
         <tr><td style="padding: 8px 0;">Next billing</td><td style="text-align: right; padding: 8px 0;">${data.nextBillingDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</td></tr>
       </table>
       <a href="${data.appUrl}/billing" style="display: inline-block; margin-top: 8px; padding: 10px 20px; background: #1E2A22; color: #F3F0E6; text-decoration: none; border-radius: 3px; font-weight: 600;">
