@@ -16,8 +16,8 @@ android {
         applicationId "com.xsta360.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.1"
+        versionCode 3
+        versionName "1.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField "String", "PLAY_STORE_LICENSE_KEY", "\"${localProps.getProperty('playStoreLicenseKey') ?: ''}\""
         aaptOptions {

@@ -3,13 +3,10 @@ import type { CapacitorConfig } from "@capacitor/cli";
 const config: CapacitorConfig = {
   appId: "com.xsta360.app",
   appName: "Xsta360",
-  // Local splash screen / offline fallback bundled in the app.
+  // Local shell that redirects to the live app when online.
+  // When offline, shows a branded offline page with auto-retry.
+  // The service worker on xsta360.com.ng handles caching after first visit.
   webDir: "out",
-  server: {
-    // Load the live app directly inside the Capacitor webview.
-    // This keeps the user in the app instead of opening the system browser.
-    url: "https://xsta360.com.ng/login",
-  },
   android: {
     // captureInput keeps the virtual keyboard from covering focused fields.
     captureInput: true,
@@ -17,10 +14,11 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 0,
+      launchShowDuration: 1000,
       backgroundColor: "#1e2a22",
       splashFullScreen: true,
       splashImmersive: true,
+      autoHide: true,
     },
   },
 };

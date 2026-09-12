@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Xsta360 — Offline</title>
+  <meta name="theme-color" content="#1e2a22" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      background: #1e2a22;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #f3f0e6;
+      text-align: center;
+      padding: 28px;
+    }
+    .logo-mark { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+    .logo-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #d98a2b;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .logo-text {
+      font-family: "Courier New", monospace;
+      font-size: 32px; font-weight: 700;
+      color: #f3f0e6; letter-spacing: 2px;
+    }
+    h1 {
+      font-family: "Courier New", monospace;
+      font-size: 22px; font-weight: 700;
+      margin-bottom: 12px; color: #f3f0e6;
+    }
+    p {
+      font-size: 15px; color: #9fae9f; line-height: 1.6;
+      margin-bottom: 28px; max-width: 320px;
+    }
+    .btn-retry {
+      padding: 14px 28px; background: #d98a2b; border: none;
+      border-radius: 12px; color: #1e2a22;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      transition: all 0.2s; min-width: 180px;
+    }
+    .btn-retry:active { background: #c47a24; transform: scale(0.98); }
+    .status { margin-top: 20px; font-size: 13px; color: #9fae9f; }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(217, 138, 43, 0.4); }
+      50% { transform: scale(1.15); box-shadow: 0 0 0 8px rgba(217, 138, 43, 0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="logo-mark">
+    <div class="logo-dot"></div>
+    <div class="logo-text">XSTA360</div>
+  </div>
+  <h1>You're offline</h1>
+  <p>We couldn't reach the Xsta360 server. Your cached data is still available — reconnect to sync changes.</p>
+  <button class="btn-retry" onclick="window.location.reload()">Retry</button>
+  <div class="status" id="status">Checking connection…</div>
+  <script>
+    // Auto-retry when connection is restored
+    window.addEventListener("online", () => {
+      document.getElementById("status").textContent = "Back online — reloading…";
+      window.location.reload();
+    });
+    window.addEventListener("offline", () => {
+      document.getElementById("status").textContent = "Still offline.";
+    });
+    if (navigator.onLine) {
+      document.getElementById("status").textContent = "Connection detected — retrying…";
+      window.location.reload();
+    } else {
+      document.getElementById("status").textContent = "No connection detected.";
+    }
+  </script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
+import { OfflineProvider } from "@/components/app/offline-provider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -128,7 +129,9 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${plexMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <OfflineProvider>{children}</OfflineProvider>
+      </body>
     </html>
   );
 }
