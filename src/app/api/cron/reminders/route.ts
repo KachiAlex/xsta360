@@ -51,10 +51,18 @@ export async function GET(request: Request) {
       assigneeEmail: schema.users.email,
       orgName: schema.organizations.name,
       whatsappConfig: schema.organizations.whatsappConfig,
+      memberActive: schema.memberships.id,
     })
     .from(schema.reminders)
     .innerJoin(schema.leads, eq(schema.reminders.leadId, schema.leads.id))
     .leftJoin(schema.users, eq(schema.reminders.assigneeId, schema.users.id))
+    .leftJoin(
+      schema.memberships,
+      and(
+        eq(schema.memberships.userId, schema.reminders.assigneeId),
+        eq(schema.memberships.orgId, schema.reminders.orgId),
+      ),
+    )
     .leftJoin(schema.organizations, eq(schema.reminders.orgId, schema.organizations.id))
     .where(
       or(
@@ -88,6 +96,16 @@ export async function GET(request: Request) {
   let whatsappSent = 0;
 
   for (const r of claimed) {
+    // Skip if the assignee is no longer a member of this org.
+    if (!r.memberActive) {
+      await db
+        .update(schema.reminders)
+        .set({ status: "failed", lastError: "Assignee is no longer a member of this organization", updatedAt: now })
+        .where(eq(schema.reminders.id, r.reminderId));
+      failed++;
+      continue;
+    }
+
     let didSend = false;
 
     // Try WhatsApp first if configured and lead has a phone.

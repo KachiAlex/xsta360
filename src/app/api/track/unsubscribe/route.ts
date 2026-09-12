@@ -63,7 +63,7 @@ async function handleUnsubscribe(token: string): Promise<boolean> {
 
 export async function GET(request: Request) {
   // Rate limit: 10/min per IP (humans click unsubscribe rarely)
-  const rl = rateLimit(clientKey(request, "unsub"), 10, 60_000);
+  const rl = await rateLimit(clientKey(request, "unsub"), 10, 60_000);
   if (!rl.allowed) {
     return new Response("Too Many Requests", {
       status: 429,

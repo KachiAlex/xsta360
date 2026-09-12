@@ -433,6 +433,8 @@ export async function updateLead(
       customFields: parsedCustomFields,
       lostReasonId: lostReasonIdUpdate,
       lostReasonText: lostReasonTextUpdate,
+      wonAt: targetStageKind === "won" ? new Date() : (stageId && existing.stageId !== newStageId ? null : undefined),
+      lostAt: targetStageKind === "lost" ? new Date() : (stageId && existing.stageId !== newStageId ? null : undefined),
       updatedAt: new Date(),
     })
     .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, ctx.orgId)));
@@ -587,6 +589,8 @@ export async function changeStage(
       updatedAt: new Date(),
       lostReasonId: target.kind === "lost" ? finalLostReasonId : null,
       lostReasonText: target.kind === "lost" ? (lostReasonText || null) : null,
+      wonAt: target.kind === "won" ? new Date() : null,
+      lostAt: target.kind === "lost" ? new Date() : null,
     })
     .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, ctx.orgId)))
     .returning();
@@ -1024,6 +1028,8 @@ export async function bulkMoveStage(
       updatedAt: new Date(),
       lostReasonId: stage.kind === "lost" ? (lostReasonId || null) : null,
       lostReasonText: stage.kind === "lost" ? (lostReasonText || null) : null,
+      wonAt: stage.kind === "won" ? new Date() : null,
+      lostAt: stage.kind === "lost" ? new Date() : null,
     })
     .where(and(eq(schema.leads.orgId, ctx.orgId), inArray(schema.leads.id, validIds)));
 

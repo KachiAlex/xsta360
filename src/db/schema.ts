@@ -11,6 +11,7 @@ import {
   uniqueIndex,
   jsonb,
   numeric,
+  serial,
 } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
@@ -138,6 +139,8 @@ export const organizations = pgTable("organizations", {
   currency: text("currency").notNull().default("₦"),
   // Default reply-to email for sequence emails (shared inbox, etc.)
   replyToEmail: text("reply_to_email"),
+  // IANA timezone for date bucketing (e.g. "Africa/Lagos"). Defaults to Lagos.
+  timezone: text("timezone").notNull().default("Africa/Lagos"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -371,6 +374,10 @@ export const leads = pgTable(
     }),
     // When the lead unsubscribed from sequence emails (null = not unsubscribed).
     unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
+    // When the lead was moved to a Won stage (null = never won). Used for win-rate stats.
+    wonAt: timestamp("won_at", { withTimezone: true }),
+    // When the lead was moved to a Lost stage (null = never lost).
+    lostAt: timestamp("lost_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -380,6 +387,7 @@ export const leads = pgTable(
     orgSourceIdx: index("leads_org_source_idx").on(t.orgId, t.source),
     orgUpdatedIdx: index("leads_org_updated_idx").on(t.orgId, t.updatedAt),
     orgCreatedIdx: index("leads_org_created_idx").on(t.orgId, t.createdAt),
+    orgWonIdx: index("leads_org_won_idx").on(t.orgId, t.wonAt),
     contactCardIdx: index("leads_contact_card_idx").on(t.contactCardId),
     // Standalone FK indexes for cross-org lookups (e.g. reassignment, stage moves).
     assigneeIdx: index("leads_assignee_idx").on(t.assigneeId),
@@ -934,5 +942,42 @@ export const auditEvents = pgTable(
     // Standalone indexes for org-scoped and type-scoped event queries.
     orgIdx: index("audit_events_org_idx").on(t.orgId),
     typeIdx: index("audit_events_type_idx").on(t.type),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Rate limit buckets (DB-backed, multi-instance safe)
+// ---------------------------------------------------------------------------
+
+export const rateLimitBuckets = pgTable(
+  "rate_limit_buckets",
+  {
+    id: serial("id").primaryKey(),
+    key: text("key").notNull(),
+    count: integer("count").notNull().default(1),
+    resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
+  },
+  (t) => ({
+    keyIdx: uniqueIndex("rate_limit_key_idx").on(t.key),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Processed payment references (idempotency for billing)
+// ---------------------------------------------------------------------------
+
+export const processedReferences = pgTable(
+  "processed_references",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    reference: text("reference").notNull(),
+    // What the reference was for: "subscription", "plan_upgrade", "trial_conversion", "renewal".
+    purpose: text("purpose").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    // Prevent the same reference from being processed twice for the same org.
+    orgRefIdx: uniqueIndex("processed_references_org_ref_idx").on(t.orgId, t.reference),
   }),
 );

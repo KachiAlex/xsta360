@@ -1,6 +1,16 @@
 import "server-only";
 import { and, eq, inArray, sql, count } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { startOfDayInZone } from "@/lib/timezone";
+
+async function getOrgTimezone(orgId: string): Promise<string> {
+  const [org] = await db
+    .select({ timezone: schema.organizations.timezone })
+    .from(schema.organizations)
+    .where(eq(schema.organizations.id, orgId))
+    .limit(1);
+  return org?.timezone ?? "Africa/Lagos";
+}
 
 export interface SourceStat {
   source: string;
@@ -83,8 +93,7 @@ export interface RepStat {
 
 export async function getRepReport(orgId: string): Promise<RepStat[]> {
   const now = new Date();
-  const sod = new Date(now);
-  sod.setHours(0, 0, 0, 0);
+  const sod = startOfDayInZone(await getOrgTimezone(orgId));
 
   const members = await db
     .select({ userId: schema.users.id, name: schema.users.name })

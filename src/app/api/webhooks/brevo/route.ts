@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: Request) {
   // Rate limit: 120 webhook events/min per IP (Brevo batches events)
-  const rl = rateLimit(clientKey(request, "brevo"), 120, 60_000);
+  const rl = await rateLimit(clientKey(request, "brevo"), 120, 60_000);
   if (!rl.allowed) {
     return new Response("Too Many Requests", {
       status: 429,

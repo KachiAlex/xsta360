@@ -104,7 +104,7 @@ export async function signup(
   // Rate limit: 5 signups per IP per hour.
   const h = await headers();
   const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  const rl = rateLimit(`signup:${ip}`, 5, 60 * 60 * 1000);
+  const rl = await rateLimit(`signup:${ip}`, 5, 60 * 60 * 1000);
   if (!rl.allowed) {
     return { errors: { _: ["Too many signup attempts. Try again later."] } };
   }
@@ -298,7 +298,7 @@ export async function signin(
   // Rate limit: 10 login attempts per IP per 15 minutes.
   const h = await headers();
   const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  const rl = rateLimit(`signin:${ip}`, 10, 15 * 60 * 1000);
+  const rl = await rateLimit(`signin:${ip}`, 10, 15 * 60 * 1000);
   if (!rl.allowed) {
     return { message: "Too many login attempts. Try again in a few minutes." };
   }
@@ -393,7 +393,7 @@ export async function requestPasswordReset(
   // Rate limit: 5 reset requests per IP per hour.
   const h = await headers();
   const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  const rl = rateLimit(`reset:${ip}`, 5, 60 * 60 * 1000);
+  const rl = await rateLimit(`reset:${ip}`, 5, 60 * 60 * 1000);
   if (!rl.allowed) {
     return { message: "Too many reset requests. Try again later." };
   }

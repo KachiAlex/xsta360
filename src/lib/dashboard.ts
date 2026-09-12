@@ -1,6 +1,7 @@
 import "server-only";
 import { and, asc, desc, eq, gte, lte, lt, sql, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { startOfDayInZone, endOfDayInZone } from "@/lib/timezone";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -68,6 +69,15 @@ function daysBetween(from: Date, to: Date): number {
   return Math.max(0, Math.floor((to.getTime() - from.getTime()) / 86_400_000));
 }
 
+async function getOrgTimezone(orgId: string): Promise<string> {
+  const [org] = await db
+    .select({ timezone: schema.organizations.timezone })
+    .from(schema.organizations)
+    .where(eq(schema.organizations.id, orgId))
+    .limit(1);
+  return org?.timezone ?? "Africa/Lagos";
+}
+
 // ---------------------------------------------------------------------------
 // Get all assigned leads grouped by urgency bucket
 // ---------------------------------------------------------------------------
@@ -79,8 +89,9 @@ export async function getPulseLeads(orgId: string, userId: string, categoryId?: 
   quiet: PulseLead[];
 }> {
   const now = new Date();
-  const sod = startOfDay(now);
-  const eod = endOfDay(now);
+  const tz = await getOrgTimezone(orgId);
+  const sod = startOfDayInZone(tz);
+  const eod = endOfDayInZone(tz);
   const sevenDaysAhead = new Date(now.getTime() + 7 * 86_400_000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000);
 
@@ -408,9 +419,10 @@ export async function getLeadTimeline(orgId: string, leadId: string): Promise<Ti
 
 export async function getDashboardStats(orgId: string, userId: string): Promise<DashboardStats> {
   const now = new Date();
-  const sod = startOfDay(now);
-  const eod = endOfDay(now);
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000);
+  const tz = await getOrgTimezone(orgId);
+  const sod = startOfDayInZone(tz);
+  const eod = endOfDayInZone(tz);
+  const sevenDaysAgo = new Date(sod.getTime() - 7 * 86_400_000);
 
   const [leadsToday] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -449,21 +461,6 @@ export async function getDashboardStats(orgId: string, userId: string): Promise<
     );
 
   // Win rate over last 7 days.
-  const wonStageRows = await db
-    .select({ id: schema.pipelineStages.id })
-    .from(schema.pipelineStages)
-    .where(
-      and(eq(schema.pipelineStages.orgId, orgId), eq(schema.pipelineStages.kind, "won")),
-    );
-  const lostStageRows = await db
-    .select({ id: schema.pipelineStages.id })
-    .from(schema.pipelineStages)
-    .where(
-      and(eq(schema.pipelineStages.orgId, orgId), eq(schema.pipelineStages.kind, "lost")),
-    );
-  const wonStageIds = wonStageRows.map((s) => s.id);
-  const lostStageIds = lostStageRows.map((s) => s.id);
-
   const [wonCount] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(schema.leads)
@@ -471,8 +468,7 @@ export async function getDashboardStats(orgId: string, userId: string): Promise<
       and(
         eq(schema.leads.orgId, orgId),
         eq(schema.leads.assigneeId, userId),
-        ...(wonStageIds.length > 0 ? [inArray(schema.leads.stageId, wonStageIds)] : [sql`false`]),
-        gte(schema.leads.updatedAt, sevenDaysAgo),
+        gte(schema.leads.wonAt, sevenDaysAgo),
       ),
     );
 
@@ -483,8 +479,7 @@ export async function getDashboardStats(orgId: string, userId: string): Promise<
       and(
         eq(schema.leads.orgId, orgId),
         eq(schema.leads.assigneeId, userId),
-        ...(lostStageIds.length > 0 ? [inArray(schema.leads.stageId, lostStageIds)] : [sql`false`]),
-        gte(schema.leads.updatedAt, sevenDaysAgo),
+        gte(schema.leads.lostAt, sevenDaysAgo),
       ),
     );
 
@@ -521,8 +516,9 @@ export async function getUpcomingReminders(orgId: string, userId: string): Promi
   upcoming: ReminderRow[];
 }> {
   const now = new Date();
-  const sod = startOfDay(now);
-  const eod = endOfDay(now);
+  const tz = await getOrgTimezone(orgId);
+  const sod = startOfDayInZone(tz);
+  const eod = endOfDayInZone(tz);
   const fourteenDaysAhead = new Date(now.getTime() + 14 * 86_400_000);
 
   const reminders = await db

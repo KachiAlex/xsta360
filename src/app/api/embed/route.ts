@@ -20,7 +20,7 @@ export async function OPTIONS() {
 
 const EmbedSchema = z.object({
   token: z.string().min(1),
-  name: z.string().min(1, "Name is required"),
+  name: z.string().min(1, "Name is required").trim().max(200),
   email: z.string().email().nullish().or(z.literal("")),
   phone: z.string().nullish().or(z.literal("")),
   company: z.string().nullish().or(z.literal("")),
@@ -31,7 +31,7 @@ const EmbedSchema = z.object({
 
 export async function POST(request: Request) {
   // Rate limit: 20 submissions per IP per minute.
-  const rl = rateLimit(clientKey(request, "embed"), 20, 60_000);
+  const rl = await rateLimit(clientKey(request, "embed"), 20, 60_000);
   if (!rl.allowed) {
     return Response.json(
       { ok: false, error: "Too many submissions. Try again later." },

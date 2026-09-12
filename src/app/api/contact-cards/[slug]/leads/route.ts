@@ -5,7 +5,7 @@ import { submitCardLead, CardLeadError } from "@/lib/contact-cards";
 export const dynamic = "force-dynamic";
 
 const CardLeadSchema = z.object({
-  name: z.string().min(1, "Name is required").trim(),
+  name: z.string().min(1, "Name is required").trim().max(200),
   email: z.string().email("Enter a valid email").trim().toLowerCase(),
   phone: z.string().min(1, "Phone is required").trim(),
   company: z.string().trim().optional().or(z.literal("")),

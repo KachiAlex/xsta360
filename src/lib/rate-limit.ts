@@ -1,22 +1,5 @@
-/**
- * Simple in-memory rate limiter for public endpoints.
- * Per-process (per-container) sliding window — good enough for a single
- * instance. For multi-instance deployments, swap to Redis/Upstash.
- */
-
-type Bucket = { count: number; resetAt: number };
-
-const buckets = new Map<string, Bucket>();
-
-// Periodically purge expired buckets so the map doesn't grow forever.
-let lastSweep = Date.now();
-function sweep(now: number) {
-  if (now - lastSweep < 60_000) return;
-  lastSweep = now;
-  for (const [key, b] of buckets) {
-    if (b.resetAt <= now) buckets.delete(key);
-  }
-}
+import { sql } from "drizzle-orm";
+import { db, schema } from "@/db";
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -24,26 +7,47 @@ export interface RateLimitResult {
   retryAfterSeconds: number;
 }
 
-export function rateLimit(key: string, limit: number, windowMs: number): RateLimitResult {
+/**
+ * DB-backed rate limiter. Uses an upsert to atomically increment or reset
+ * the bucket. Multi-instance safe.
+ */
+export async function rateLimit(
+  key: string,
+  limit: number,
+  windowMs: number,
+): Promise<RateLimitResult> {
   const now = Date.now();
-  sweep(now);
+  const resetAt = new Date(now + windowMs);
 
-  const bucket = buckets.get(key);
-  if (!bucket || bucket.resetAt <= now) {
-    buckets.set(key, { count: 1, resetAt: now + windowMs });
-    return { allowed: true, remaining: limit - 1, retryAfterSeconds: 0 };
-  }
+  // Atomic upsert: insert or update the bucket.
+  const [row] = await db
+    .insert(schema.rateLimitBuckets)
+    .values({ key, count: 1, resetAt })
+    .onConflictDoUpdate({
+      target: schema.rateLimitBuckets.key,
+      set: {
+        count: sql`CASE WHEN ${schema.rateLimitBuckets.resetAt} <= ${new Date(now)} THEN 1 ELSE ${schema.rateLimitBuckets.count} + 1 END`,
+        resetAt: sql`CASE WHEN ${schema.rateLimitBuckets.resetAt} <= ${new Date(now)} THEN ${resetAt} ELSE ${schema.rateLimitBuckets.resetAt} END`,
+      },
+    })
+    .returning({ count: schema.rateLimitBuckets.count, resetAt: schema.rateLimitBuckets.resetAt });
 
-  if (bucket.count >= limit) {
+  const currentCount = row?.count ?? 1;
+  const bucketResetAt = row?.resetAt ?? resetAt;
+
+  if (currentCount > limit) {
     return {
       allowed: false,
       remaining: 0,
-      retryAfterSeconds: Math.ceil((bucket.resetAt - now) / 1000),
+      retryAfterSeconds: Math.ceil((bucketResetAt.getTime() - now) / 1000),
     };
   }
 
-  bucket.count++;
-  return { allowed: true, remaining: limit - bucket.count, retryAfterSeconds: 0 };
+  return {
+    allowed: true,
+    remaining: limit - currentCount,
+    retryAfterSeconds: 0,
+  };
 }
 
 /** Extract a client identifier from the request (IP or fallback). */

@@ -177,6 +177,23 @@ export async function GET(request: Request) {
     try {
       const { memberCount, amount: amountNaira } = await orgMonthlyAmount(sub.orgId, sub.basePrice, sub.perSeat);
       const reference = generateReference("xsta_trial");
+
+      // Check if this reference was already processed.
+      const [existing] = await db
+        .select({ id: schema.processedReferences.id })
+        .from(schema.processedReferences)
+        .where(
+          and(
+            eq(schema.processedReferences.orgId, sub.orgId),
+            eq(schema.processedReferences.reference, reference),
+          ),
+        )
+        .limit(1);
+      if (existing) {
+        results.push({ orgId: sub.orgId, status: "already_processed" });
+        continue;
+      }
+
       const chargeResult = await chargeAuthorization({
         authorizationCode: sub.authCode,
         email: sub.email,
@@ -204,6 +221,18 @@ export async function GET(request: Request) {
             updatedAt: now,
           })
           .where(eq(schema.subscriptions.id, sub.id));
+
+        try {
+          await db.insert(schema.processedReferences).values({
+            orgId: sub.orgId,
+            reference,
+            purpose: "trial_conversion",
+          });
+        } catch {
+          // Race condition — another instance already processed this.
+          results.push({ orgId: sub.orgId, status: "already_processed" });
+          continue;
+        }
 
         await logEvent(sub.orgId, "subscription_updated", {
           meta: { action: "trial_converted", reference, amount: amountNaira },
@@ -275,6 +304,23 @@ export async function GET(request: Request) {
     try {
       const { memberCount, amount: amountNaira } = await orgMonthlyAmount(sub.orgId, sub.basePrice, sub.perSeat);
       const reference = generateReference("xsta_renew");
+
+      // Check if this reference was already processed.
+      const [existing] = await db
+        .select({ id: schema.processedReferences.id })
+        .from(schema.processedReferences)
+        .where(
+          and(
+            eq(schema.processedReferences.orgId, sub.orgId),
+            eq(schema.processedReferences.reference, reference),
+          ),
+        )
+        .limit(1);
+      if (existing) {
+        results.push({ orgId: sub.orgId, status: "already_processed" });
+        continue;
+      }
+
       const chargeResult = await chargeAuthorization({
         authorizationCode: sub.authCode!,
         email: sub.email!,
@@ -303,6 +349,18 @@ export async function GET(request: Request) {
             updatedAt: now,
           })
           .where(eq(schema.subscriptions.id, sub.id));
+
+        try {
+          await db.insert(schema.processedReferences).values({
+            orgId: sub.orgId,
+            reference,
+            purpose: "renewal",
+          });
+        } catch {
+          // Race condition — another instance already processed this.
+          results.push({ orgId: sub.orgId, status: "already_processed" });
+          continue;
+        }
 
         await logEvent(sub.orgId, "subscription_updated", {
           meta: { action: "recurring_charge_success", reference, amount: amountNaira, members: memberCount },

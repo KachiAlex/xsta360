@@ -23,7 +23,7 @@ function isSafeRedirectUrl(urlStr: string): boolean {
  */
 export async function GET(request: Request) {
   // Rate limit: 30 clicks/min per IP
-  const rl = rateLimit(clientKey(request, "click"), 30, 60_000);
+  const rl = await rateLimit(clientKey(request, "click"), 30, 60_000);
   if (!rl.allowed) {
     return new Response("Too Many Requests", {
       status: 429,

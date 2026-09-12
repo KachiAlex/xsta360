@@ -103,6 +103,22 @@ export async function POST(request: Request) {
         const amount = data.amount as number; // in kobo
         const now = new Date();
 
+        if (reference) {
+          const [existing] = await db
+            .select({ id: schema.processedReferences.id })
+            .from(schema.processedReferences)
+            .where(
+              and(
+                eq(schema.processedReferences.orgId, orgId),
+                eq(schema.processedReferences.reference, reference),
+              ),
+            )
+            .limit(1);
+          if (existing) {
+            return NextResponse.json({ received: true, alreadyApplied: true });
+          }
+        }
+
         const [sub] = await db
           .select()
           .from(schema.subscriptions)
@@ -142,6 +158,19 @@ export async function POST(request: Request) {
               updatedAt: now,
             })
             .where(eq(schema.subscriptions.id, sub.id));
+        }
+
+        if (reference) {
+          try {
+            await db.insert(schema.processedReferences).values({
+              orgId,
+              reference,
+              purpose: "subscription",
+            });
+          } catch {
+            // Already processed — race condition handled by unique constraint.
+            return NextResponse.json({ received: true, alreadyApplied: true });
+          }
         }
 
         await logEvent(orgId, "subscription_updated", {

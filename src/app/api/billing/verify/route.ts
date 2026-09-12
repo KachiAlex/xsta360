@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { db, schema } from "@/db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { verifySession, getOrgBilling } from "@/lib/dal";
 import { verifyTransaction } from "@/lib/paystack";
 import { sendReceiptEmail } from "@/lib/email";
@@ -77,6 +77,22 @@ export async function POST(request: Request) {
       .where(eq(schema.subscriptions.orgId, ctx.orgId))
       .limit(1);
 
+    // Idempotency: check if this reference was already processed.
+    const [existing] = await db
+      .select({ id: schema.processedReferences.id })
+      .from(schema.processedReferences)
+      .where(
+        and(
+          eq(schema.processedReferences.orgId, ctx.orgId),
+          eq(schema.processedReferences.reference, reference),
+        ),
+      )
+      .limit(1);
+
+    if (existing) {
+      return NextResponse.json({ success: true, alreadyApplied: true });
+    }
+
     if (existingSub) {
       if (existingSub.lastPaymentReference === reference) {
         return NextResponse.json({ success: true, alreadyApplied: true });
@@ -128,6 +144,17 @@ export async function POST(request: Request) {
         currentPeriodStart: now,
         currentPeriodEnd: periodEnd,
       });
+    }
+
+    try {
+      await db.insert(schema.processedReferences).values({
+        orgId: ctx.orgId,
+        reference,
+        purpose: isPlanUpgrade ? "plan_upgrade" : "subscription",
+      });
+    } catch {
+      // Unique constraint violation — already processed.
+      return NextResponse.json({ success: true, alreadyApplied: true });
     }
 
     await logEvent(ctx.orgId, "subscription_updated", {

@@ -16,7 +16,7 @@ const TRACKING_PIXEL = Buffer.from(
  */
 export async function GET(request: Request) {
   // Rate limit: 60 opens/min per IP (pixels are loaded in bulk by email clients)
-  const rl = rateLimit(clientKey(request, "open"), 60, 60_000);
+  const rl = await rateLimit(clientKey(request, "open"), 60, 60_000);
   if (!rl.allowed) {
     return new Response(TRACKING_PIXEL, {
       status: 429,
