@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { verifySession, can, getOrgBilling, getPlanMaxMembers } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
@@ -31,7 +31,10 @@ const TokenSchema = z.string().min(10);
 
 const appUrl = () => (process.env.APP_URL || "").replace(/\/$/, "");
 
-async function adminCount(tx: typeof db, orgId: string) {
+// Accepts either the db client or a transaction.
+type DbOrTx = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function adminCount(tx: DbOrTx, orgId: string) {
   const [{ value }] = await tx
     .select({ value: count() })
     .from(schema.memberships)
@@ -169,15 +172,19 @@ export async function acceptInvite(
   }
 
   await db.transaction(async (tx) => {
+    // Atomically claim the invitation — prevents double-accept.
+    const [updated] = await tx
+      .update(schema.invitations)
+      .set({ acceptedAt: new Date() })
+      .where(and(eq(schema.invitations.id, invite.id), isNull(schema.invitations.acceptedAt)))
+      .returning();
+    if (!updated) throw new Error("Invitation already used");
+
     await tx.insert(schema.memberships).values({
       orgId: invite.orgId,
       userId: ctx.userId,
       role: invite.role,
     });
-    await tx
-      .update(schema.invitations)
-      .set({ acceptedAt: new Date() })
-      .where(eq(schema.invitations.id, invite.id));
   });
 
   await logEvent(invite.orgId, "member_joined", { actorId: ctx.userId, meta: { role: invite.role } });
@@ -252,16 +259,25 @@ export async function changeRole(
     if (membership.userId === ctx.userId) {
       return { message: "Admins can't demote themselves" };
     }
-    const admins = await adminCount(db, ctx.orgId);
-    if (membership.role === "admin" && admins <= 1) {
-      return { message: "You need at least one admin in the workspace" };
-    }
   }
 
-  await db
-    .update(schema.memberships)
-    .set({ role: parsed.data.role })
-    .where(and(eq(schema.memberships.id, membership.id), eq(schema.memberships.orgId, ctx.orgId)));
+  // Wrap in transaction to prevent last-admin race condition.
+  try {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(schema.memberships)
+        .set({ role: parsed.data.role })
+        .where(and(eq(schema.memberships.id, membership.id), eq(schema.memberships.orgId, ctx.orgId)));
+
+      // Re-check admin count after the update.
+      if (parsed.data.role !== "admin" && membership.role === "admin") {
+        const admins = await adminCount(tx, ctx.orgId);
+        if (admins === 0) throw new Error("You need at least one admin in the workspace");
+      }
+    });
+  } catch (err) {
+    return { message: err instanceof Error ? err.message : "Failed to change role" };
+  }
 
   await logEvent(ctx.orgId, "role_changed", {
     actorId: ctx.userId,
@@ -303,6 +319,18 @@ export async function removeMember(
       return { message: "You need at least one admin in the workspace" };
     }
   }
+
+  // Clear lead assignments before removing the membership (prevents orphaned assigneeId).
+  await db
+    .update(schema.leads)
+    .set({ assigneeId: null, updatedAt: new Date() })
+    .where(and(eq(schema.leads.orgId, ctx.orgId), eq(schema.leads.assigneeId, membership.userId)));
+
+  // Also clear reminder assignments.
+  await db
+    .update(schema.reminders)
+    .set({ assigneeId: null })
+    .where(and(eq(schema.reminders.orgId, ctx.orgId), eq(schema.reminders.assigneeId, membership.userId)));
 
   await db.delete(schema.memberships).where(and(eq(schema.memberships.id, membership.id), eq(schema.memberships.orgId, ctx.orgId)));
 

@@ -28,6 +28,15 @@ const PROTECTED = ["/dashboard", "/leads", "/pipeline", "/reports", "/settings",
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // If already logged in and hitting /login or /signup, bounce to the app.
+  if (pathname === "/login" || pathname === "/signup") {
+    const token = request.cookies.get(SESSION_COOKIE)?.value;
+    if (await isValidSession(token)) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    return NextResponse.next();
+  }
+
   const isProtected = PROTECTED.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
@@ -35,11 +44,6 @@ export async function proxy(request: NextRequest) {
 
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const hasSession = await isValidSession(token);
-
-  // If already logged in and hitting /login or /signup, bounce to the app.
-  if ((pathname === "/login" || pathname === "/signup") && hasSession) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
 
   if (!hasSession) {
     const loginUrl = new URL("/login", request.url);

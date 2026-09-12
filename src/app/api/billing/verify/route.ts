@@ -78,6 +78,9 @@ export async function POST(request: Request) {
       .limit(1);
 
     if (existingSub) {
+      if (existingSub.lastPaymentReference === reference) {
+        return NextResponse.json({ success: true, alreadyApplied: true });
+      }
       // Extend from max(now, existingPeriodEnd) to not lose early payments.
       const baseDate = existingSub.currentPeriodEnd && existingSub.currentPeriodEnd > now
         ? existingSub.currentPeriodEnd

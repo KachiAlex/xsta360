@@ -90,11 +90,25 @@ export async function getPipelineBoard(orgId: string, categoryId?: string): Prom
     byStage.set(key, arr);
   }
 
-  return stages.map((s) => ({
+  const result = stages.map((s) => ({
     id: s.id,
     name: s.name,
     kind: s.kind,
     position: s.position,
     leads: byStage.get(s.id) ?? [],
   }));
+
+  // Append unassigned leads as a catch-all column.
+  const unassigned = byStage.get("__unassigned") ?? [];
+  if (unassigned.length > 0) {
+    result.push({
+      id: "unassigned",
+      name: "Unassigned",
+      kind: "open",
+      position: 999,
+      leads: unassigned,
+    });
+  }
+
+  return result;
 }

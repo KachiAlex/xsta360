@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import Link from "next/link";
 import { changeStage } from "@/app/actions/leads";
 import type { PipelineColumn } from "@/lib/pipeline";
@@ -21,6 +21,9 @@ export function PipelineBoard({ initialColumns }: { initialColumns: PipelineColu
   const [movingLeadId, setMovingLeadId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
+  const columnsRef = useRef(columns);
+  columnsRef.current = columns;
+
   function onDrop(targetStageId: string) {
     if (!draggedId) return;
     setDragOverCol(null);
@@ -29,6 +32,8 @@ export function PipelineBoard({ initialColumns }: { initialColumns: PipelineColu
   }
 
   function moveLead(leadId: string, targetStageId: string) {
+    const snapshot = columnsRef.current; // capture pre-move state
+
     // Optimistic move.
     setColumns((prev) => {
       let moved: PipelineColumn["leads"][number] | null = null;
@@ -46,7 +51,7 @@ export function PipelineBoard({ initialColumns }: { initialColumns: PipelineColu
       );
     });
 
-    // Persist via server action — revert on failure.
+    // Persist via server action — revert to snapshot on failure.
     const fd = new FormData();
     fd.set("leadId", leadId);
     fd.set("toStageId", targetStageId);
@@ -54,10 +59,10 @@ export function PipelineBoard({ initialColumns }: { initialColumns: PipelineColu
       try {
         const result = await changeStage({}, fd);
         if (result && (result.message || result.errors)) {
-          setColumns(initialColumns);
+          setColumns(snapshot);
         }
       } catch {
-        setColumns(initialColumns);
+        setColumns(snapshot);
       }
     });
   }

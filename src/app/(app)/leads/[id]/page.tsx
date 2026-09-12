@@ -129,9 +129,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                           {entry.type === "remark" && entry.body && (
                             <p className="text-sm mt-1">{entry.body}</p>
                           )}
-                          {entry.type === "lead_lost" && Boolean(entry.meta?.lostReasonText) && (
+                          {entry.type === "lead_lost" && Boolean(entry.meta?.lostReasonText || entry.meta?.lostReasonLabel) && (
                             <p className="text-sm mt-1 text-stamp">
-                              {"Reason: " + String(entry.meta?.lostReasonText)}
+                              {"Reason: " + String(entry.meta?.lostReasonText ?? entry.meta?.lostReasonLabel ?? "")}
                             </p>
                           )}
                           {entry.type === "stage_changed" && Boolean(entry.meta?.toStageName) && (
@@ -191,10 +191,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     <dd className="whitespace-pre-wrap">{lead.notes}</dd>
                   </div>
                 )}
-                {lead.lostReasonText && (
+                {(lead.lostReasonText || lead.lostReasonLabel) && (
                   <div>
                     <dt className="font-mono text-[11px] uppercase tracking-wider text-stamp">Lost reason</dt>
-                    <dd className="text-stamp">{lead.lostReasonText}</dd>
+                    <dd className="text-stamp">{lead.lostReasonText || lead.lostReasonLabel}</dd>
                   </div>
                 )}
               </dl>

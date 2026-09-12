@@ -16,7 +16,9 @@ export interface LeadDetail {
   stageKind: string | null;
   assigneeId: string | null;
   assigneeName: string | null;
+  lostReasonId: string | null;
   lostReasonText: string | null;
+  lostReasonLabel: string | null;
   value: string | null;
   expectedCloseDate: Date | null;
   customFields: Record<string, unknown>;
@@ -48,7 +50,9 @@ export async function getLeadDetail(orgId: string, leadId: string): Promise<Lead
       stageKind: schema.pipelineStages.kind,
       assigneeId: schema.leads.assigneeId,
       assigneeName: schema.users.name,
+      lostReasonId: schema.leads.lostReasonId,
       lostReasonText: schema.leads.lostReasonText,
+      lostReasonLabel: schema.lostReasons.label,
       value: schema.leads.value,
       expectedCloseDate: schema.leads.expectedCloseDate,
       customFields: schema.leads.customFields,
@@ -58,6 +62,7 @@ export async function getLeadDetail(orgId: string, leadId: string): Promise<Lead
     .from(schema.leads)
     .leftJoin(schema.pipelineStages, eq(schema.leads.stageId, schema.pipelineStages.id))
     .leftJoin(schema.users, eq(schema.leads.assigneeId, schema.users.id))
+    .leftJoin(schema.lostReasons, eq(schema.leads.lostReasonId, schema.lostReasons.id))
     .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, orgId)))
     .limit(1);
   return row ? { ...row, customFields: row.customFields as Record<string, unknown> } : null;

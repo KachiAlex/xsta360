@@ -89,6 +89,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   }
 
+  // Only process charge.success for subscription extension.
+  if (event.event !== "charge.success") {
+    return NextResponse.json({ received: true, skipped: true });
+  }
+
   // Process event — return 500 on DB failures so Paystack retries.
   try {
     switch (eventType) {

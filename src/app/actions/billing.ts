@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { verifySession, getOrgBilling } from "@/lib/dal";
+import { verifySession, getOrgBilling, getPlanMaxMembers } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
 import {
   chargeAuthorization,
@@ -82,6 +82,10 @@ export async function changePlan(
 
   // Compute current and new monthly amounts.
   const billing = await getOrgBilling(ctx.orgId);
+  const maxMembers = getPlanMaxMembers({ ...billing.plan, planId: plan.id, planName: plan.name, features: plan.features as Record<string, unknown> });
+  if (maxMembers !== null && billing.memberCount > maxMembers) {
+    return { message: `This plan supports at most ${maxMembers} members. Remove ${billing.memberCount - maxMembers} member(s) first or choose a higher plan.`, error: true };
+  }
   const currentMonthly = billing.monthlyAmount;
   const additionalSeats = Math.max(0, billing.memberCount - 1);
   const newMonthly = plan.basePriceMonthly + additionalSeats * plan.perSeatPriceMonthly;

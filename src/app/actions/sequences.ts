@@ -25,17 +25,17 @@ export type SequenceFormState = {
 
 const CreateSequenceSchema = z.object({
   name: z.string().min(1, "Name is required").trim(),
-  description: z.string().trim().optional().or(z.literal("")),
+  description: z.string().trim().nullish().or(z.literal("")),
 });
 
 const CreateStepSchema = z.object({
   sequenceId: z.string().uuid(),
   delayDays: z.string().or(z.number()),
   action: z.string().default("reminder"),
-  subject: z.string().trim().optional().or(z.literal("")),
+  subject: z.string().trim().nullish().or(z.literal("")),
   body: z.string().min(1, "Content is required"),
-  senderName: z.string().trim().optional().or(z.literal("")),
-  attachments: z.string().optional().or(z.literal("")),
+  senderName: z.string().trim().nullish().or(z.literal("")),
+  attachments: z.string().nullish().or(z.literal("")),
 });
 
 const EnrollSchema = z.object({
@@ -294,10 +294,10 @@ const UpdateStepSchema = z.object({
   stepId: z.string().uuid(),
   delayDays: z.string().or(z.number()),
   action: z.string().default("reminder"),
-  subject: z.string().trim().optional().or(z.literal("")),
+  subject: z.string().trim().nullish().or(z.literal("")),
   body: z.string().min(1, "Content is required"),
-  senderName: z.string().trim().optional().or(z.literal("")),
-  attachments: z.string().optional().or(z.literal("")),
+  senderName: z.string().trim().nullish().or(z.literal("")),
+  attachments: z.string().nullish().or(z.literal("")),
 });
 
 export async function updateSequenceStep(
@@ -374,8 +374,8 @@ export async function updateSequenceStep(
 
 const UpdateSequenceSettingsSchema = z.object({
   sequenceId: z.string().uuid(),
-  sendWindowStart: z.string().trim().optional().or(z.literal("")),
-  sendWindowEnd: z.string().trim().optional().or(z.literal("")),
+  sendWindowStart: z.string().trim().nullish().or(z.literal("")),
+  sendWindowEnd: z.string().trim().nullish().or(z.literal("")),
   skipWeekends: z.string().optional(),
   timezone: z.string().trim().default("Africa/Lagos"),
 });
@@ -544,7 +544,7 @@ export async function resumeEnrollment(
 
 const CreateTemplateSchema = z.object({
   name: z.string().min(1, "Name is required").trim(),
-  description: z.string().trim().optional().or(z.literal("")),
+  description: z.string().trim().nullish().or(z.literal("")),
   category: z.string().trim().default("general"),
   definition: z.string(),
 });
@@ -659,7 +659,7 @@ export async function createSequenceFromTemplate(
         sequenceId: seq.id,
         orgId: ctx.orgId,
         position: i,
-        delayDays: s.delayDays || 0,
+        delayDays: parseInt(String(s.delayDays)) || 0,
         action: s.action || "reminder",
         subject: s.subject || null,
         body: s.body || "",

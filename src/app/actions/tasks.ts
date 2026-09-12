@@ -13,25 +13,25 @@ import { logEvent } from "@/lib/audit";
 
 const CreateTodoSchema = z.object({
   title: z.string().min(1, "Title is required").trim(),
-  description: z.string().trim().optional().or(z.literal("")),
+  description: z.string().trim().nullish().or(z.literal("")),
   priority: z.enum(["low", "medium", "high"]).default("medium"),
-  dueAt: z.string().optional().or(z.literal("")),
-  leadId: z.string().uuid().optional().or(z.literal("")),
+  dueAt: z.string().nullish().or(z.literal("")),
+  leadId: z.string().uuid().nullish().or(z.literal("")),
 });
 
 const UpdateTodoSchema = z.object({
   id: z.string().uuid(),
   title: z.string().min(1).trim().optional(),
-  description: z.string().trim().optional().or(z.literal("")),
+  description: z.string().trim().nullish().or(z.literal("")),
   priority: z.enum(["low", "medium", "high"]).optional(),
-  dueAt: z.string().optional().or(z.literal("")),
-  leadId: z.string().uuid().optional().or(z.literal("")),
+  dueAt: z.string().nullish().or(z.literal("")),
+  leadId: z.string().uuid().nullish().or(z.literal("")),
 });
 
 const CreateNoteSchema = z.object({
   title: z.string().min(1, "Title is required").trim(),
-  body: z.string().trim().optional().or(z.literal("")),
-  leadId: z.string().uuid().optional().or(z.literal("")),
+  body: z.string().trim().nullish().or(z.literal("")),
+  leadId: z.string().uuid().nullish().or(z.literal("")),
 });
 
 const UpdateNoteSchema = z.object({
@@ -39,7 +39,7 @@ const UpdateNoteSchema = z.object({
   title: z.string().min(1).trim().optional(),
   body: z.string().trim().optional(),
   pinned: z.boolean().optional(),
-  leadId: z.string().uuid().optional().or(z.literal("")),
+  leadId: z.string().uuid().nullish().or(z.literal("")),
 });
 
 export type TaskFormState = {

@@ -40,6 +40,7 @@ export type StageKind = (typeof stageKindEnum.enumValues)[number];
 
 export const reminderStatusEnum = pgEnum("reminder_status", [
   "pending",
+  "processing",
   "sent",
   "failed",
   "completed",
@@ -50,6 +51,7 @@ export type ReminderStatus = (typeof reminderStatusEnum.enumValues)[number];
 export const auditEventTypeEnum = pgEnum("audit_event_type", [
   "lead_created",
   "lead_updated",
+  "lead_deleted",
   "remark_added",
   "activity_logged",
   "reminder_set",
@@ -515,6 +517,8 @@ export const reminders = pgTable(
     sequenceStepId: uuid("sequence_step_id").references(() => sequenceSteps.id, { onDelete: "set null" }),
     // Channel hint from the sequence step: "reminder" | "email" | "whatsapp".
     channel: text("channel"),
+    // When the reminder was successfully sent.
+    sentAt: timestamp("sent_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

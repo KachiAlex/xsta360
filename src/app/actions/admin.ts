@@ -19,7 +19,7 @@ const PlanSchema = z.object({
   perSeatPriceMonthly: z.coerce.number().int().min(0),
   trialDays: z.coerce.number().int().min(0),
   currency: z.string().min(1).max(3).default("₦"),
-  features: z.string().optional(),
+  features: z.string().nullish(),
   position: z.coerce.number().int().min(0).default(0),
 });
 
@@ -175,7 +175,7 @@ export async function manageSubscription(
     if (!planId) {
       // No plan selected — remove subscription if it exists.
       if (subId) {
-        await db.delete(schema.subscriptions).where(eq(schema.subscriptions.id, subId));
+        await db.delete(schema.subscriptions).where(and(eq(schema.subscriptions.id, subId), eq(schema.subscriptions.orgId, orgId)));
         await logEvent(null, "subscription_canceled", {
           actorId: ctx.userId,
           meta: { orgId },
@@ -190,19 +190,31 @@ export async function manageSubscription(
       await db
         .update(schema.subscriptions)
         .set({ planId, status, updatedAt: new Date() })
-        .where(eq(schema.subscriptions.id, subId));
+        .where(and(eq(schema.subscriptions.id, subId), eq(schema.subscriptions.orgId, orgId)));
       await logEvent(null, "subscription_updated", {
         actorId: ctx.userId,
         meta: { orgId, planId, status },
       });
     } else {
-      // Create new subscription.
-      await db.insert(schema.subscriptions).values({
-        orgId,
-        planId,
-        status,
-        trialEndsAt: status === "trialing" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : null,
-      });
+      // Check if a subscription already exists for this org.
+      const [existing] = await db
+        .select({ id: schema.subscriptions.id })
+        .from(schema.subscriptions)
+        .where(eq(schema.subscriptions.orgId, orgId))
+        .limit(1);
+      if (existing) {
+        await db
+          .update(schema.subscriptions)
+          .set({ planId, status, updatedAt: new Date() })
+          .where(and(eq(schema.subscriptions.id, existing.id), eq(schema.subscriptions.orgId, orgId)));
+      } else {
+        await db.insert(schema.subscriptions).values({
+          orgId,
+          planId,
+          status,
+          trialEndsAt: status === "trialing" ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : null,
+        });
+      }
       await logEvent(null, "subscription_created", {
         actorId: ctx.userId,
         meta: { orgId, planId, status },
@@ -252,7 +264,7 @@ export async function extendTrial(
     await db
       .update(schema.subscriptions)
       .set({ trialEndsAt: newEnd, currentPeriodEnd: newEnd, updatedAt: new Date() })
-      .where(eq(schema.subscriptions.id, subId));
+      .where(and(eq(schema.subscriptions.id, subId), eq(schema.subscriptions.orgId, orgId)));
 
     await logEvent(null, "subscription_updated", {
       actorId: ctx.userId,
@@ -296,7 +308,7 @@ export async function markSubscriptionPaid(
         graceEndsAt: null,
         updatedAt: now,
       })
-      .where(eq(schema.subscriptions.id, subId));
+      .where(and(eq(schema.subscriptions.id, subId), eq(schema.subscriptions.orgId, orgId)));
 
     await logEvent(null, "subscription_updated", {
       actorId: ctx.userId,

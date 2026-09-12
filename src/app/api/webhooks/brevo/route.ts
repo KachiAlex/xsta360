@@ -1,5 +1,5 @@
 import { db, schema } from "@/db";
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { rateLimit, clientKey } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -57,18 +57,24 @@ export async function POST(request: Request) {
     try {
       // Find the "sent" event by looking up the lead by email
       if (email) {
-        const [lead] = await db
+        const leads = await db
           .select({ id: schema.leads.id, orgId: schema.leads.orgId })
           .from(schema.leads)
           .where(eq(schema.leads.email, email))
-          .limit(1);
+          .limit(10);
 
-        if (lead) {
+        for (const lead of leads) {
           // Find the most recent "sent" event for this lead
           const [sentEvent] = await db
             .select()
             .from(schema.sequenceEmailEvents)
-            .where(eq(schema.sequenceEmailEvents.leadId, lead.id))
+            .where(
+              and(
+                eq(schema.sequenceEmailEvents.leadId, lead.id),
+                eq(schema.sequenceEmailEvents.eventType, "sent"),
+              ),
+            )
+            .orderBy(desc(schema.sequenceEmailEvents.createdAt))
             .limit(1);
 
           if (sentEvent) {
@@ -116,6 +122,7 @@ export async function POST(request: Request) {
             }
 
             results.push(`processed:${mappedType}`);
+            break;
           }
         }
       }

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { verifySession, type AuthContext } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
@@ -18,10 +18,10 @@ const LogActivitySchema = z.object({
   type: ActivityTypeEnum,
   body: z.string().min(1, "Describe what happened").trim(),
   // ISO string or datetime-local string; defaults to now if empty.
-  occurredAt: z.string().optional().or(z.literal("")),
+  occurredAt: z.string().nullish().or(z.literal("")),
   // Optional next follow-up reminder.
-  reminderDue: z.string().optional().or(z.literal("")),
-  reminderType: z.string().optional().or(z.literal("")),
+  reminderDue: z.string().nullish().or(z.literal("")),
+  reminderType: z.string().nullish().or(z.literal("")),
 });
 
 export type ActivityFormState = {
@@ -182,6 +182,9 @@ export async function snoozeReminderFromDashboard(
   if (isNaN(dueAt.getTime())) {
     return { errors: { dueAt: ["Pick a valid date"] } };
   }
+  if (dueAt <= new Date()) {
+    return { errors: { dueAt: ["Pick a future date"] } };
+  }
 
   const [reminder] = await db
     .update(schema.reminders)
@@ -190,6 +193,7 @@ export async function snoozeReminderFromDashboard(
       and(
         eq(schema.reminders.id, reminderId),
         eq(schema.reminders.orgId, ctx.orgId),
+        inArray(schema.reminders.status, ["pending", "snoozed"]),
       ),
     )
     .returning();
@@ -213,7 +217,7 @@ export async function snoozeReminderFromDashboard(
 const SetReminderSchema = z.object({
   leadId: z.string().uuid(),
   dueAt: z.string().min(1, "Pick a date"),
-  note: z.string().trim().optional().or(z.literal("")),
+  note: z.string().trim().nullish().or(z.literal("")),
 });
 
 export async function setReminder(

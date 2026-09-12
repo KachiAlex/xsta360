@@ -1,4 +1,5 @@
 import { and, eq, lte } from "drizzle-orm";
+import { timingSafeEqual } from "crypto";
 import { db, schema } from "@/db";
 import { sendReminderEmail } from "@/lib/email";
 import { sendWhatsAppMessage, formatReminderMessage } from "@/lib/whatsapp";
@@ -17,7 +18,11 @@ export async function GET(request: Request) {
     return new Response("CRON_SECRET not configured", { status: 500 });
   }
   const expected = `Bearer ${cronSecret}`;
-  if (authHeader !== expected) {
+  if (
+    typeof authHeader !== "string" ||
+    authHeader.length !== expected.length ||
+    !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))
+  ) {
     return new Response("Unauthorized", { status: 401 });
   }
 
@@ -57,11 +62,27 @@ export async function GET(request: Request) {
     )
     .limit(100);
 
+  // Atomically claim due reminders by setting status to "processing".
+  const claimed: typeof due = [];
+  for (const r of due) {
+    const [updated] = await db
+      .update(schema.reminders)
+      .set({ status: "processing", updatedAt: now })
+      .where(
+        and(
+          eq(schema.reminders.id, r.reminderId),
+          eq(schema.reminders.status, "pending"),
+        ),
+      )
+      .returning();
+    if (updated) claimed.push(r);
+  }
+
   let sent = 0;
   let failed = 0;
   let whatsappSent = 0;
 
-  for (const r of due) {
+  for (const r of claimed) {
     let didSend = false;
 
     // Try WhatsApp first if configured and lead has a phone.
@@ -100,7 +121,7 @@ export async function GET(request: Request) {
           const message = err instanceof Error ? err.message : "Unknown error";
           await db
             .update(schema.reminders)
-            .set({ status: "failed", lastError: message, updatedAt: now })
+            .set({ status: "pending", lastError: message, updatedAt: now })
             .where(eq(schema.reminders.id, r.reminderId));
           failed++;
           continue;
@@ -111,20 +132,20 @@ export async function GET(request: Request) {
     if (didSend) {
       await db
         .update(schema.reminders)
-        .set({ status: "sent", lastError: null, updatedAt: now })
+        .set({ status: "sent", sentAt: now, lastError: null, updatedAt: now })
         .where(eq(schema.reminders.id, r.reminderId));
       sent++;
     } else if (!r.assigneeEmail) {
       await db
         .update(schema.reminders)
-        .set({ status: "failed", lastError: "Assignee has no email and WhatsApp not configured", updatedAt: now })
+        .set({ status: "pending", lastError: "Assignee has no email and WhatsApp not configured", updatedAt: now })
         .where(eq(schema.reminders.id, r.reminderId));
       failed++;
     }
   }
 
   // Recompute lead scores for all orgs with due reminders.
-  const orgIds = [...new Set(due.map((r) => r.orgId))];
+  const orgIds = [...new Set(claimed.map((r) => r.orgId))];
   let scoresUpdated = 0;
   for (const orgId of orgIds) {
     scoresUpdated += await recomputeOrgLeadScores(orgId);
@@ -134,7 +155,7 @@ export async function GET(request: Request) {
     sent,
     failed,
     whatsappSent,
-    checked: due.length,
+    checked: claimed.length,
     sequenceSteps: seqResult.processed,
     sequenceEmails: seqResult.emailsSent,
     sequenceWhatsapp: seqResult.whatsappSent,

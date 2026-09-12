@@ -1,4 +1,5 @@
 import { and, eq, lte } from "drizzle-orm";
+import { timingSafeEqual } from "crypto";
 import { db, schema } from "@/db";
 import { sendDigestEmail } from "@/lib/email";
 import { getDashboardStats } from "@/lib/dashboard";
@@ -20,7 +21,11 @@ export async function GET(request: Request) {
     return new Response("CRON_SECRET not configured", { status: 500 });
   }
   const expected = `Bearer ${cronSecret}`;
-  if (authHeader !== expected) {
+  if (
+    typeof authHeader !== "string" ||
+    authHeader.length !== expected.length ||
+    !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))
+  ) {
     return new Response("Unauthorized", { status: 401 });
   }
 

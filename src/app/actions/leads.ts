@@ -44,7 +44,7 @@ const RemarkSchema = z.object({
   leadId: z.string().uuid(),
   body: z.string().min(1, "Remark cannot be empty").trim(),
   // Optional: set a follow-up reminder alongside the remark.
-  reminderDue: z.string().optional().or(z.literal("")),
+  reminderDue: z.string().nullish().or(z.literal("")),
 });
 
 const StageChangeSchema = z.object({
@@ -183,15 +183,29 @@ export async function createLead(
     if (isNaN(closeDate.getTime())) closeDate = null;
   }
 
+  // Validate assignee belongs to the org (prevent cross-tenant assignment).
+  let finalAssigneeId = ctx.userId;
+  if (assigneeId) {
+    const { getOrgMembers } = await import("@/lib/queries");
+    const members = await getOrgMembers(ctx.orgId);
+    if (!members.some((m) => m.userId === assigneeId)) {
+      return { message: "Assignee is not a member of this organization" };
+    }
+    finalAssigneeId = assigneeId;
+  }
+
+  // Sanitize numeric value (strip currency symbols, commas).
+  const numericValue = value ? value.replace(/[^\d.-]/g, "") || null : null;
+
   const [lead] = await db
     .insert(schema.leads)
     .values({
       ...rest,
       orgId: ctx.orgId,
-      assigneeId: assigneeId || ctx.userId,
+      assigneeId: finalAssigneeId,
       stageId: stage?.id,
       createdById: ctx.userId,
-      value: value || null,
+      value: numericValue,
       expectedCloseDate: closeDate,
       customFields: parsedCustomFields,
     })
@@ -200,7 +214,7 @@ export async function createLead(
   await logEvent(ctx.orgId, "lead_created", {
     leadId: lead.id,
     actorId: ctx.userId,
-    meta: { source: lead.source, stage: stage?.name, value: value || null },
+    meta: { source: lead.source, stage: stage?.name, value: numericValue },
   });
 
   await notifyAssignee(ctx, lead);
@@ -324,10 +338,12 @@ export async function updateLead(
 
   // Validate stage if provided.
   let newStageId = existing.stageId;
+  let targetStageKind: string | null = null;
   if (stageId) {
     const stage = await loadOrgStage(ctx, stageId);
     if (!stage) return { message: "Stage not found" };
     newStageId = stage.id;
+    targetStageKind = stage.kind;
   }
 
   // Validate assignee if provided.
@@ -360,15 +376,38 @@ export async function updateLead(
 
   const newAssigneeId = assigneeId || null;
 
+  // Sanitize numeric value (strip currency symbols, commas).
+  const numericValue = value ? value.replace(/[^\d.-]/g, "") || null : null;
+
+  // Handle lost-reason logic when stage changes.
+  let lostReasonIdUpdate: string | null = null;
+  let lostReasonTextUpdate: string | null = null;
+  if (targetStageKind === "lost") {
+    if (!existing.lostReasonId && !existing.lostReasonText) {
+      return { errors: { lostReasonText: ["A reason is required when marking a lead lost"] } };
+    }
+    lostReasonIdUpdate = existing.lostReasonId;
+    lostReasonTextUpdate = existing.lostReasonText;
+  } else if (stageId && existing.stageId !== newStageId) {
+    // Moving away from lost — clear reason.
+    lostReasonIdUpdate = null;
+    lostReasonTextUpdate = null;
+  } else {
+    lostReasonIdUpdate = existing.lostReasonId;
+    lostReasonTextUpdate = existing.lostReasonText;
+  }
+
   await db
     .update(schema.leads)
     .set({
       ...rest,
       assigneeId: newAssigneeId,
       stageId: newStageId,
-      value: value || null,
+      value: numericValue,
       expectedCloseDate: closeDate,
       customFields: parsedCustomFields,
+      lostReasonId: lostReasonIdUpdate,
+      lostReasonText: lostReasonTextUpdate,
       updatedAt: new Date(),
     })
     .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, ctx.orgId)));
@@ -499,12 +538,26 @@ export async function changeStage(
     return { errors: { lostReasonText: ["A reason is required when marking a lead lost"] } };
   }
 
+  // Validate lostReasonId exists and belongs to the org.
+  let finalLostReasonId: string | null = null;
+  let lostReasonLabel: string | null = null;
+  if (target.kind === "lost" && lostReasonId) {
+    const [reason] = await db
+      .select({ id: schema.lostReasons.id, label: schema.lostReasons.label })
+      .from(schema.lostReasons)
+      .where(and(eq(schema.lostReasons.id, lostReasonId), eq(schema.lostReasons.orgId, ctx.orgId)))
+      .limit(1);
+    if (!reason) return { message: "Lost reason not found" };
+    finalLostReasonId = reason.id;
+    lostReasonLabel = reason.label;
+  }
+
   await db
     .update(schema.leads)
     .set({
       stageId: target.id,
       updatedAt: new Date(),
-      lostReasonId: target.kind === "lost" ? (lostReasonId || null) : null,
+      lostReasonId: target.kind === "lost" ? finalLostReasonId : null,
       lostReasonText: target.kind === "lost" ? (lostReasonText || null) : null,
     })
     .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, ctx.orgId)))
@@ -518,8 +571,9 @@ export async function changeStage(
       fromStageId: lead.stageId,
       toStageId: target.id,
       toStageName: target.name,
-      lostReasonId: lostReasonId || null,
+      lostReasonId: finalLostReasonId,
       lostReasonText: lostReasonText || null,
+      lostReasonLabel,
     },
   });
 
@@ -560,6 +614,9 @@ export async function snoozeReminder(
   if (isNaN(dueAt.getTime())) {
     return { errors: { dueAt: ["Invalid date"] } };
   }
+  if (dueAt <= new Date()) {
+    return { errors: { dueAt: ["Pick a future date"] } };
+  }
 
   const [reminder] = await db
     .update(schema.reminders)
@@ -568,6 +625,7 @@ export async function snoozeReminder(
       and(
         eq(schema.reminders.id, parsed.data.reminderId),
         eq(schema.reminders.orgId, ctx.orgId),
+        inArray(schema.reminders.status, ["pending", "snoozed"]),
       ),
     )
     .returning();
@@ -688,12 +746,23 @@ export async function assignLead(
 
   const leadId = String(formData.get("leadId"));
   if (!z.string().uuid().safeParse(leadId).success) return { message: "Invalid ID" };
-  const assigneeId = String(formData.get("assigneeId") || "");
+  const assigneeIdRaw = String(formData.get("assigneeId") || "");
+  if (assigneeIdRaw && !z.string().uuid().safeParse(assigneeIdRaw).success) {
+    return { message: "Invalid assignee ID" };
+  }
 
   const lead = await loadOrgLead(ctx, leadId);
   if (!lead) return { message: "Lead not found" };
 
-  const newAssigneeId = assigneeId || null;
+  // Validate assignee belongs to the org.
+  const newAssigneeId = assigneeIdRaw || null;
+  if (newAssigneeId) {
+    const { getOrgMembers } = await import("@/lib/queries");
+    const members = await getOrgMembers(ctx.orgId);
+    if (!members.some((m) => m.userId === newAssigneeId)) {
+      return { message: "Assignee is not a member of this organization" };
+    }
+  }
 
   await db
     .update(schema.leads)
@@ -707,7 +776,7 @@ export async function assignLead(
   await logEvent(ctx.orgId, "lead_assigned", {
     leadId,
     actorId: ctx.userId,
-    meta: { fromAssigneeId: lead.assigneeId, toAssigneeId: assigneeId || null },
+    meta: { fromAssigneeId: lead.assigneeId, toAssigneeId: newAssigneeId },
   });
 
   revalidatePath("/dashboard");
@@ -825,7 +894,7 @@ export async function bulkDeleteLeads(
   await db.delete(schema.leads).where(and(eq(schema.leads.orgId, ctx.orgId), inArray(schema.leads.id, validIds)));
 
   for (const id of validIds) {
-    await logEvent(ctx.orgId, "lead_updated", { leadId: id, actorId: ctx.userId, meta: { action: "deleted" } });
+    await logEvent(ctx.orgId, "lead_deleted", { leadId: id, actorId: ctx.userId, meta: { action: "deleted" } });
   }
 
   revalidatePath("/dashboard");
@@ -847,6 +916,16 @@ export async function bulkAssignLeads(
   const leadIds = leadIdsRaw.split(",").map((s) => s.trim()).filter(Boolean);
   const assigneeId = String(formData.get("assigneeId") ?? "").trim() || null;
   if (leadIds.length === 0) return { message: "No leads selected" };
+
+  // Validate assignee UUID + org membership.
+  if (assigneeId) {
+    if (!z.string().uuid().safeParse(assigneeId).success) return { message: "Invalid assignee ID" };
+    const { getOrgMembers } = await import("@/lib/queries");
+    const members = await getOrgMembers(ctx.orgId);
+    if (!members.some((m) => m.userId === assigneeId)) {
+      return { message: "Assignee is not a member of this organization" };
+    }
+  }
 
   // Verify all leads belong to this org.
   const leads = await db
@@ -904,11 +983,18 @@ export async function bulkMoveStage(
 
   await db
     .update(schema.leads)
-    .set({ stageId, updatedAt: new Date() })
+    .set({
+      stageId,
+      updatedAt: new Date(),
+      // Clear lost reason when moving away from a lost stage.
+      lostReasonId: stage.kind === "lost" ? undefined : null,
+      lostReasonText: stage.kind === "lost" ? undefined : null,
+    })
     .where(and(eq(schema.leads.orgId, ctx.orgId), inArray(schema.leads.id, validIds)));
 
+  const eventType = stage.kind === "won" ? "lead_won" : stage.kind === "lost" ? "lead_lost" : "stage_changed";
   for (const id of validIds) {
-    await logEvent(ctx.orgId, "stage_changed", { leadId: id, actorId: ctx.userId, meta: { toStage: stage.name } });
+    await logEvent(ctx.orgId, eventType, { leadId: id, actorId: ctx.userId, meta: { toStage: stage.name } });
   }
 
   revalidatePath("/dashboard");

@@ -237,6 +237,14 @@ export async function signupAndJoin(
 
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // Check plan seat limit before creating the user.
+    const { getOrgBilling, getPlanMaxMembers } = await import("@/lib/dal");
+    const billing = await getOrgBilling(invite.orgId);
+    const maxMembers = getPlanMaxMembers(billing.plan);
+    if (maxMembers !== null && billing.memberCount >= maxMembers) {
+      return { message: "This workspace is full. Ask an admin to upgrade the plan." };
+    }
+
     const [created] = await db.transaction(async (tx) => {
       const [user] = await tx
         .insert(schema.users)
@@ -312,18 +320,17 @@ export async function signin(
       .from(schema.users)
       .where(eq(schema.users.email, email))
       .limit(1);
-    if (!user) {
+
+    // Always run bcrypt.compare to prevent email-enumeration timing attacks.
+    const DUMMY_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+    const ok = (await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH)) && !!user;
+    if (!user || !ok) {
       return { message: "Invalid email or password" };
     }
 
     // Suspended users cannot sign in.
     if (user.suspendedAt) {
       return { message: "Your account has been suspended. Contact support." };
-    }
-
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) {
-      return { message: "Invalid email or password" };
     }
 
     // Superadmins go straight to the admin panel — they don't need an org membership.
@@ -480,12 +487,13 @@ export async function resetPassword(
         .update(schema.users)
         .set({ passwordHash, tokenVersion: sql`${schema.users.tokenVersion} + 1`, updatedAt: new Date() })
         .where(eq(schema.users.id, user.id));
+      // Invalidate ALL unused reset tokens for this email, not just the consumed one.
       await tx
         .update(schema.passwordResetTokens)
         .set({ usedAt: new Date() })
         .where(
           and(
-            eq(schema.passwordResetTokens.id, record.id),
+            eq(schema.passwordResetTokens.email, record.email),
             isNull(schema.passwordResetTokens.usedAt),
           ),
         );

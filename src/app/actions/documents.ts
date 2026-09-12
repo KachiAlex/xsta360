@@ -51,7 +51,7 @@ export async function uploadLeadDocument(
       filename,
       url,
       mimeType: mimeType || null,
-      size: sizeStr ? parseInt(sizeStr) : null,
+      size: sizeStr ? (Number.isFinite(Number(sizeStr)) ? Number(sizeStr) : null) : null,
     })
     .returning();
 

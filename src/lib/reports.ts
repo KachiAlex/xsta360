@@ -22,7 +22,7 @@ export async function getSourceReport(orgId: string): Promise<SourceStat[]> {
   const rows = await db
     .select({
       source: schema.leads.source,
-      total: count(),
+      total: sql<number>`count(*)::int`,
     })
     .from(schema.leads)
     .where(eq(schema.leads.orgId, orgId))
@@ -31,7 +31,7 @@ export async function getSourceReport(orgId: string): Promise<SourceStat[]> {
   // Count won + lost per source.
   const wonRows = wonIds.length
     ? await db
-        .select({ source: schema.leads.source, won: count() })
+        .select({ source: schema.leads.source, won: sql<number>`count(*)::int` })
         .from(schema.leads)
         .where(
           and(
@@ -43,7 +43,7 @@ export async function getSourceReport(orgId: string): Promise<SourceStat[]> {
     : [];
   const lostRows = lostIds.length
     ? await db
-        .select({ source: schema.leads.source, lost: count() })
+        .select({ source: schema.leads.source, lost: sql<number>`count(*)::int` })
         .from(schema.leads)
         .where(
           and(
@@ -82,6 +82,10 @@ export interface RepStat {
 }
 
 export async function getRepReport(orgId: string): Promise<RepStat[]> {
+  const now = new Date();
+  const sod = new Date(now);
+  sod.setHours(0, 0, 0, 0);
+
   const members = await db
     .select({ userId: schema.users.id, name: schema.users.name })
     .from(schema.memberships)
@@ -101,7 +105,7 @@ export async function getRepReport(orgId: string): Promise<RepStat[]> {
   const totalRows = await db
     .select({
       assigneeId: schema.leads.assigneeId,
-      total: count(),
+      total: sql<number>`count(*)::int`,
     })
     .from(schema.leads)
     .where(eq(schema.leads.orgId, orgId))
@@ -112,14 +116,14 @@ export async function getRepReport(orgId: string): Promise<RepStat[]> {
   const overdueRows = await db
     .select({
       assigneeId: schema.reminders.assigneeId,
-      overdue: count(),
+      overdue: sql<number>`count(*)::int`,
     })
     .from(schema.reminders)
     .where(
       and(
         eq(schema.reminders.orgId, orgId),
         eq(schema.reminders.status, "pending"),
-        sql`${schema.reminders.dueAt} < NOW()`,
+        sql`${schema.reminders.dueAt} < ${sod}`,
       ),
     )
     .groupBy(schema.reminders.assigneeId);
@@ -130,7 +134,7 @@ export async function getRepReport(orgId: string): Promise<RepStat[]> {
     ? await db
         .select({
           assigneeId: schema.leads.assigneeId,
-          won: count(),
+          won: sql<number>`count(*)::int`,
         })
         .from(schema.leads)
         .where(
@@ -147,7 +151,7 @@ export async function getRepReport(orgId: string): Promise<RepStat[]> {
     ? await db
         .select({
           assigneeId: schema.leads.assigneeId,
-          lost: count(),
+          lost: sql<number>`count(*)::int`,
         })
         .from(schema.leads)
         .where(

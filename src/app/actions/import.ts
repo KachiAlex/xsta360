@@ -16,13 +16,13 @@ export type ImportFormState = {
 };
 
 const RowSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  company: z.string().optional().or(z.literal("")),
-  email: z.string().optional().or(z.literal("")),
-  phone: z.string().optional().or(z.literal("")),
-  source: z.enum(["referral", "social", "ad", "walk_in", "embedded_form", "other"]).optional().or(z.literal("")),
-  campaign: z.string().optional().or(z.literal("")),
-  notes: z.string().optional().or(z.literal("")),
+  name: z.string().trim().min(1, "Name is required"),
+  company: z.string().nullish().or(z.literal("")),
+  email: z.string().nullish().or(z.literal("")),
+  phone: z.string().nullish().or(z.literal("")),
+  source: z.enum(["referral", "social", "ad", "walk_in", "embedded_form", "contact_card_scan", "other"]).nullish().or(z.literal("")),
+  campaign: z.string().nullish().or(z.literal("")),
+  notes: z.string().nullish().or(z.literal("")),
 });
 
 // Accepts a JSON array of row objects (already mapped client-side).

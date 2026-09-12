@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, gte, lte, sql, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, lt, sql, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 
 // ---------------------------------------------------------------------------
@@ -431,7 +431,7 @@ export async function getDashboardStats(orgId: string, userId: string): Promise<
         eq(schema.reminders.orgId, orgId),
         eq(schema.reminders.assigneeId, userId),
         eq(schema.reminders.status, "pending"),
-        lte(schema.reminders.dueAt, sod),
+        lt(schema.reminders.dueAt, sod),
       ),
     );
 

@@ -342,14 +342,22 @@ export async function bulkAssignCategory(
   if (!cat) return { message: "Category not found" };
 
   let assigned = 0;
-  for (const leadId of leadIds) {
+  for (const rawLeadId of leadIds) {
+    if (!z.string().uuid().safeParse(rawLeadId).success) continue;
+    const [lead] = await db
+      .select({ id: schema.leads.id })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.id, rawLeadId), eq(schema.leads.orgId, ctx.orgId)))
+      .limit(1);
+    if (!lead) continue;
+
     // Skip if already assigned.
     const [existing] = await db
       .select()
       .from(schema.leadCategoryAssignments)
       .where(
         and(
-          eq(schema.leadCategoryAssignments.leadId, leadId),
+          eq(schema.leadCategoryAssignments.leadId, rawLeadId),
           eq(schema.leadCategoryAssignments.categoryId, categoryId),
         ),
       )
@@ -357,7 +365,7 @@ export async function bulkAssignCategory(
     if (existing) continue;
 
     await db.insert(schema.leadCategoryAssignments).values({
-      leadId,
+      leadId: rawLeadId,
       categoryId,
       orgId: ctx.orgId,
       assignedBy: ctx.userId,
@@ -365,7 +373,7 @@ export async function bulkAssignCategory(
 
     // Auto-enroll in sequence.
     if (cat.linkedSequenceId) {
-      await enrollLeadInSequence(ctx.orgId, leadId, cat.linkedSequenceId, ctx.userId).catch(() => {});
+      await enrollLeadInSequence(ctx.orgId, rawLeadId, cat.linkedSequenceId, ctx.userId).catch(() => {});
     }
 
     // Auto-assign rep.
@@ -373,14 +381,14 @@ export async function bulkAssignCategory(
       await db
         .update(schema.leads)
         .set({ assigneeId: cat.defaultAssigneeId, updatedAt: new Date() })
-        .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, ctx.orgId)));
+        .where(and(eq(schema.leads.id, rawLeadId), eq(schema.leads.orgId, ctx.orgId)));
     }
 
     // Auto-schedule follow-up.
     if (cat.followUpCadenceDays) {
       const dueAt = new Date(Date.now() + cat.followUpCadenceDays * 86_400_000);
       await db.insert(schema.reminders).values({
-        leadId,
+        leadId: rawLeadId,
         orgId: ctx.orgId,
         assigneeId: cat.defaultAssigneeId,
         dueAt,

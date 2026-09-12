@@ -9,7 +9,7 @@ import { verifySession, type AuthContext } from "@/lib/dal";
 import { getContactCardStats } from "@/lib/contact-cards";
 
 const ManageCardSchema = z.object({
-  id: z.string().uuid().optional().or(z.literal("")),
+  id: z.string().uuid().nullish().or(z.literal("")),
   displayName: z.string().min(1, "Display name is required").trim(),
   title: z.string().trim().nullish().or(z.literal("")),
   role: z.string().trim().nullish().or(z.literal("")),
@@ -29,7 +29,7 @@ const ManageCardSchema = z.object({
       (val) => !val || val.startsWith("https://") || val.startsWith("data:image/"),
       "Photo URL must be https: or a data: image URI",
     ),
-  socialLinks: z.string().trim().optional().or(z.literal("")),
+  socialLinks: z.string().trim().nullish().or(z.literal("")),
 });
 
 export type ContactCardFormState = {

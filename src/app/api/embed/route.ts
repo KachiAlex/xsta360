@@ -21,12 +21,12 @@ export async function OPTIONS() {
 const EmbedSchema = z.object({
   token: z.string().min(1),
   name: z.string().min(1, "Name is required"),
-  email: z.string().email().optional().or(z.literal("")),
-  phone: z.string().optional().or(z.literal("")),
-  company: z.string().optional().or(z.literal("")),
-  campaign: z.string().optional().or(z.literal("")),
+  email: z.string().email().nullish().or(z.literal("")),
+  phone: z.string().nullish().or(z.literal("")),
+  company: z.string().nullish().or(z.literal("")),
+  campaign: z.string().nullish().or(z.literal("")),
   // Honeypot — must be empty for a human submission.
-  website: z.string().optional().or(z.literal("")),
+  website: z.string().nullish().or(z.literal("")),
 });
 
 export async function POST(request: Request) {
@@ -39,11 +39,12 @@ export async function POST(request: Request) {
     );
   }
 
+  const text = await request.text();
   let body: unknown;
   try {
-    body = await request.json();
+    body = JSON.parse(text);
   } catch {
-    body = Object.fromEntries(new URLSearchParams(await request.text()));
+    body = Object.fromEntries(new URLSearchParams(text));
   }
 
   const parsed = EmbedSchema.safeParse(body);
@@ -79,6 +80,13 @@ export async function POST(request: Request) {
     .orderBy(schema.pipelineStages.position)
     .limit(1);
 
+  if (!firstStage) {
+    return Response.json(
+      { ok: false, error: "This workspace is not accepting submissions right now." },
+      { status: 400, headers: { "Access-Control-Allow-Origin": "*" } },
+    );
+  }
+
   const [lead] = await db
     .insert(schema.leads)
     .values({
@@ -89,7 +97,7 @@ export async function POST(request: Request) {
       company: company || null,
       campaign: campaign || null,
       source: "embedded_form",
-      stageId: firstStage?.id,
+      stageId: firstStage.id,
     })
     .returning();
 

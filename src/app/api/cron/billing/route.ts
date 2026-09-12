@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { db, schema } from "@/db";
 import { eq, and, asc } from "drizzle-orm";
 import { count } from "drizzle-orm";
@@ -67,7 +68,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
   }
   const expected = `Bearer ${cronSecret}`;
-  if (authHeader !== expected) {
+  if (
+    typeof authHeader !== "string" ||
+    authHeader.length !== expected.length ||
+    !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))
+  ) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -213,6 +218,9 @@ export async function GET(request: Request) {
         }
 
         results.push({ orgId: sub.orgId, status: "trial_charged", amount: amountNaira });
+      } else if (chargeResult.status === "pending") {
+        // Don't change subscription status — wait for the charge.success/charge.failed webhook.
+        continue;
       } else {
         await db
           .update(schema.subscriptions)
@@ -309,6 +317,9 @@ export async function GET(request: Request) {
         }
 
         results.push({ orgId: sub.orgId, status: "charged", amount: amountNaira });
+      } else if (chargeResult.status === "pending") {
+        // Don't change subscription status — wait for the charge.success/charge.failed webhook.
+        continue;
       } else {
         // Charge failed — past_due with a grace window, then dunning email.
         const graceEndsAt = new Date(now.getTime() + GRACE_DAYS * DAY_MS);

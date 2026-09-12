@@ -45,8 +45,7 @@ export async function sendMail(
   },
 ): Promise<void> {
   if (!smtpUser || !smtpPass) {
-    console.log(`[email/dev] To: ${to} | Subject: ${subject}${options?.senderName ? ` | From: ${options.senderName}` : ""}${options?.attachments?.length ? ` | ${options.attachments.length} attachment(s)` : ""}`);
-    return;
+    throw new Error("SMTP not configured — email not sent");
   }
 
   // Build the From header: "Sender Name <noreply@...>" or default.
