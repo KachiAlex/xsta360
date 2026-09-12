@@ -407,7 +407,6 @@ export async function getLeadTimeline(orgId: string, leadId: string): Promise<Ti
 // ---------------------------------------------------------------------------
 
 export async function getDashboardStats(orgId: string, userId: string): Promise<DashboardStats> {
-  const now = new Date();
   const tz = await getOrgTimezone(orgId);
   const sod = startOfDayInZone(tz);
   const eod = endOfDayInZone(tz);

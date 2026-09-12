@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { verifySession } from "@/lib/dal";
 import { getLeadTimeline } from "@/lib/dashboard";
 
@@ -9,8 +10,8 @@ export async function GET(request: NextRequest) {
   }
 
   const leadId = request.nextUrl.searchParams.get("leadId");
-  if (!leadId) {
-    return NextResponse.json({ error: "leadId required" }, { status: 400 });
+  if (!leadId || !z.string().uuid().safeParse(leadId).success) {
+    return NextResponse.json({ error: "Invalid lead ID" }, { status: 400 });
   }
 
   try {

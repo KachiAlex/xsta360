@@ -131,7 +131,7 @@ export async function verifyTransaction(
   reference: string,
 ): Promise<VerifyTransactionResponse> {
   return paystackFetch<VerifyTransactionResponse>(
-    `/transaction/verify/${reference}`,
+    `/transaction/verify/${encodeURIComponent(reference)}`,
   );
 }
 

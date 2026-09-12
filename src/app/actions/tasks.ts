@@ -285,6 +285,7 @@ export async function updateNote(
       ...(title !== undefined && { title }),
       ...(body !== undefined && { body }),
       ...(pinned !== undefined && { pinned }),
+      leadId: leadId ?? null,
       updatedAt: new Date(),
     })
     .where(
@@ -316,6 +317,7 @@ export async function deleteNote(
       and(eq(schema.notes.id, noteId), eq(schema.notes.orgId, ctx.orgId), eq(schema.notes.userId, ctx.userId)),
     )
     .limit(1);
+  if (!note) return { message: "Note not found" };
 
   await db
     .delete(schema.notes)
@@ -361,7 +363,7 @@ export async function toggleNotePin(
   await db
     .update(schema.notes)
     .set({ pinned: !note.pinned, updatedAt: new Date() })
-    .where(and(eq(schema.notes.id, noteId), eq(schema.notes.orgId, ctx.orgId)));
+    .where(and(eq(schema.notes.id, noteId), eq(schema.notes.orgId, ctx.orgId), eq(schema.notes.userId, ctx.userId)));
 
   revalidatePath("/tasks");
   revalidatePath("/dashboard");

@@ -203,6 +203,7 @@ export async function GET(request: Request) {
             lastPaymentReference: reference,
             currentPeriodStart: now,
             currentPeriodEnd: periodEnd,
+            graceEndsAt: null,
             updatedAt: now,
           })
           .where(eq(schema.subscriptions.id, sub.id));
@@ -213,10 +214,13 @@ export async function GET(request: Request) {
             reference,
             purpose: "trial_conversion",
           });
-        } catch {
-          // Race condition — another instance already processed this.
-          results.push({ orgId: sub.orgId, status: "already_processed" });
-          continue;
+        } catch (err) {
+          const isUniqueViolation = err instanceof Error && "code" in err && (err as { code: string }).code === "23505";
+          if (isUniqueViolation) {
+            results.push({ orgId: sub.orgId, status: "already_processed" });
+            continue;
+          }
+          throw err;
         }
 
         await logEvent(sub.orgId, "subscription_updated", {
@@ -331,10 +335,13 @@ export async function GET(request: Request) {
             reference,
             purpose: "renewal",
           });
-        } catch {
-          // Race condition — another instance already processed this.
-          results.push({ orgId: sub.orgId, status: "already_processed" });
-          continue;
+        } catch (err) {
+          const isUniqueViolation = err instanceof Error && "code" in err && (err as { code: string }).code === "23505";
+          if (isUniqueViolation) {
+            results.push({ orgId: sub.orgId, status: "already_processed" });
+            continue;
+          }
+          throw err;
         }
 
         await logEvent(sub.orgId, "subscription_updated", {

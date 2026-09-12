@@ -124,6 +124,7 @@ export async function POST(request: Request) {
               lastPaymentReference: reference,
               currentPeriodStart: now,
               currentPeriodEnd: periodEnd,
+              graceEndsAt: null,
               updatedAt: now,
             })
             .where(eq(schema.subscriptions.id, existingSub.id));
@@ -162,8 +163,12 @@ export async function POST(request: Request) {
       });
     } catch (err) {
       // Unique constraint violation means a concurrent request already applied it.
-      if (err instanceof Error && err.message.includes("unique")) {
+      const isUniqueViolation = err instanceof Error && "code" in err && (err as { code: string }).code === "23505";
+      if (isUniqueViolation) {
         return NextResponse.json({ success: true, alreadyApplied: true });
+      }
+      if (err instanceof Error && err.message === "No plan configured") {
+        return NextResponse.json({ error: "No plan configured" }, { status: 500 });
       }
       throw err;
     }

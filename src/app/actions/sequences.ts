@@ -30,8 +30,8 @@ const CreateSequenceSchema = z.object({
 
 const CreateStepSchema = z.object({
   sequenceId: z.string().uuid(),
-  delayDays: z.string().or(z.number()),
-  action: z.string().default("reminder"),
+  delayDays: z.coerce.number().int().min(0).default(0),
+  action: z.enum(["reminder", "email", "whatsapp"]).default("reminder"),
   subject: z.string().trim().nullish().or(z.literal("")),
   body: z.string().min(1, "Content is required"),
   senderName: z.string().trim().nullish().or(z.literal("")),
@@ -187,7 +187,7 @@ export async function addSequenceStep(
     sequenceId: parsed.data.sequenceId,
     orgId: ctx.orgId,
     position: nextPos,
-    delayDays: parseInt(String(parsed.data.delayDays)) || 0,
+    delayDays: parsed.data.delayDays,
     action: parsed.data.action,
     subject: parsed.data.subject || null,
     body: parsed.data.body,
@@ -292,8 +292,8 @@ export async function unenrollLead(
 
 const UpdateStepSchema = z.object({
   stepId: z.string().uuid(),
-  delayDays: z.string().or(z.number()),
-  action: z.string().default("reminder"),
+  delayDays: z.coerce.number().int().min(0).default(0),
+  action: z.enum(["reminder", "email", "whatsapp"]).default("reminder"),
   subject: z.string().trim().nullish().or(z.literal("")),
   body: z.string().min(1, "Content is required"),
   senderName: z.string().trim().nullish().or(z.literal("")),
@@ -354,7 +354,7 @@ export async function updateSequenceStep(
   await db
     .update(schema.sequenceSteps)
     .set({
-      delayDays: parseInt(String(parsed.data.delayDays)) || 0,
+      delayDays: parsed.data.delayDays,
       action: parsed.data.action,
       subject: parsed.data.subject || null,
       body: parsed.data.body,

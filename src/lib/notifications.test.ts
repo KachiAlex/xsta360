@@ -116,7 +116,7 @@ describe("notifications lib", () => {
   });
 
   it("markAsRead calls db.update", async () => {
-    await markAsRead("notif-1", "user-1");
+    await markAsRead("org-1", "notif-1", "user-1");
     expect(true).toBe(true);
   });
 

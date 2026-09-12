@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, not } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { verifySession, can, type AuthContext } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
@@ -586,6 +586,11 @@ export async function changeStage(
     lostReasonLabel = reason.label;
   }
 
+  // No-op if the lead is already in the target stage (prevents overwriting wonAt/lostAt).
+  if (lead.stageId === target.id) {
+    return { ok: true };
+  }
+
   await db
     .update(schema.leads)
     .set({
@@ -1029,11 +1034,11 @@ export async function bulkMoveStage(
     validatedLostReasonId = reason.id;
   }
 
-  // Verify leads belong to org.
+  // Verify leads belong to org (exclude leads already in the target stage to avoid overwriting wonAt/lostAt).
   const leads = await db
     .select({ id: schema.leads.id })
     .from(schema.leads)
-    .where(and(eq(schema.leads.orgId, ctx.orgId), inArray(schema.leads.id, leadIds)));
+    .where(and(eq(schema.leads.orgId, ctx.orgId), inArray(schema.leads.id, leadIds), not(eq(schema.leads.stageId, stageId))));
   const validIds = leads.map((l) => l.id);
   if (validIds.length === 0) return { message: "No valid leads found" };
 

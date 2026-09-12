@@ -114,12 +114,13 @@ export async function getUnreadCount(orgId: string, userId: string): Promise<num
 /**
  * Mark a notification as read.
  */
-export async function markAsRead(notificationId: string, userId: string) {
+export async function markAsRead(orgId: string, notificationId: string, userId: string) {
   await db
     .update(schema.notifications)
     .set({ readAt: new Date() })
     .where(
       and(
+        eq(schema.notifications.orgId, orgId),
         eq(schema.notifications.id, notificationId),
         // Ensure the user owns this notification (or it's a broadcast).
         or(

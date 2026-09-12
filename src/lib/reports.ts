@@ -92,7 +92,6 @@ export interface RepStat {
 }
 
 export async function getRepReport(orgId: string): Promise<RepStat[]> {
-  const now = new Date();
   const sod = startOfDayInZone(await getOrgTimezone(orgId));
 
   const members = await db

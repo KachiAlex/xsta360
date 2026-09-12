@@ -3,6 +3,7 @@ import { and, eq, gte, sql } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 import { db, schema } from "@/db";
 import { sendCardLeadEmail, sendCardRescanEmail } from "@/lib/email";
+import { startOfDayInZone } from "@/lib/timezone";
 
 export interface PublicContactCard {
   id: string;
@@ -232,10 +233,13 @@ export class CardLeadError extends Error {
   }
 }
 
-function startOfDay(d = new Date()): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
+async function getOrgTimezone(orgId: string): Promise<string> {
+  const [org] = await db
+    .select({ timezone: schema.organizations.timezone })
+    .from(schema.organizations)
+    .where(eq(schema.organizations.id, orgId))
+    .limit(1);
+  return org?.timezone ?? "Africa/Lagos";
 }
 
 /** Daily stats for the current user's contact card. */
@@ -248,7 +252,7 @@ export async function getMyCardStats(userId: string, orgId: string) {
 
   if (!card) return null;
 
-  const today = startOfDay();
+  const today = startOfDayInZone(await getOrgTimezone(orgId));
   const [{ viewCount }] = await db
     .select({ viewCount: sql<number>`count(*)::int` })
     .from(schema.cardViews)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { z } from "zod";
 import { db, schema } from "@/db";
 import { verifySession } from "@/lib/dal";
 import { getPresignedUploadUrl, buildPublicUrl } from "@/lib/r2";
@@ -45,8 +46,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "File too large. Max 100 MB." }, { status: 413 });
   }
 
-  // If leadId is provided, verify the lead belongs to the org.
+  // If leadId is provided, validate it as a UUID and verify the lead belongs to the org.
   if (leadId) {
+    if (!z.string().uuid().safeParse(leadId).success) {
+      return NextResponse.json({ error: "Invalid lead ID" }, { status: 400 });
+    }
     const { eq, and } = await import("drizzle-orm");
     const [lead] = await db
       .select({ id: schema.leads.id })

@@ -103,74 +103,80 @@ export async function POST(request: Request) {
         const amount = data.amount as number; // in kobo
         const now = new Date();
 
-        if (reference) {
-          const [existing] = await db
-            .select({ id: schema.processedReferences.id })
-            .from(schema.processedReferences)
-            .where(
-              and(
-                eq(schema.processedReferences.orgId, orgId),
-                eq(schema.processedReferences.reference, reference),
-              ),
-            )
-            .limit(1);
-          if (existing) {
+        try {
+          await db.transaction(async (tx) => {
+            if (reference) {
+              const [existing] = await tx
+                .select({ id: schema.processedReferences.id })
+                .from(schema.processedReferences)
+                .where(
+                  and(
+                    eq(schema.processedReferences.orgId, orgId),
+                    eq(schema.processedReferences.reference, reference),
+                  ),
+                )
+                .limit(1);
+              if (existing) {
+                return NextResponse.json({ received: true, alreadyApplied: true });
+              }
+            }
+
+            const [sub] = await tx
+              .select()
+              .from(schema.subscriptions)
+              .where(eq(schema.subscriptions.orgId, orgId))
+              .limit(1);
+
+            // Dedup: skip if this reference was already processed.
+            if (sub && sub.lastPaymentReference === reference) {
+              return NextResponse.json({ received: true, deduped: true });
+            }
+
+            // Check if this is a plan-upgrade checkout.
+            const txnPlanId = metadata.planId as string | undefined;
+            const isPlanUpgrade = metadata.isPlanUpgrade === true;
+
+            if (sub) {
+              // Extend from max(now, existingPeriodEnd) to not lose early payments.
+              const baseDate = sub.currentPeriodEnd && sub.currentPeriodEnd > now
+                ? sub.currentPeriodEnd
+                : now;
+              const extendedPeriodEnd = addMonths(baseDate, 1);
+
+              await tx
+                .update(schema.subscriptions)
+                .set({
+                  status: "active",
+                  // Apply plan change if this was an upgrade checkout.
+                  ...(isPlanUpgrade && txnPlanId ? { planId: txnPlanId } : {}),
+                  paystackCustomerCode: customer?.customer_code as string,
+                  paystackAuthorizationCode: authorization?.authorization_code as string,
+                  paystackCustomerEmail: customer?.email as string,
+                  lastPaymentAt: now,
+                  lastPaymentAmount: amount,
+                  lastPaymentReference: reference,
+                  currentPeriodStart: now,
+                  currentPeriodEnd: extendedPeriodEnd,
+                  graceEndsAt: null,
+                  updatedAt: now,
+                })
+                .where(eq(schema.subscriptions.id, sub.id));
+            }
+
+            if (reference) {
+              await tx.insert(schema.processedReferences).values({
+                orgId,
+                reference,
+                purpose: "subscription",
+              });
+            }
+          });
+        } catch (err) {
+          const isUniqueViolation = err instanceof Error && "code" in err && (err as { code: string }).code === "23505";
+          if (isUniqueViolation) {
             return NextResponse.json({ received: true, alreadyApplied: true });
           }
-        }
-
-        const [sub] = await db
-          .select()
-          .from(schema.subscriptions)
-          .where(eq(schema.subscriptions.orgId, orgId))
-          .limit(1);
-
-        // Dedup: skip if this reference was already processed.
-        if (sub && sub.lastPaymentReference === reference) {
-          return NextResponse.json({ received: true, deduped: true });
-        }
-
-        // Check if this is a plan-upgrade checkout.
-        const txnPlanId = metadata.planId as string | undefined;
-        const isPlanUpgrade = metadata.isPlanUpgrade === true;
-
-        if (sub) {
-          // Extend from max(now, existingPeriodEnd) to not lose early payments.
-          const baseDate = sub.currentPeriodEnd && sub.currentPeriodEnd > now
-            ? sub.currentPeriodEnd
-            : now;
-          const extendedPeriodEnd = addMonths(baseDate, 1);
-
-          await db
-            .update(schema.subscriptions)
-            .set({
-              status: "active",
-              // Apply plan change if this was an upgrade checkout.
-              ...(isPlanUpgrade && txnPlanId ? { planId: txnPlanId } : {}),
-              paystackCustomerCode: customer?.customer_code as string,
-              paystackAuthorizationCode: authorization?.authorization_code as string,
-              paystackCustomerEmail: customer?.email as string,
-              lastPaymentAt: now,
-              lastPaymentAmount: amount,
-              lastPaymentReference: reference,
-              currentPeriodStart: now,
-              currentPeriodEnd: extendedPeriodEnd,
-              updatedAt: now,
-            })
-            .where(eq(schema.subscriptions.id, sub.id));
-        }
-
-        if (reference) {
-          try {
-            await db.insert(schema.processedReferences).values({
-              orgId,
-              reference,
-              purpose: "subscription",
-            });
-          } catch {
-            // Already processed — race condition handled by unique constraint.
-            return NextResponse.json({ received: true, alreadyApplied: true });
-          }
+          throw err;
         }
 
         await logEvent(orgId, "subscription_updated", {
@@ -211,7 +217,7 @@ export async function POST(request: Request) {
             currency: billing.plan.currency,
             reference,
             memberCount: billing.memberCount,
-            nextBillingDate: sub?.currentPeriodEnd ?? addMonths(now, 1),
+            nextBillingDate: addMonths(now, 1),
             appUrl: process.env.APP_URL ?? "http://localhost:3000",
           }).catch((e) => console.error("Webhook receipt email failed:", e));
         }
