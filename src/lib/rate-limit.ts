@@ -18,6 +18,9 @@ export async function rateLimit(
 ): Promise<RateLimitResult> {
   const now = Date.now();
   const resetAt = new Date(now + windowMs);
+  // Convert Dates to ISO strings — the postgres driver can't serialize Date objects.
+  const nowISO = new Date(now).toISOString();
+  const resetAtISO = resetAt.toISOString();
 
   // Atomic upsert: insert or update the bucket.
   const [row] = await db
@@ -26,8 +29,8 @@ export async function rateLimit(
     .onConflictDoUpdate({
       target: schema.rateLimitBuckets.key,
       set: {
-        count: sql`CASE WHEN ${schema.rateLimitBuckets.resetAt} <= ${new Date(now)} THEN 1 ELSE ${schema.rateLimitBuckets.count} + 1 END`,
-        resetAt: sql`CASE WHEN ${schema.rateLimitBuckets.resetAt} <= ${new Date(now)} THEN ${resetAt} ELSE ${schema.rateLimitBuckets.resetAt} END`,
+        count: sql`CASE WHEN ${schema.rateLimitBuckets.resetAt} <= ${nowISO}::timestamptz THEN 1 ELSE ${schema.rateLimitBuckets.count} + 1 END`,
+        resetAt: sql`CASE WHEN ${schema.rateLimitBuckets.resetAt} <= ${nowISO}::timestamptz THEN ${resetAtISO}::timestamptz ELSE ${schema.rateLimitBuckets.resetAt} END`,
       },
     })
     .returning({ count: schema.rateLimitBuckets.count, resetAt: schema.rateLimitBuckets.resetAt });
