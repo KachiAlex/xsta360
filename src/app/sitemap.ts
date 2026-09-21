@@ -24,6 +24,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "yearly" as const,
       priority: 0.5,
     },
+    {
+      url: `${siteUrl}/privacy`,
+      lastModified: now,
+      changeFrequency: "yearly" as const,
+      priority: 0.2,
+    },
+    {
+      url: `${siteUrl}/termsofservice`,
+      lastModified: now,
+      changeFrequency: "yearly" as const,
+      priority: 0.2,
+    },
   ];
 
   return staticRoutes;
