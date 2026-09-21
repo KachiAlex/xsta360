@@ -240,3 +240,89 @@ export async function updateOrgSettings(
   revalidatePath("/dashboard");
   return { ok: true };
 }
+
+// ---------------------------------------------------------------------------
+// WhatsApp Embedded Signup — one-click connect via Meta's Facebook Login for
+// Business. The client collects an auth code + waba_id + phone_number_id;
+// we exchange the code for a WABA access token and store it on the org.
+// ---------------------------------------------------------------------------
+
+export async function connectWhatsAppEmbedded(
+  code: string,
+  phoneNumberId: string,
+  wabaId: string,
+): Promise<OrgFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+  if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
+
+  const appId = process.env.NEXT_PUBLIC_META_APP_ID;
+  const appSecret = process.env.META_APP_SECRET;
+  if (!appId || !appSecret) {
+    return { message: "WhatsApp integration is not configured on this server" };
+  }
+  if (!code || !phoneNumberId || !wabaId) {
+    return { message: "Incomplete WhatsApp setup — missing code, phone number, or account" };
+  }
+
+  // Exchange the short-lived auth code for a WABA access token.
+  const tokenRes = await fetch(
+    `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${encodeURIComponent(appId)}&client_secret=${encodeURIComponent(appSecret)}&code=${encodeURIComponent(code)}`,
+  );
+  const tokenData = await tokenRes.json().catch(() => ({}));
+  if (!tokenRes.ok || !tokenData?.access_token) {
+    return { message: "Could not finish WhatsApp connection. Please try again." };
+  }
+  const accessToken = tokenData.access_token as string;
+
+  // Subscribe our app to the WABA's webhook events (best-effort).
+  try {
+    await fetch(`https://graph.facebook.com/v21.0/${wabaId}/subscribed_apps`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    // Non-fatal — messaging still works without webhook subscription.
+  }
+
+  await db
+    .update(schema.organizations)
+    .set({
+      whatsappConfig: {
+        enabled: true,
+        phoneNumberId,
+        wabaId,
+        apiKey: accessToken,
+        connectedVia: "embedded_signup",
+      } as any,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.organizations.id, ctx.orgId));
+
+  await logEvent(ctx.orgId, "org_settings_updated", {
+    actorId: ctx.userId,
+    meta: { whatsappConnected: true, via: "embedded_signup", wabaId },
+  });
+
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function disconnectWhatsApp(): Promise<OrgFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+  if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
+
+  await db
+    .update(schema.organizations)
+    .set({ whatsappConfig: { enabled: false } as any, updatedAt: new Date() })
+    .where(eq(schema.organizations.id, ctx.orgId));
+
+  await logEvent(ctx.orgId, "org_settings_updated", {
+    actorId: ctx.userId,
+    meta: { whatsappConnected: false },
+  });
+
+  revalidatePath("/settings");
+  return { ok: true };
+}

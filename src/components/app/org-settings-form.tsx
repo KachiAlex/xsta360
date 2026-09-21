@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { updateOrgSettings, type OrgFormState } from "@/app/actions/org";
 import { Button } from "@/components/ui/button";
 import { Label, Input, Textarea } from "@/components/ui/field";
+import { WhatsAppConnect, embeddedSignupConfigured } from "@/components/app/whatsapp-connect";
 
 interface CustomFieldDef {
   key: string;
@@ -58,19 +59,39 @@ export function OrgSettingsForm({
       <div className="border-t border-rule pt-4">
         <div className="flex items-center gap-2 mb-3">
           <span className="block text-xs font-semibold mb-1.5 text-ink-soft">WhatsApp Business</span>
-          <label className="flex items-center gap-1.5 text-xs ml-auto">
-            <input
-              type="checkbox"
-              checked={whatsappEnabled}
-              onChange={(e) => setWhatsappEnabled(e.target.checked)}
-            />
-            Enable
-          </label>
+          {whatsappConfig?.enabled && whatsappConfig?.phoneNumberId && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-won">
+              <span className="inline-block h-2 w-2 rounded-full bg-won" />
+              Connected
+            </span>
+          )}
         </div>
-        <input type="hidden" name="whatsappEnabled" value={whatsappEnabled ? "true" : "false"} />
-        {whatsappEnabled && (
-          <>
-            <details className="mb-3 rounded border border-rule bg-paper/60 text-xs">
+
+        {/* One-click embedded signup — primary path when Meta app env is configured. */}
+        {embeddedSignupConfigured && (
+          <div className="mb-3">
+            <WhatsAppConnect
+              connected={Boolean(whatsappConfig?.enabled && whatsappConfig?.phoneNumberId)}
+              phoneNumberId={whatsappConfig?.phoneNumberId}
+            />
+          </div>
+        )}
+
+        {/* Manual setup — fallback when embedded signup isn't configured or fails. */}
+        <details className="rounded border border-rule bg-paper/60 text-xs">
+          <summary className="cursor-pointer px-3 py-2 font-medium text-ink-soft select-none">
+            {embeddedSignupConfigured ? "Manual setup (advanced)" : "Set up WhatsApp Business"}
+          </summary>
+          <div className="px-3 pb-3 pt-2 border-t border-rule space-y-3">
+            <label className="flex items-center gap-1.5 text-xs">
+              <input
+                type="checkbox"
+                checked={whatsappEnabled}
+                onChange={(e) => setWhatsappEnabled(e.target.checked)}
+              />
+              Enable WhatsApp
+            </label>
+            <details className="rounded border border-rule bg-paper text-xs">
               <summary className="cursor-pointer px-3 py-2 font-medium text-ink-soft select-none">
                 How do I get these credentials? (setup guide)
               </summary>
@@ -109,18 +130,21 @@ export function OrgSettingsForm({
                 ). Per-message fees apply for template messages.
               </p>
             </details>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <Label>Phone Number ID</Label>
-                <Input name="whatsappPhoneNumberId" defaultValue={whatsappConfig?.phoneNumberId ?? ""} placeholder="123456789" />
+            {whatsappEnabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label>Phone Number ID</Label>
+                  <Input name="whatsappPhoneNumberId" defaultValue={whatsappConfig?.phoneNumberId ?? ""} placeholder="123456789" />
+                </div>
+                <div>
+                  <Label>API Key (Access Token)</Label>
+                  <Input name="whatsappApiKey" type="password" defaultValue={whatsappConfig?.apiKey ?? ""} placeholder="EAAG..." />
+                </div>
               </div>
-              <div>
-                <Label>API Key (Access Token)</Label>
-                <Input name="whatsappApiKey" type="password" defaultValue={whatsappConfig?.apiKey ?? ""} placeholder="EAAG..." />
-              </div>
-            </div>
-          </>
-        )}
+            )}
+          </div>
+        </details>
+        <input type="hidden" name="whatsappEnabled" value={whatsappEnabled ? "true" : "false"} />
         <p className="text-xs text-ink-soft mt-2">
           Configure to send follow-up reminders via WhatsApp. Without this, click-to-chat links still work.
         </p>
