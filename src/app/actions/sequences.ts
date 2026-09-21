@@ -15,7 +15,7 @@ async function requireSequences(orgId: string): Promise<{ message: string } | nu
   return null;
 }
 import { logEvent } from "@/lib/audit";
-import { enrollLeadInSequence } from "@/lib/sequences";
+import { enrollLeadInSequence, processSequenceSteps } from "@/lib/sequences";
 
 export type SequenceFormState = {
   errors?: Record<string, string[]>;
@@ -284,6 +284,53 @@ export async function unenrollLead(
 
   revalidatePath("/sequences");
   return { ok: true, message: "Unenrolled from sequence" };
+}
+
+// ---------------------------------------------------------------------------
+// Manual run — process due steps for a single sequence right now.
+// Same logic as the cron job, scoped to this org + sequence.
+// ---------------------------------------------------------------------------
+
+export async function runSequenceNow(
+  _prev: SequenceFormState,
+  formData: FormData,
+): Promise<SequenceFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+  const gate = await requireSequences(ctx.orgId);
+  if (gate) return gate;
+
+  const sequenceId = String(formData.get("sequenceId"));
+  if (!z.string().uuid().safeParse(sequenceId).success) return { message: "Invalid ID" };
+
+  // Verify sequence belongs to org.
+  const [seq] = await db
+    .select({ id: schema.sequences.id })
+    .from(schema.sequences)
+    .where(
+      and(eq(schema.sequences.id, sequenceId), eq(schema.sequences.orgId, ctx.orgId)),
+    )
+    .limit(1);
+  if (!seq) return { message: "Sequence not found" };
+
+  const result = await processSequenceSteps({ orgId: ctx.orgId, sequenceId });
+
+  revalidatePath("/sequences");
+  revalidatePath(`/sequences/${sequenceId}`);
+
+  if (result.processed === 0) {
+    return {
+      ok: true,
+      message: result.skippedWindow > 0
+        ? `${result.skippedWindow} step(s) held — outside the send window`
+        : "No due steps — enrollments may not exist or next steps aren't due yet",
+    };
+  }
+  const parts: string[] = [];
+  if (result.emailsSent) parts.push(`${result.emailsSent} email${result.emailsSent === 1 ? "" : "s"}`);
+  if (result.whatsappSent) parts.push(`${result.whatsappSent} WhatsApp${result.whatsappSent === 1 ? "" : "s"}`);
+  if (result.remindersCreated) parts.push(`${result.remindersCreated} reminder${result.remindersCreated === 1 ? "" : "s"}`);
+  return { ok: true, message: `Sent: ${parts.join(", ") || `${result.processed} step(s) processed`}` };
 }
 
 // ---------------------------------------------------------------------------

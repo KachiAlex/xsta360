@@ -138,7 +138,10 @@ function isWithinSendWindow(
  * - A/B testing: randomly assign variant A or B
  * - Record email events for analytics
  */
-export async function processSequenceSteps(): Promise<{
+export async function processSequenceSteps(opts?: {
+  orgId?: string;
+  sequenceId?: string;
+}): Promise<{
   processed: number;
   emailsSent: number;
   whatsappSent: number;
@@ -152,11 +155,14 @@ export async function processSequenceSteps(): Promise<{
   let remindersCreated = 0;
   let skippedWindow = 0;
 
-  // Get all active enrollments.
+  // Get all active enrollments (optionally scoped to one org/sequence).
+  const enrollmentConditions = [eq(schema.sequenceEnrollments.status, "active")];
+  if (opts?.orgId) enrollmentConditions.push(eq(schema.sequenceEnrollments.orgId, opts.orgId));
+  if (opts?.sequenceId) enrollmentConditions.push(eq(schema.sequenceEnrollments.sequenceId, opts.sequenceId));
   const enrollments = await db
     .select()
     .from(schema.sequenceEnrollments)
-    .where(eq(schema.sequenceEnrollments.status, "active"));
+    .where(and(...enrollmentConditions));
 
   // Prefetch all steps and leads in bulk to avoid N+1 queries.
   const sequenceIds = [...new Set(enrollments.map((e) => e.sequenceId))];

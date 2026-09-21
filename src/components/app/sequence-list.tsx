@@ -9,6 +9,7 @@ import {
   deleteSequenceStep,
   updateSequenceStep,
   updateSequenceSettings,
+  runSequenceNow,
   type SequenceFormState,
 } from "@/app/actions/sequences";
 import { Button } from "@/components/ui/button";
@@ -119,6 +120,8 @@ function SequenceItem({
   const [emailSubject, setEmailSubject] = useState<string>("");
   const [emailSender, setEmailSender] = useState<string>("");
   const [attachmentIds, setAttachmentIds] = useState<string[]>([]);
+  const [running, setRunning] = useState(false);
+  const [runMsg, setRunMsg] = useState<string | null>(null);
   // Close on success: reset showStepForm so the form can be reopened.
   const stepVisible = showStepForm;
   useEffect(() => {
@@ -161,6 +164,24 @@ function SequenceItem({
           </a>
           <button
             type="button"
+            disabled={running}
+            className="text-xs text-[var(--accent)] hover:text-ink min-h-[40px] px-2 active:bg-paper-2 rounded disabled:opacity-50"
+            onClick={() => {
+              setRunning(true);
+              setRunMsg(null);
+              const fd = new FormData();
+              fd.set("sequenceId", sequence.id);
+              startTransition(async () => {
+                const res = await runSequenceNow({}, fd);
+                setRunning(false);
+                setRunMsg(res.message ?? (res.ok ? "Done" : "Failed"));
+              });
+            }}
+          >
+            {running ? "Running…" : "▶ Run now"}
+          </button>
+          <button
+            type="button"
             className="text-xs text-ink-soft hover:text-ink min-h-[40px] px-2 active:bg-paper-2 rounded"
             onClick={() => {
               const fd = new FormData();
@@ -188,6 +209,10 @@ function SequenceItem({
           </button>
         </div>
       </div>
+
+      {runMsg && (
+        <div className="text-xs font-mono text-ink-soft mb-3 ml-1">{runMsg}</div>
+      )}
 
       {/* Steps */}
       {sequence.steps.length > 0 && (
