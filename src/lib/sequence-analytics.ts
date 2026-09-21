@@ -18,6 +18,10 @@ export interface SequenceAnalytics {
   emailsReplied: number;
   emailsBounced: number;
   unsubscribes: number;
+  // WhatsApp + reminder channel stats (stored in reminders table)
+  whatsappSent: number;
+  whatsappFailed: number;
+  remindersCreated: number;
   // Rates
   openRate: number;
   clickRate: number;
@@ -35,6 +39,7 @@ export interface StepAnalytics {
   subject: string | null;
   delayDays: number;
   sent: number;
+  failed: number;
   opened: number;
   clicked: number;
   replied: number;
@@ -102,10 +107,38 @@ export async function getSequenceAnalytics(
   const emailsBounced = allEvents.filter((e) => e.eventType === "bounced").length;
   const unsubscribes = allEvents.filter((e) => e.eventType === "unsubscribed").length;
 
+  // WhatsApp and reminder step executions are logged as reminders rows
+  // (channel = "whatsapp" | "reminder", linked via sequenceStepId).
+  let channelEvents: { stepId: string | null; channel: string | null; status: string | null }[] = [];
+  if (stepIds.length > 0) {
+    channelEvents = await db
+      .select({
+        stepId: schema.reminders.sequenceStepId,
+        channel: schema.reminders.channel,
+        status: schema.reminders.status,
+      })
+      .from(schema.reminders)
+      .where(
+        and(
+          eq(schema.reminders.orgId, orgId),
+          inArraySafe(schema.reminders.sequenceStepId, stepIds),
+        ),
+      );
+  }
+
+  const whatsappSent = channelEvents.filter((e) => e.channel === "whatsapp" && e.status === "sent").length;
+  const whatsappFailed = channelEvents.filter((e) => e.channel === "whatsapp" && e.status === "failed").length;
+  const remindersCreated = channelEvents.filter((e) => e.channel === "reminder").length;
+
   // Per-step breakdown
   const perStep: StepAnalytics[] = steps.map((step) => {
     const stepEvents = allEvents.filter((e) => e.stepId === step.id);
-    const sent = stepEvents.filter((e) => e.eventType === "sent").length;
+    const stepChannel = channelEvents.filter((e) => e.stepId === step.id);
+    const emailSent = stepEvents.filter((e) => e.eventType === "sent").length;
+    const waSent = stepChannel.filter((e) => e.channel === "whatsapp" && e.status === "sent").length;
+    const remCreated = stepChannel.filter((e) => e.channel === "reminder").length;
+    const failed = stepChannel.filter((e) => e.status === "failed").length;
+    const sent = emailSent + waSent + remCreated;
     const opened = stepEvents.filter((e) => e.eventType === "opened").length;
     const clicked = stepEvents.filter((e) => e.eventType === "clicked").length;
     const replied = stepEvents.filter((e) => e.eventType === "replied").length;
@@ -118,6 +151,7 @@ export async function getSequenceAnalytics(
       subject: step.subject,
       delayDays: step.delayDays,
       sent,
+      failed,
       opened,
       clicked,
       replied,
@@ -142,6 +176,9 @@ export async function getSequenceAnalytics(
     emailsReplied,
     emailsBounced,
     unsubscribes,
+    whatsappSent,
+    whatsappFailed,
+    remindersCreated,
     openRate: emailsSent > 0 ? (emailsOpened / emailsSent) * 100 : 0,
     clickRate: emailsSent > 0 ? (emailsClicked / emailsSent) * 100 : 0,
     replyRate: emailsSent > 0 ? (emailsReplied / emailsSent) * 100 : 0,

@@ -60,6 +60,13 @@ export default async function SequenceAnalyticsPage({
             <StatCard label="Emails sent" value={analytics.emailsSent} tone="neutral" />
             <StatCard label="Unsubscribes" value={analytics.unsubscribes} tone="lost" />
           </div>
+          {(analytics.whatsappSent > 0 || analytics.whatsappFailed > 0 || analytics.remindersCreated > 0) && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 px-4 pb-4">
+              <StatCard label="WhatsApp sent" value={analytics.whatsappSent} tone="won" />
+              <StatCard label="WhatsApp failed" value={analytics.whatsappFailed} tone="lost" />
+              <StatCard label="Reminders created" value={analytics.remindersCreated} tone="neutral" />
+            </div>
+          )}
         </Panel>
 
         {/* Email performance rates */}
@@ -85,6 +92,7 @@ export default async function SequenceAnalyticsPage({
                   <th className="text-left px-4 py-2 font-semibold">Action</th>
                   <th className="text-left px-4 py-2 font-semibold">Subject</th>
                   <th className="text-right px-4 py-2 font-semibold">Sent</th>
+                  <th className="text-right px-4 py-2 font-semibold">Failed</th>
                   <th className="text-right px-4 py-2 font-semibold">Opened</th>
                   <th className="text-right px-4 py-2 font-semibold">Open %</th>
                   <th className="text-right px-4 py-2 font-semibold">Clicked</th>
@@ -96,7 +104,7 @@ export default async function SequenceAnalyticsPage({
               <tbody>
                 {analytics.perStep.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="text-center py-8 text-ink-soft">No steps yet</td>
+                    <td colSpan={11} className="text-center py-8 text-ink-soft">No steps yet</td>
                   </tr>
                 ) : (
                   analytics.perStep.map((step) => (
@@ -105,6 +113,7 @@ export default async function SequenceAnalyticsPage({
                       <td className="px-4 py-2.5"><Badge tone="neutral">{step.action}</Badge></td>
                       <td className="px-4 py-2.5 text-xs max-w-[200px] truncate">{step.subject || "—"}</td>
                       <td className="px-4 py-2.5 text-right font-mono">{step.sent}</td>
+                      <td className="px-4 py-2.5 text-right font-mono">{step.failed > 0 ? <span className="text-stamp">{step.failed}</span> : 0}</td>
                       <td className="px-4 py-2.5 text-right font-mono">{step.opened}</td>
                       <td className="px-4 py-2.5 text-right font-mono">{step.openRate.toFixed(1)}%</td>
                       <td className="px-4 py-2.5 text-right font-mono">{step.clicked}</td>
