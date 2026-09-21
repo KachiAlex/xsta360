@@ -10,6 +10,10 @@ import {
   updateSequenceStep,
   updateSequenceSettings,
   runSequenceNow,
+  bulkEnrollLeads,
+  unenrollLead,
+  pauseEnrollment,
+  resumeEnrollment,
   type SequenceFormState,
 } from "@/app/actions/sequences";
 import { Button } from "@/components/ui/button";
@@ -47,14 +51,38 @@ interface Sequence {
   enrollmentCount: number;
 }
 
+interface EnrollmentRow {
+  enrollmentId: string;
+  sequenceId: string;
+  leadId: string;
+  leadName: string;
+  leadPhone: string | null;
+  leadEmail: string | null;
+  status: string;
+  currentStep: number;
+  enrolledAt: Date;
+}
+
+interface LeadOption {
+  id: string;
+  name: string;
+  company: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
 export function SequenceList({
   sequences,
   documents,
   orgName,
+  enrollments,
+  leads,
 }: {
   sequences: Sequence[];
   documents: AttachmentDoc[];
   orgName: string;
+  enrollments: EnrollmentRow[];
+  leads: LeadOption[];
 }) {
   const [showForm, setShowForm] = useState(false);
   const [state, action, pending] = useActionState<SequenceFormState, FormData>(createSequence, {});
@@ -95,7 +123,14 @@ export function SequenceList({
       ) : (
         <div className="divide-y divide-rule">
           {sequences.map((seq) => (
-            <SequenceItem key={seq.id} sequence={seq} documents={documents} orgName={orgName} />
+            <SequenceItem
+              key={seq.id}
+              sequence={seq}
+              documents={documents}
+              orgName={orgName}
+              enrollments={enrollments.filter((e) => e.sequenceId === seq.id)}
+              leads={leads}
+            />
           ))}
         </div>
       )}
@@ -107,10 +142,14 @@ function SequenceItem({
   sequence,
   documents,
   orgName,
+  enrollments,
+  leads,
 }: {
   sequence: Sequence;
   documents: AttachmentDoc[];
   orgName: string;
+  enrollments: EnrollmentRow[];
+  leads: LeadOption[];
 }) {
   const [, startTransition] = useTransition();
   const [showStepForm, setShowStepForm] = useState(false);
@@ -122,6 +161,11 @@ function SequenceItem({
   const [attachmentIds, setAttachmentIds] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
   const [runMsg, setRunMsg] = useState<string | null>(null);
+  const [showLeads, setShowLeads] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState("");
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
+  const [enrollMsg, setEnrollMsg] = useState<string | null>(null);
   // Close on success: reset showStepForm so the form can be reopened.
   const stepVisible = showStepForm;
   useEffect(() => {
@@ -133,6 +177,55 @@ function SequenceItem({
       setAttachmentIds([]);
     }
   }, [stepState.ok]);
+
+  // Leads already committed to this sequence (active or paused) can't be picked again.
+  const visibleEnrollments = enrollments.filter((e) => e.status !== "cancelled");
+  const committedLeadIds = new Set(
+    enrollments.filter((e) => e.status === "active" || e.status === "paused").map((e) => e.leadId),
+  );
+  const q = pickerQuery.trim().toLowerCase();
+  const pickableLeads = leads.filter(
+    (l) =>
+      !committedLeadIds.has(l.id) &&
+      (!q ||
+        l.name.toLowerCase().includes(q) ||
+        (l.company ?? "").toLowerCase().includes(q) ||
+        (l.phone ?? "").includes(q) ||
+        (l.email ?? "").toLowerCase().includes(q)),
+  );
+
+  function toggleLeadPick(id: string) {
+    setSelectedLeadIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function submitEnrollment() {
+    if (selectedLeadIds.size === 0) return;
+    const fd = new FormData();
+    fd.set("sequenceId", sequence.id);
+    fd.set("leadIds", [...selectedLeadIds].join(","));
+    startTransition(async () => {
+      const res = await bulkEnrollLeads({}, fd);
+      setEnrollMsg(res.message ?? (res.ok ? "Done" : "Failed"));
+      if (res.ok) {
+        setSelectedLeadIds(new Set());
+        setShowPicker(false);
+        setPickerQuery("");
+      }
+    });
+  }
+
+  function enrollmentAction(enrollmentId: string, fn: typeof unenrollLead) {
+    const fd = new FormData();
+    fd.set("enrollmentId", enrollmentId);
+    startTransition(async () => {
+      await fn({}, fd);
+    });
+  }
 
   return (
     <div className="px-3.5 sm:px-5 py-3.5 sm:py-4">
@@ -253,6 +346,127 @@ function SequenceItem({
           ))}
         </ol>
       )}
+
+      {/* Enrolled leads — who this sequence targets */}
+      <div className="mb-3 ml-4">
+        <button
+          type="button"
+          onClick={() => setShowLeads((v) => !v)}
+          className="text-xs font-semibold text-ink-soft hover:text-ink min-h-[36px] px-2 -ml-2 rounded active:bg-paper-2"
+        >
+          {showLeads ? "▾" : "▸"} 👥 Leads ({visibleEnrollments.length})
+        </button>
+
+        {showLeads && (
+          <div className="mt-1 space-y-1.5">
+            {visibleEnrollments.length === 0 && (
+              <p className="text-xs text-ink-soft">No leads enrolled — add leads below, or enroll from a lead's page.</p>
+            )}
+            {visibleEnrollments.map((e) => (
+              <div key={e.enrollmentId} className="flex items-center gap-2 text-sm">
+                <a href={`/leads/${e.leadId}`} className="font-medium hover:underline truncate">
+                  {e.leadName}
+                </a>
+                <Badge tone={e.status === "active" ? "won" : e.status === "completed" ? "neutral" : "lost"}>
+                  {e.status}
+                </Badge>
+                <span className="text-[11px] font-mono text-ink-soft">
+                  {e.status === "completed" ? `${sequence.steps.length}/${sequence.steps.length}` : `${e.currentStep}/${sequence.steps.length}`} steps
+                </span>
+                <span className="ml-auto flex gap-1">
+                  {e.status === "active" && (
+                    <button
+                      type="button"
+                      className="text-[11px] text-ink-soft hover:text-ink px-1.5 py-1 rounded active:bg-paper-2"
+                      onClick={() => enrollmentAction(e.enrollmentId, pauseEnrollment)}
+                    >
+                      Pause
+                    </button>
+                  )}
+                  {e.status === "paused" && (
+                    <button
+                      type="button"
+                      className="text-[11px] text-[var(--accent)] hover:text-ink px-1.5 py-1 rounded active:bg-paper-2"
+                      onClick={() => enrollmentAction(e.enrollmentId, resumeEnrollment)}
+                    >
+                      Resume
+                    </button>
+                  )}
+                  {e.status !== "completed" && e.status !== "cancelled" && (
+                    <button
+                      type="button"
+                      className="text-[11px] text-stamp hover:underline px-1.5 py-1 rounded active:bg-stamp/10"
+                      onClick={() => {
+                        if (!confirm(`Remove ${e.leadName} from this sequence?`)) return;
+                        enrollmentAction(e.enrollmentId, unenrollLead);
+                      }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </span>
+              </div>
+            ))}
+
+            {/* Add-leads picker */}
+            {sequence.active && (
+              <div className="pt-1">
+                {!showPicker ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowPicker(true)}
+                    className="text-xs text-[var(--accent)] hover:underline min-h-[36px] px-1.5 rounded active:bg-paper-2"
+                  >
+                    + Add leads
+                  </button>
+                ) : (
+                  <div className="bg-paper-2 rounded p-3 space-y-2">
+                    <Input
+                      placeholder="Search leads by name, company, phone…"
+                      value={pickerQuery}
+                      onChange={(e) => setPickerQuery(e.currentTarget.value)}
+                      autoFocus
+                    />
+                    <div className="max-h-48 overflow-y-auto divide-y divide-rule">
+                      {pickableLeads.length === 0 && (
+                        <p className="text-xs text-ink-soft py-2">No matching leads available to enroll.</p>
+                      )}
+                      {pickableLeads.map((l) => (
+                        <label key={l.id} className="flex items-center gap-2 py-1.5 text-sm cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedLeadIds.has(l.id)}
+                            onChange={() => toggleLeadPick(l.id)}
+                            className="accent-[var(--accent)]"
+                          />
+                          <span className="font-medium truncate">{l.name}</span>
+                          {l.company && <span className="text-xs text-ink-soft truncate">{l.company}</span>}
+                          {!l.phone && !l.email && (
+                            <span className="text-[10px] text-stamp">no contact info</span>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                    {enrollMsg && <p className="text-xs font-mono text-ink-soft">{enrollMsg}</p>}
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="ghost" size="sm" onClick={() => { setShowPicker(false); setSelectedLeadIds(new Set()); setPickerQuery(""); }}>
+                        Cancel
+                      </Button>
+                      <Button type="button" size="sm" disabled={selectedLeadIds.size === 0} onClick={submitEnrollment}>
+                        Enroll {selectedLeadIds.size > 0 ? `${selectedLeadIds.size} ` : ""}lead{selectedLeadIds.size === 1 ? "" : "s"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {!sequence.active && visibleEnrollments.length === 0 && (
+              <p className="text-[11px] text-ink-soft">Activate the sequence to enroll leads.</p>
+            )}
+          </div>
+        )}
+        {enrollMsg && !showPicker && <p className="text-xs font-mono text-ink-soft mt-1">{enrollMsg}</p>}
+      </div>
 
       {/* Add step form */}
       {stepVisible ? (

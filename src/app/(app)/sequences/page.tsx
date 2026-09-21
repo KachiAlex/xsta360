@@ -1,6 +1,6 @@
 import { requireAuth, getOrgPlan, planHasFeature } from "@/lib/dal";
 import { UpgradePrompt } from "@/components/app/upgrade-prompt";
-import { getOrgSequences } from "@/lib/sequence-queries";
+import { getOrgSequences, getOrgSequenceEnrollments, getOrgLeadOptions } from "@/lib/sequence-queries";
 import { getOrgDocuments } from "@/lib/document-queries";
 import { Topbar } from "@/components/app/topbar";
 import { Panel, PanelHead } from "@/components/ui/panel";
@@ -15,10 +15,12 @@ export default async function SequencesPage() {
     return <UpgradePrompt feature="sequences" plan={plan} />;
   }
 
-  const [sequences, documents, orgRow] = await Promise.all([
+  const [sequences, documents, orgRow, enrollments, leads] = await Promise.all([
     getOrgSequences(ctx.orgId),
     getOrgDocuments(ctx.orgId),
     db.select({ name: schema.organizations.name }).from(schema.organizations).where(eq(schema.organizations.id, ctx.orgId)).limit(1),
+    getOrgSequenceEnrollments(ctx.orgId),
+    getOrgLeadOptions(ctx.orgId),
   ]);
 
   return (
@@ -41,6 +43,8 @@ export default async function SequencesPage() {
               mimeType: d.mimeType,
             }))}
             orgName={orgRow[0]?.name ?? "Xsta360"}
+            enrollments={enrollments}
+            leads={leads}
           />
         </Panel>
       </div>

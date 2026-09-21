@@ -159,3 +159,62 @@ export async function getLeadEnrollments(orgId: string, leadId: string): Promise
     bouncedAt: e.bouncedAt,
   }));
 }
+
+export interface SequenceEnrollmentRow {
+  enrollmentId: string;
+  sequenceId: string;
+  leadId: string;
+  leadName: string;
+  leadPhone: string | null;
+  leadEmail: string | null;
+  status: string;
+  currentStep: number;
+  enrolledAt: Date;
+}
+
+/**
+ * Get all enrollments across an org's sequences, joined to lead info.
+ * Used by the sequences page to show who is enrolled in each sequence.
+ */
+export async function getOrgSequenceEnrollments(orgId: string): Promise<SequenceEnrollmentRow[]> {
+  return db
+    .select({
+      enrollmentId: schema.sequenceEnrollments.id,
+      sequenceId: schema.sequenceEnrollments.sequenceId,
+      leadId: schema.sequenceEnrollments.leadId,
+      leadName: schema.leads.name,
+      leadPhone: schema.leads.phone,
+      leadEmail: schema.leads.email,
+      status: schema.sequenceEnrollments.status,
+      currentStep: schema.sequenceEnrollments.currentStep,
+      enrolledAt: schema.sequenceEnrollments.enrolledAt,
+    })
+    .from(schema.sequenceEnrollments)
+    .innerJoin(schema.leads, eq(schema.sequenceEnrollments.leadId, schema.leads.id))
+    .where(eq(schema.sequenceEnrollments.orgId, orgId))
+    .orderBy(asc(schema.sequenceEnrollments.enrolledAt));
+}
+
+export interface LeadOption {
+  id: string;
+  name: string;
+  company: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
+/** Lightweight org leads list for the sequence enrollment picker. */
+export async function getOrgLeadOptions(orgId: string): Promise<LeadOption[]> {
+  return db
+    .select({
+      id: schema.leads.id,
+      name: schema.leads.name,
+      company: schema.leads.company,
+      phone: schema.leads.phone,
+      email: schema.leads.email,
+    })
+    .from(schema.leads)
+    .where(eq(schema.leads.orgId, orgId))
+    .orderBy(asc(schema.leads.name))
+    .limit(500);
+}
