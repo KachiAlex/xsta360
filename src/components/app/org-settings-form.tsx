@@ -134,7 +134,11 @@ export function OrgSettingsForm({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Phone Number ID</Label>
-                  <Input name="whatsappPhoneNumberId" defaultValue={whatsappConfig?.phoneNumberId ?? ""} placeholder="123456789" />
+                  <Input name="whatsappPhoneNumberId" defaultValue={whatsappConfig?.phoneNumberId ?? ""} placeholder="e.g. 1249837834878071" />
+                  {state.errors?.whatsappPhoneNumberId && (
+                    <p className="text-xs text-stamp mt-1">{state.errors.whatsappPhoneNumberId[0]}</p>
+                  )}
+                  <p className="text-[11px] text-ink-soft mt-1">The numeric ID under your number in Meta's API Setup — not the phone number.</p>
                 </div>
                 <div>
                   <Label>API Key (Access Token)</Label>

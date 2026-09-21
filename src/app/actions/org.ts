@@ -212,11 +212,23 @@ export async function updateOrgSettings(
     return { errors: { customFields: ["Invalid JSON for custom field definitions"] } };
   }
 
+  // Phone Number ID is a numeric Meta ID — reject phone numbers pasted by mistake.
+  const phoneNumberIdClean = whatsappPhoneNumberId.trim();
+  if (whatsappEnabled && phoneNumberIdClean && !/^\d+$/.test(phoneNumberIdClean)) {
+    return {
+      message:
+        "Phone Number ID must be digits only (e.g. 1249837834878071) — it's the numeric ID under the number in Meta's API Setup, not the phone number itself",
+      errors: {
+        whatsappPhoneNumberId: ["Must be the numeric Phone Number ID, not the phone number"],
+      },
+    };
+  }
+
   const whatsappConfig = whatsappEnabled
     ? {
         enabled: true,
-        phoneNumberId: whatsappPhoneNumberId || undefined,
-        apiKey: whatsappApiKey || undefined,
+        phoneNumberId: phoneNumberIdClean || undefined,
+        apiKey: whatsappApiKey.trim() || undefined,
       }
     : { enabled: false };
 
