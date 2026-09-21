@@ -69,16 +69,57 @@ export function OrgSettingsForm({
         </div>
         <input type="hidden" name="whatsappEnabled" value={whatsappEnabled ? "true" : "false"} />
         {whatsappEnabled && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <Label>Phone Number ID</Label>
-              <Input name="whatsappPhoneNumberId" defaultValue={whatsappConfig?.phoneNumberId ?? ""} placeholder="123456789" />
+          <>
+            <details className="mb-3 rounded border border-rule bg-paper/60 text-xs">
+              <summary className="cursor-pointer px-3 py-2 font-medium text-ink-soft select-none">
+                How do I get these credentials? (setup guide)
+              </summary>
+              <ol className="list-decimal space-y-2 px-3 pb-3 pl-8 pt-1 text-ink-soft">
+                <li>
+                  Go to{" "}
+                  <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener noreferrer" className="text-stamp underline underline-offset-2">
+                    developers.facebook.com/apps
+                  </a>{" "}
+                  → <strong>Create App</strong> → choose <strong>Business</strong> type → add the <strong>WhatsApp</strong> product.
+                </li>
+                <li>
+                  In your app, open <strong>WhatsApp → API Setup</strong>. Under <strong>Send and receive messages</strong>, add your business phone number.
+                </li>
+                <li>
+                  Copy the <strong>Phone Number ID</strong> shown under your number (it&apos;s a numeric ID, not the phone number).
+                </li>
+                <li>
+                  For testing, copy the <strong>Temporary access token</strong> on the same page (expires in 24 hours).
+                </li>
+                <li>
+                  For production, create a permanent token:{" "}
+                  <a href="https://business.facebook.com/settings/system-users" target="_blank" rel="noopener noreferrer" className="text-stamp underline underline-offset-2">
+                    business.facebook.com → System Users
+                  </a>{" "}
+                  → Add system user → Generate token → select your app → check <code>whatsapp_business_messaging</code>.
+                </li>
+                <li>Paste both values here and save.</li>
+              </ol>
+              <p className="px-3 pb-3 text-[11px] leading-relaxed text-ink-soft/80 border-t border-rule pt-2">
+                Note: Meta only lets you message leads who have contacted you in the last 24 hours
+                unless you use a pre-approved message template (created in{" "}
+                <a href="https://business.facebook.com/wa/manage/home/" target="_blank" rel="noopener noreferrer" className="text-stamp underline underline-offset-2">
+                  WhatsApp Manager
+                </a>
+                ). Per-message fees apply for template messages.
+              </p>
+            </details>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label>Phone Number ID</Label>
+                <Input name="whatsappPhoneNumberId" defaultValue={whatsappConfig?.phoneNumberId ?? ""} placeholder="123456789" />
+              </div>
+              <div>
+                <Label>API Key (Access Token)</Label>
+                <Input name="whatsappApiKey" type="password" defaultValue={whatsappConfig?.apiKey ?? ""} placeholder="EAAG..." />
+              </div>
             </div>
-            <div>
-              <Label>API Key (Access Token)</Label>
-              <Input name="whatsappApiKey" type="password" defaultValue={whatsappConfig?.apiKey ?? ""} placeholder="EAAG..." />
-            </div>
-          </div>
+          </>
         )}
         <p className="text-xs text-ink-soft mt-2">
           Configure to send follow-up reminders via WhatsApp. Without this, click-to-chat links still work.

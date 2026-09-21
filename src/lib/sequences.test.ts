@@ -512,3 +512,244 @@ describe("processSequenceSteps — email flow", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// processSequenceSteps — WhatsApp step processing
+// ---------------------------------------------------------------------------
+
+const sendWhatsAppMock = vi.fn(() => Promise.resolve({ success: true as boolean, error: undefined as string | undefined }));
+
+function buildWhatsAppMockDb(opts: {
+  enrollments: any[];
+  steps: any[];
+  lead: any | null;
+  org?: any;
+  rep?: any;
+  sequence?: any;
+}) {
+  let callIdx = 0;
+  const selectReturns = [
+    opts.enrollments,
+    opts.steps,
+    opts.lead ? [opts.lead] : [],
+    opts.sequence
+      ? [opts.sequence]
+      : [{ id: "seq-1", sendWindowStart: null, sendWindowEnd: null, skipWeekends: false, timezone: "Africa/Lagos" }],
+    opts.org ? [opts.org] : [],
+    opts.rep ? [opts.rep] : [],
+  ];
+
+  function makeThenable(data: any[]) {
+    return {
+      then: (resolve: any, reject?: any) => Promise.resolve(data).then(resolve, reject),
+      limit: () => makeThenable(data),
+      orderBy: () => makeThenable(data),
+    };
+  }
+
+  return {
+    select: vi.fn(() => {
+      const idx = callIdx++;
+      const data = selectReturns[idx] ?? [];
+      return {
+        from: vi.fn(() => ({
+          where: vi.fn(() => makeThenable(data)),
+        })),
+      };
+    }),
+    insert: vi.fn(() => ({
+      values: vi.fn(() => ({
+        returning: vi.fn(() => Promise.resolve([{ id: "evt-" + Math.random() }])),
+      })),
+    })),
+    update: vi.fn(() => ({
+      set: vi.fn(() => ({
+        where: vi.fn(() => Promise.resolve()),
+      })),
+    })),
+  };
+}
+
+async function loadSequencesWithWhatsApp(dbMock: any) {
+  vi.doMock("@/db", () => ({
+    db: dbMock,
+    schema: {
+      sequences: { id: "id", orgId: "org_id", active: "active", sendWindowStart: "send_window_start", sendWindowEnd: "send_window_end", skipWeekends: "skip_weekends", timezone: "timezone" },
+      sequenceEnrollments: { id: "id", sequenceId: "seq_id", leadId: "lead_id", status: "status", orgId: "org_id", unsubscribeToken: "unsubscribe_token", currentStep: "current_step", updatedAt: "updated_at" },
+      sequenceSteps: { sequenceId: "seq_id", position: "position" },
+      sequenceEmailEvents: { id: "id" },
+      leads: { id: "id" },
+      organizations: { id: "id", name: "name", whatsappConfig: "whatsapp_config", replyToEmail: "reply_to_email" },
+      users: { id: "id", name: "name" },
+      reminders: {},
+      documents: { id: "id", orgId: "org_id" },
+    },
+  }));
+  vi.doMock("drizzle-orm", () => ({
+    eq: vi.fn((a, b) => ({ eq: [a, b] })),
+    and: vi.fn((...args) => ({ and: args })),
+    asc: vi.fn((a) => ({ asc: a })),
+    inArray: vi.fn((a, b) => ({ inArray: [a, b] })),
+    isNull: vi.fn((a) => ({ isNull: a })),
+  }));
+  vi.doMock("@/lib/whatsapp", () => ({
+    sendWhatsAppMessage: sendWhatsAppMock,
+    formatWhatsAppMessage: vi.fn((body: string, org: string) => `${body}\n\n— ${org}`),
+  }));
+  vi.resetModules();
+  return await import("@/lib/sequences");
+}
+
+describe("processSequenceSteps — whatsapp flow", () => {
+  beforeEach(() => {
+    sendWhatsAppMock.mockClear();
+    sendWhatsAppMock.mockResolvedValue({ success: true, error: undefined });
+  });
+
+  const baseEnrollment = {
+    id: "enr-w1",
+    sequenceId: "seq-w1",
+    leadId: "lead-w1",
+    orgId: "org-1",
+    currentStep: 0,
+    enrolledAt: new Date(Date.now() - 86_400_000),
+    enrolledBy: "user-1",
+    unsubscribeToken: "tok-1",
+  };
+
+  const whatsappStep = {
+    id: "step-w1",
+    sequenceId: "seq-w1",
+    position: 0,
+    delayDays: 0,
+    action: "whatsapp",
+    subject: null,
+    body: "Hi {{first_name}}, following up on our chat",
+    senderName: null,
+    attachments: [],
+  };
+
+  it("sends WhatsApp message when config + phone present, and advances", async () => {
+    const dbMock = buildWhatsAppMockDb({
+      enrollments: [baseEnrollment],
+      steps: [whatsappStep],
+      lead: {
+        id: "lead-w1",
+        name: "Adaeze Okonkwo",
+        email: null,
+        phone: "+234 803 123 4567",
+        company: "Acme Corp",
+        assigneeId: null,
+        unsubscribedAt: null,
+      },
+      org: {
+        name: "Kreatix",
+        whatsappConfig: { enabled: true, phoneNumberId: "12345", apiKey: "EAAGtest" },
+        replyToEmail: null,
+      },
+    });
+
+    const { processSequenceSteps } = await loadSequencesWithWhatsApp(dbMock);
+    const result = await processSequenceSteps();
+
+    expect(result.whatsappSent).toBe(1);
+    expect(result.processed).toBe(1);
+    expect(sendWhatsAppMock).toHaveBeenCalledTimes(1);
+    const [config, toPhone, msg] = sendWhatsAppMock.mock.calls[0] as any[];
+    expect(config.phoneNumberId).toBe("12345");
+    expect(toPhone).toBe("+234 803 123 4567");
+    expect(msg).toContain("following up");
+    expect(msg).toContain("— Kreatix");
+  });
+
+  it("advances (skips) when lead has no phone", async () => {
+    const dbMock = buildWhatsAppMockDb({
+      enrollments: [baseEnrollment],
+      steps: [whatsappStep],
+      lead: {
+        id: "lead-w1",
+        name: "No Phone",
+        email: "x@example.com",
+        phone: null,
+        company: null,
+        assigneeId: null,
+        unsubscribedAt: null,
+      },
+      org: {
+        name: "Kreatix",
+        whatsappConfig: { enabled: true, phoneNumberId: "12345", apiKey: "EAAGtest" },
+        replyToEmail: null,
+      },
+    });
+
+    const { processSequenceSteps } = await loadSequencesWithWhatsApp(dbMock);
+    const result = await processSequenceSteps();
+
+    expect(sendWhatsAppMock).not.toHaveBeenCalled();
+    expect(result.whatsappSent).toBe(0);
+    // Permanent skip still advances the enrollment.
+    expect(result.processed).toBe(1);
+  });
+
+  it("advances (skips) when WhatsApp is not configured on the org", async () => {
+    const dbMock = buildWhatsAppMockDb({
+      enrollments: [baseEnrollment],
+      steps: [whatsappStep],
+      lead: {
+        id: "lead-w1",
+        name: "Test Lead",
+        email: null,
+        phone: "+2348000000000",
+        company: null,
+        assigneeId: null,
+        unsubscribedAt: null,
+      },
+      org: { name: "Kreatix", whatsappConfig: null, replyToEmail: null },
+    });
+
+    const { processSequenceSteps } = await loadSequencesWithWhatsApp(dbMock);
+    const result = await processSequenceSteps();
+
+    expect(sendWhatsAppMock).not.toHaveBeenCalled();
+    expect(result.processed).toBe(1);
+  });
+
+  it("does NOT advance when WhatsApp API call fails (transient)", async () => {
+    sendWhatsAppMock.mockResolvedValue({ success: false, error: "401 Unauthorized" });
+
+    const updateSpy = vi.fn(() => ({
+      set: vi.fn(() => ({
+        where: vi.fn(() => Promise.resolve()),
+      })),
+    }));
+
+    const dbMock = buildWhatsAppMockDb({
+      enrollments: [baseEnrollment],
+      steps: [whatsappStep],
+      lead: {
+        id: "lead-w1",
+        name: "Test Lead",
+        email: null,
+        phone: "+2348000000000",
+        company: null,
+        assigneeId: null,
+        unsubscribedAt: null,
+      },
+      org: {
+        name: "Kreatix",
+        whatsappConfig: { enabled: true, phoneNumberId: "12345", apiKey: "bad-key" },
+        replyToEmail: null,
+      },
+    });
+    dbMock.update = updateSpy;
+
+    const { processSequenceSteps } = await loadSequencesWithWhatsApp(dbMock);
+    const result = await processSequenceSteps();
+
+    expect(sendWhatsAppMock).toHaveBeenCalledTimes(1);
+    expect(result.whatsappSent).toBe(0);
+    // On transient failure, currentStep must NOT advance (no enrollment update).
+    expect(result.processed).toBe(0);
+    expect(updateSpy).not.toHaveBeenCalled();
+  });
+});
+
