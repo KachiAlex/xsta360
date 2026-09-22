@@ -78,6 +78,14 @@ export function OrgSettingsForm({
           </div>
         )}
 
+        {/* Notice when one-click connect isn't live yet (pending Meta approval). */}
+        {!embeddedSignupConfigured && (
+          <p className="mb-3 text-[11px] text-ink-soft bg-paper-2 border border-rule rounded px-3 py-2">
+            ⏳ One-click WhatsApp connect is coming soon (pending Meta approval) — use manual setup
+            below for now; it works today.
+          </p>
+        )}
+
         {/* Manual setup — fallback when embedded signup isn't configured or fails. */}
         <details className="rounded border border-rule bg-paper/60 text-xs">
           <summary className="cursor-pointer px-3 py-2 font-medium text-ink-soft select-none">
