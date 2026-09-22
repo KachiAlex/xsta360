@@ -139,6 +139,14 @@ export const organizations = pgTable("organizations", {
   currency: text("currency").notNull().default("₦"),
   // Default reply-to email for sequence emails (shared inbox, etc.)
   replyToEmail: text("reply_to_email"),
+  // Custom sender domain connected via Brevo (e.g. "clientdomain.com").
+  emailDomain: text("email_domain"),
+  // Brevo status: "pending" | "verified" | "authenticated" (only authenticated sends).
+  emailDomainStatus: text("email_domain_status"),
+  // DNS records Brevo returned for the client to add ({brevo_code, dkim_record, dmarc_record}).
+  emailDomainRecords: jsonb("email_domain_records"),
+  // Sender address on the custom domain (e.g. "sales@clientdomain.com").
+  emailFromAddress: text("email_from_address"),
   // IANA timezone for date bucketing (e.g. "Africa/Lagos"). Defaults to Lagos.
   timezone: text("timezone").notNull().default("Africa/Lagos"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

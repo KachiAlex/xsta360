@@ -253,12 +253,14 @@ export async function processSequenceSteps(opts?: {
       }
     }
 
-    // Load the org for WhatsApp config, org name, and reply-to email.
+    // Load the org for WhatsApp config, org name, reply-to, and custom email domain.
     const [org] = await db
       .select({
         name: schema.organizations.name,
         whatsappConfig: schema.organizations.whatsappConfig,
         replyToEmail: schema.organizations.replyToEmail,
+        emailDomainStatus: schema.organizations.emailDomainStatus,
+        emailFromAddress: schema.organizations.emailFromAddress,
       })
       .from(schema.organizations)
       .where(eq(schema.organizations.id, enrollment.orgId))
@@ -379,6 +381,13 @@ export async function processSequenceSteps(opts?: {
               }
             }
 
+            // Custom sender domain only when Brevo has authenticated it —
+            // otherwise fall back to the platform sender.
+            const customFrom =
+              org?.emailDomainStatus === "authenticated" && org.emailFromAddress
+                ? org.emailFromAddress
+                : undefined;
+
             await sendMail(
               lead.email,
               personalizedSubject,
@@ -386,6 +395,7 @@ export async function processSequenceSteps(opts?: {
               {
                 senderName: stepSenderName || orgName,
                 replyTo: org?.replyToEmail || undefined,
+                fromEmail: customFrom,
                 attachments,
               },
             );

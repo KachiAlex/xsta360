@@ -41,6 +41,8 @@ export async function sendMail(
   options?: {
     senderName?: string;
     replyTo?: string;
+    // Custom sender address on a Brevo-authenticated org domain.
+    fromEmail?: string;
     attachments?: EmailAttachment[];
   },
 ): Promise<void> {
@@ -52,8 +54,8 @@ export async function sendMail(
     return;
   }
 
-  // Build the From header: "Sender Name <noreply@...>" or default.
-  const fromAddress = from;
+  // Build the From header: "Sender Name <addr>" — custom domain if given.
+  const fromAddress = options?.fromEmail ?? from;
   const fromHeader = options?.senderName
     ? `${options.senderName} <${extractEmail(fromAddress)}>`
     : fromAddress;

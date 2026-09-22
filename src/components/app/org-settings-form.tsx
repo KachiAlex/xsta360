@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label, Input, Textarea } from "@/components/ui/field";
 import { WhatsAppConnect, embeddedSignupConfigured } from "@/components/app/whatsapp-connect";
 import { WhatsAppTemplates } from "@/components/app/whatsapp-templates";
+import { EmailDomain } from "@/components/app/email-domain";
 
 interface CustomFieldDef {
   key: string;
@@ -19,11 +20,21 @@ export function OrgSettingsForm({
   replyToEmail,
   whatsappConfig,
   customFieldDefs,
+  emailDomain,
+  emailDomainStatus,
+  emailDomainRecords,
+  emailFromAddress,
+  emailDomainEnabled,
 }: {
   currency: string;
   replyToEmail: string | null;
   whatsappConfig: { enabled?: boolean; phoneNumberId?: string; apiKey?: string; wabaId?: string } | null;
   customFieldDefs: CustomFieldDef[];
+  emailDomain: string | null;
+  emailDomainStatus: string | null;
+  emailDomainRecords: Record<string, { host_name: string; type: string; value: string; status: boolean }> | null;
+  emailFromAddress: string | null;
+  emailDomainEnabled: boolean;
 }) {
   const [state, action, pending] = useActionState<OrgFormState, FormData>(updateOrgSettings, {});
   const [fields, setFields] = useState<CustomFieldDef[]>(customFieldDefs || []);
@@ -54,6 +65,13 @@ export function OrgSettingsForm({
         <Label>Reply-to email (for sequence emails)</Label>
         <Input name="replyToEmail" type="email" defaultValue={replyToEmail ?? ""} placeholder="replies@yourcompany.com" className="max-w-sm" />
         <p className="text-xs text-ink-soft mt-1">When leads reply to automated sequence emails, their reply goes to this address. Use a shared inbox if multiple reps should see replies.</p>
+        <EmailDomain
+          enabled={emailDomainEnabled}
+          domain={emailDomain}
+          status={emailDomainStatus}
+          records={emailDomainRecords}
+          fromAddress={emailFromAddress}
+        />
       </div>
 
       {/* WhatsApp config */}

@@ -136,6 +136,11 @@ export default async function SettingsPage() {
               replyToEmail={org[0].replyToEmail}
               whatsappConfig={org[0].whatsappConfig as any}
               customFieldDefs={org[0].customFieldDefs as any}
+              emailDomain={org[0].emailDomain}
+              emailDomainStatus={org[0].emailDomainStatus}
+              emailDomainRecords={org[0].emailDomainRecords as any}
+              emailFromAddress={org[0].emailFromAddress}
+              emailDomainEnabled={Boolean(process.env.BREVO_API_KEY)}
             />
           </Panel>
         )}

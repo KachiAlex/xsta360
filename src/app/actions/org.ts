@@ -425,3 +425,205 @@ export async function deleteWhatsAppTemplateAction(name: string): Promise<OrgFor
   });
   return { ok: true, message: `Template "${name}" deleted` };
 }
+
+// ---------------------------------------------------------------------------
+// Custom sender domain (Brevo-authenticated) — lets an org send sequence
+// emails From: anything@theirdomain.com instead of the platform address.
+// ---------------------------------------------------------------------------
+
+const DOMAIN_RE = /^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/i;
+
+function domainStatus(info: { verified: boolean; authenticated: boolean }): string {
+  return info.authenticated ? "authenticated" : info.verified ? "verified" : "pending";
+}
+
+/** Domains an org may never connect (they're already authenticated on the
+ * shared Brevo account, so connecting them would let an org send AS us). */
+function platformDomains(): string[] {
+  const domains = new Set<string>();
+  const fromEmail = process.env.EMAIL_FROM?.match(/@([a-z0-9.-]+\.[a-z]{2,})/i)?.[1];
+  if (fromEmail) domains.add(fromEmail.toLowerCase());
+  try {
+    if (process.env.APP_URL) domains.add(new URL(process.env.APP_URL).hostname.toLowerCase());
+  } catch {}
+  return [...domains];
+}
+
+export async function connectEmailDomain(domain: string): Promise<OrgFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+  if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
+
+  const { brevoConfigured, createSenderDomain } = await import("@/lib/brevo");
+  if (!brevoConfigured()) {
+    return { message: "Custom sender domains aren't enabled on this server" };
+  }
+
+  const d = domain.trim().toLowerCase();
+  if (!DOMAIN_RE.test(d)) {
+    return { errors: { emailDomain: ["Enter a valid domain (e.g. yourcompany.com)"] } };
+  }
+  if (platformDomains().includes(d)) {
+    return { message: "That domain can't be connected to a workspace" };
+  }
+
+  // One domain per org — and one org per domain.
+  const [existing] = await db
+    .select({ id: schema.organizations.id })
+    .from(schema.organizations)
+    .where(eq(schema.organizations.emailDomain, d))
+    .limit(1);
+  if (existing && existing.id !== ctx.orgId) {
+    return { message: "That domain is already connected to another workspace" };
+  }
+
+  let info;
+  try {
+    info = await createSenderDomain(d);
+  } catch (err) {
+    return { message: err instanceof Error ? err.message : "Could not connect domain" };
+  }
+
+  await db
+    .update(schema.organizations)
+    .set({
+      emailDomain: d,
+      emailDomainStatus: domainStatus(info),
+      emailDomainRecords: info.records as any,
+      emailFromAddress: `noreply@${d}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.organizations.id, ctx.orgId));
+
+  await logEvent(ctx.orgId, "org_settings_updated", {
+    actorId: ctx.userId,
+    meta: { emailDomain: d },
+  });
+
+  revalidatePath("/settings");
+  return {
+    ok: true,
+    message: "Domain connected — add the DNS records shown below, then click \"Check status\"",
+  };
+}
+
+export async function checkEmailDomainStatus(): Promise<OrgFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+  if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
+
+  const [org] = await db
+    .select({ emailDomain: schema.organizations.emailDomain })
+    .from(schema.organizations)
+    .where(eq(schema.organizations.id, ctx.orgId))
+    .limit(1);
+  if (!org?.emailDomain) return { message: "No domain connected" };
+
+  const { authenticateSenderDomain, getSenderDomain } = await import("@/lib/brevo");
+  try {
+    await authenticateSenderDomain(org.emailDomain);
+  } catch {
+    // Validation may fail while records propagate — the GET below still
+    // reports per-record status.
+  }
+
+  let info;
+  try {
+    info = await getSenderDomain(org.emailDomain);
+  } catch (err) {
+    return { message: err instanceof Error ? err.message : "Could not check domain status" };
+  }
+
+  const status = domainStatus(info);
+  await db
+    .update(schema.organizations)
+    .set({
+      emailDomainStatus: status,
+      emailDomainRecords: info.records as any,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.organizations.id, ctx.orgId));
+
+  revalidatePath("/settings");
+  return {
+    ok: status === "authenticated",
+    message:
+      status === "authenticated"
+        ? `Domain authenticated — emails now send from ${org.emailDomain}`
+        : status === "verified"
+          ? "Domain verified — DKIM record still pending. Add it, then check again."
+          : "DNS records not detected yet — DNS changes can take a few minutes to propagate.",
+  };
+}
+
+export async function setEmailFromAddress(address: string): Promise<OrgFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+  if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
+
+  const [org] = await db
+    .select({ emailDomain: schema.organizations.emailDomain })
+    .from(schema.organizations)
+    .where(eq(schema.organizations.id, ctx.orgId))
+    .limit(1);
+  if (!org?.emailDomain) return { message: "Connect a sender domain first" };
+
+  const addr = address.trim().toLowerCase();
+  if (!z.string().email().safeParse(addr).success) {
+    return { errors: { emailFromAddress: ["Enter a valid email address"] } };
+  }
+  if (!addr.endsWith(`@${org.emailDomain}`)) {
+    return {
+      errors: { emailFromAddress: [`Address must be on your connected domain (@${org.emailDomain})`] },
+    };
+  }
+
+  await db
+    .update(schema.organizations)
+    .set({ emailFromAddress: addr, updatedAt: new Date() })
+    .where(eq(schema.organizations.id, ctx.orgId));
+
+  revalidatePath("/settings");
+  return { ok: true, message: `Sender address set to ${addr}` };
+}
+
+export async function removeEmailDomain(): Promise<OrgFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+  if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
+
+  const [org] = await db
+    .select({ emailDomain: schema.organizations.emailDomain })
+    .from(schema.organizations)
+    .where(eq(schema.organizations.id, ctx.orgId))
+    .limit(1);
+  if (!org?.emailDomain) return { message: "No domain connected" };
+
+  const { brevoConfigured, deleteSenderDomain } = await import("@/lib/brevo");
+  if (brevoConfigured()) {
+    try {
+      await deleteSenderDomain(org.emailDomain);
+    } catch {
+      // Best-effort — clear locally even if Brevo already removed it.
+    }
+  }
+
+  await db
+    .update(schema.organizations)
+    .set({
+      emailDomain: null,
+      emailDomainStatus: null,
+      emailDomainRecords: null,
+      emailFromAddress: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.organizations.id, ctx.orgId));
+
+  await logEvent(ctx.orgId, "org_settings_updated", {
+    actorId: ctx.userId,
+    meta: { emailDomainRemoved: org.emailDomain },
+  });
+
+  revalidatePath("/settings");
+  return { ok: true, message: "Custom sender domain removed — emails send from the platform address again" };
+}
