@@ -5,6 +5,7 @@ import { updateOrgSettings, type OrgFormState } from "@/app/actions/org";
 import { Button } from "@/components/ui/button";
 import { Label, Input, Textarea } from "@/components/ui/field";
 import { WhatsAppConnect, embeddedSignupConfigured } from "@/components/app/whatsapp-connect";
+import { WhatsAppTemplates } from "@/components/app/whatsapp-templates";
 
 interface CustomFieldDef {
   key: string;
@@ -21,7 +22,7 @@ export function OrgSettingsForm({
 }: {
   currency: string;
   replyToEmail: string | null;
-  whatsappConfig: { enabled?: boolean; phoneNumberId?: string; apiKey?: string } | null;
+  whatsappConfig: { enabled?: boolean; phoneNumberId?: string; apiKey?: string; wabaId?: string } | null;
   customFieldDefs: CustomFieldDef[];
 }) {
   const [state, action, pending] = useActionState<OrgFormState, FormData>(updateOrgSettings, {});
@@ -107,7 +108,8 @@ export function OrgSettingsForm({
                   In your app, open <strong>WhatsApp → API Setup</strong>. Under <strong>Send and receive messages</strong>, add your business phone number.
                 </li>
                 <li>
-                  Copy the <strong>Phone Number ID</strong> shown under your number (it&apos;s a numeric ID, not the phone number).
+                  Copy the <strong>Phone Number ID</strong> shown under your number (it&apos;s a numeric ID, not the phone number), and the{" "}
+                  <strong>WhatsApp Business Account ID</strong> shown in the account dropdown at the top of the same page.
                 </li>
                 <li>
                   For testing, copy the <strong>Temporary access token</strong> on the same page (expires in 24 hours).
@@ -117,9 +119,9 @@ export function OrgSettingsForm({
                   <a href="https://business.facebook.com/settings/system-users" target="_blank" rel="noopener noreferrer" className="text-stamp underline underline-offset-2">
                     business.facebook.com → System Users
                   </a>{" "}
-                  → Add system user → Generate token → select your app → check <code>whatsapp_business_messaging</code>.
+                  → Add system user → Generate token → select your app → check <code>whatsapp_business_messaging</code> and <code>whatsapp_business_management</code>.
                 </li>
-                <li>Paste both values here and save.</li>
+                <li>Paste the three values here and save.</li>
               </ol>
               <p className="px-3 pb-3 text-[11px] leading-relaxed text-ink-soft/80 border-t border-rule pt-2">
                 Note: Meta only lets you message leads who have contacted you in the last 24 hours
@@ -131,19 +133,30 @@ export function OrgSettingsForm({
               </p>
             </details>
             {whatsappEnabled && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label>Phone Number ID</Label>
-                  <Input name="whatsappPhoneNumberId" defaultValue={whatsappConfig?.phoneNumberId ?? ""} placeholder="e.g. 1249837834878071" />
-                  {state.errors?.whatsappPhoneNumberId && (
-                    <p className="text-xs text-stamp mt-1">{state.errors.whatsappPhoneNumberId[0]}</p>
-                  )}
-                  <p className="text-[11px] text-ink-soft mt-1">The numeric ID under your number in Meta's API Setup — not the phone number.</p>
+              <div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <Label>Phone Number ID</Label>
+                    <Input name="whatsappPhoneNumberId" defaultValue={whatsappConfig?.phoneNumberId ?? ""} placeholder="e.g. 1249837834878071" />
+                    {state.errors?.whatsappPhoneNumberId && (
+                      <p className="text-xs text-stamp mt-1">{state.errors.whatsappPhoneNumberId[0]}</p>
+                    )}
+                    <p className="text-[11px] text-ink-soft mt-1">The numeric ID under your number in Meta's API Setup — not the phone number.</p>
+                  </div>
+                  <div>
+                    <Label>WABA ID</Label>
+                    <Input name="whatsappWabaId" defaultValue={whatsappConfig?.wabaId ?? ""} placeholder="e.g. 123456789012345" />
+                    {state.errors?.whatsappWabaId && (
+                      <p className="text-xs text-stamp mt-1">{state.errors.whatsappWabaId[0]}</p>
+                    )}
+                    <p className="text-[11px] text-ink-soft mt-1">WhatsApp Business Account ID — needed for message templates.</p>
+                  </div>
+                  <div>
+                    <Label>API Key (Access Token)</Label>
+                    <Input name="whatsappApiKey" type="password" defaultValue={whatsappConfig?.apiKey ?? ""} placeholder="EAAG..." />
+                  </div>
                 </div>
-                <div>
-                  <Label>API Key (Access Token)</Label>
-                  <Input name="whatsappApiKey" type="password" defaultValue={whatsappConfig?.apiKey ?? ""} placeholder="EAAG..." />
-                </div>
+                <WhatsAppTemplates hasWabaId={Boolean(whatsappConfig?.wabaId)} />
               </div>
             )}
           </div>

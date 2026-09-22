@@ -202,6 +202,7 @@ export async function updateOrgSettings(
   const replyToEmail = String(formData.get("replyToEmail") || "").trim() || null;
   const whatsappEnabled = formData.get("whatsappEnabled") === "true";
   const whatsappPhoneNumberId = String(formData.get("whatsappPhoneNumberId") || "");
+  const whatsappWabaId = String(formData.get("whatsappWabaId") || "");
   const whatsappApiKey = String(formData.get("whatsappApiKey") || "");
   const customFieldsJson = String(formData.get("customFields") || "[]");
 
@@ -223,11 +224,20 @@ export async function updateOrgSettings(
       },
     };
   }
+  // WABA ID is also numeric — same validation.
+  const wabaIdClean = whatsappWabaId.trim();
+  if (whatsappEnabled && wabaIdClean && !/^\d+$/.test(wabaIdClean)) {
+    return {
+      message: "WhatsApp Business Account ID must be digits only",
+      errors: { whatsappWabaId: ["Must be the numeric WABA ID"] },
+    };
+  }
 
   const whatsappConfig = whatsappEnabled
     ? {
         enabled: true,
         phoneNumberId: phoneNumberIdClean || undefined,
+        wabaId: wabaIdClean || undefined,
         apiKey: whatsappApiKey.trim() || undefined,
       }
     : { enabled: false };
@@ -337,4 +347,81 @@ export async function disconnectWhatsApp(): Promise<OrgFormState> {
 
   revalidatePath("/settings");
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// WhatsApp message templates (whatsapp_business_management)
+// ---------------------------------------------------------------------------
+
+async function getOrgWhatsAppConfig(orgId: string) {
+  const [org] = await db
+    .select({ whatsappConfig: schema.organizations.whatsappConfig })
+    .from(schema.organizations)
+    .where(eq(schema.organizations.id, orgId))
+    .limit(1);
+  return (org?.whatsappConfig ?? null) as {
+    enabled?: boolean;
+    phoneNumberId?: string;
+    apiKey?: string;
+    wabaId?: string;
+  } | null;
+}
+
+export async function getWhatsAppTemplates(): Promise<{
+  ok: boolean;
+  templates?: import("@/lib/whatsapp").WhatsAppTemplate[];
+  message?: string;
+}> {
+  const ctx = await verifySession();
+  if (!ctx) return { ok: false, message: "Not signed in" };
+
+  const config = await getOrgWhatsAppConfig(ctx.orgId);
+  const { listWhatsAppTemplates } = await import("@/lib/whatsapp");
+  const res = await listWhatsAppTemplates(config);
+  if (!res.success) return { ok: false, message: res.error };
+  return { ok: true, templates: res.templates };
+}
+
+export async function createWhatsAppTemplateAction(input: {
+  name: string;
+  category: string;
+  language: string;
+  body: string;
+  examples?: string[];
+}): Promise<OrgFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+  if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
+
+  const category = ["UTILITY", "MARKETING", "AUTHENTICATION"].includes(input.category)
+    ? input.category
+    : "UTILITY";
+
+  const config = await getOrgWhatsAppConfig(ctx.orgId);
+  const { createWhatsAppTemplate } = await import("@/lib/whatsapp");
+  const res = await createWhatsAppTemplate(config, { ...input, category });
+  if (!res.success) return { message: res.error };
+
+  await logEvent(ctx.orgId, "org_settings_updated", {
+    actorId: ctx.userId,
+    meta: { whatsappTemplateCreated: input.name },
+  });
+  return { ok: true, message: `Template "${input.name}" submitted — Meta usually approves within minutes` };
+}
+
+export async function deleteWhatsAppTemplateAction(name: string): Promise<OrgFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in" };
+  if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
+
+  const config = await getOrgWhatsAppConfig(ctx.orgId);
+  const { deleteWhatsAppTemplate } = await import("@/lib/whatsapp");
+  const res = await deleteWhatsAppTemplate(config, name);
+  if (!res.success) return { message: res.error };
+
+  await logEvent(ctx.orgId, "org_settings_updated", {
+    actorId: ctx.userId,
+    meta: { whatsappTemplateDeleted: name },
+  });
+  return { ok: true, message: `Template "${name}" deleted` };
 }
