@@ -121,6 +121,13 @@ export function LeadSequences({
       )}
 
       {/* Enroll button / dropdown */}
+      {availableSequences.length === 0 && sequences.length > 0 && (
+        <p className="text-[11px] text-ink-soft">
+          {sequences.every((s) => !s.active)
+            ? "All sequences are paused — activate one to enroll this lead."
+            : "Already enrolled in every active sequence."}
+        </p>
+      )}
       {availableSequences.length > 0 && (
         <div>
           {!showEnroll ? (

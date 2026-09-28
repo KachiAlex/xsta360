@@ -413,24 +413,31 @@ function SequenceItem({
               </div>
             ))}
 
-            {/* Add-leads picker */}
-            {sequence.active && sequence.steps.length === 0 && (
-              <p className="text-[11px] text-stamp pt-1">
-                Add at least one step below before enrolling leads — enrollments in an
-                empty sequence complete instantly without sending anything.
-              </p>
-            )}
-            {sequence.active && sequence.steps.length > 0 && (
-              <div className="pt-1">
-                {!showPicker ? (
+            {/* Add-leads picker — always visible; disabled with an explanation
+                when the sequence can't accept enrollments. */}
+            <div className="pt-1">
+              {!showPicker ? (
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
+                    disabled={!sequence.active || sequence.steps.length === 0}
                     onClick={() => setShowPicker(true)}
-                    className="text-xs text-[var(--accent)] hover:underline min-h-[36px] px-1.5 rounded active:bg-paper-2"
+                    className="text-xs text-[var(--accent)] hover:underline min-h-[36px] px-1.5 rounded active:bg-paper-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:no-underline"
                   >
                     + Add leads
                   </button>
-                ) : (
+                  {!sequence.active && (
+                    <span className="text-[11px] text-ink-soft">
+                      Sequence is paused — activate it to enroll leads.
+                    </span>
+                  )}
+                  {sequence.active && sequence.steps.length === 0 && (
+                    <span className="text-[11px] text-stamp">
+                      Add a step below first — empty sequences send nothing.
+                    </span>
+                  )}
+                </div>
+              ) : (
                   <div className="bg-paper-2 rounded p-3 space-y-2">
                     <Input
                       placeholder="Search leads by name, company, phone…"
@@ -468,12 +475,9 @@ function SequenceItem({
                       </Button>
                     </div>
                   </div>
-                )}
-              </div>
-            )}
-            {!sequence.active && visibleEnrollments.length === 0 && (
-              <p className="text-[11px] text-ink-soft">Activate the sequence to enroll leads.</p>
-            )}
+              )}
+            </div>
+
           </div>
         )}
         {enrollMsg && !showPicker && <p className="text-xs font-mono text-ink-soft mt-1">{enrollMsg}</p>}
