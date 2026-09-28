@@ -52,12 +52,13 @@ export default async function SequenceAnalyticsPage({
         {/* Overview stats */}
         <Panel>
           <PanelHead title="Overview" sub="Enrollment and delivery stats" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 p-4">
             <StatCard label="Enrolled" value={analytics.totalEnrollments} tone="neutral" />
             <StatCard label="Active" value={analytics.activeEnrollments} tone="won" />
             <StatCard label="Completed" value={analytics.completedEnrollments} tone="neutral" />
             <StatCard label="Paused" value={analytics.pausedEnrollments} tone="lost" />
             <StatCard label="Emails sent" value={analytics.emailsSent} tone="neutral" />
+            <StatCard label="Delivered" value={analytics.emailsDelivered} tone="won" />
             <StatCard label="Unsubscribes" value={analytics.unsubscribes} tone="lost" />
           </div>
           {(analytics.whatsappSent > 0 || analytics.whatsappFailed > 0 || analytics.remindersCreated > 0) && (
@@ -71,8 +72,14 @@ export default async function SequenceAnalyticsPage({
 
         {/* Email performance rates */}
         <Panel>
-          <PanelHead title="Email performance" sub="Open, click, reply, and bounce rates" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 p-4">
+          <PanelHead title="Email performance" sub="Delivery, open, click, reply, and bounce rates" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 p-4">
+            <RateCard
+              label="Delivery rate"
+              value={analytics.emailsSent > 0 ? (analytics.emailsDelivered / analytics.emailsSent) * 100 : 0}
+              total={analytics.emailsDelivered}
+              of={analytics.emailsSent}
+            />
             <RateCard label="Open rate" value={analytics.openRate} total={analytics.emailsOpened} of={analytics.emailsSent} />
             <RateCard label="Click rate" value={analytics.clickRate} total={analytics.emailsClicked} of={analytics.emailsSent} />
             <RateCard label="Reply rate" value={analytics.replyRate} total={analytics.emailsReplied} of={analytics.emailsSent} />
