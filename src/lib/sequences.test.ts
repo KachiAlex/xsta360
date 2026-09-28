@@ -13,7 +13,10 @@ const mockDb = {
       from: vi.fn(() => ({
         where: vi.fn(() => ({
           // First call: sequence lookup → return sequence
-          // Second call: existing enrollment check → return empty (not enrolled)
+          // Second call (awaited, no limit): step-count query → 1 step exists
+          // Later calls: unsubscribed check, existing enrollment → empty
+          then: (resolve: any, reject?: any) =>
+            Promise.resolve(callNum === 2 ? [{ value: 1 }] : []).then(resolve, reject),
           limit: vi.fn(() =>
             Promise.resolve(callNum === 1 ? [{ id: "seq-1", orgId: "org-1", active: true }] : []),
           ),
@@ -44,6 +47,9 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn((a, b) => ({ eq: [a, b] })),
   and: vi.fn((...args) => ({ and: args })),
   asc: vi.fn((a) => ({ asc: a })),
+  inArray: vi.fn((a, b) => ({ inArray: [a, b] })),
+  isNull: vi.fn((a) => ({ isNull: a })),
+  count: vi.fn(() => "count()"),
 }));
 
 vi.mock("@/lib/audit", () => ({
@@ -83,6 +89,7 @@ describe("enrollLeadInSequence", () => {
     mockDb.select = vi.fn(() => ({
       from: vi.fn(() => ({
         where: vi.fn(() => ({
+          then: (resolve: any, reject?: any) => Promise.resolve([]).then(resolve, reject),
           limit: vi.fn(() => Promise.resolve([])),
         })),
       })),
@@ -98,6 +105,7 @@ describe("enrollLeadInSequence", () => {
     mockDb.select = vi.fn(() => ({
       from: vi.fn(() => ({
         where: vi.fn(() => ({
+          then: (resolve: any, reject?: any) => Promise.resolve([]).then(resolve, reject),
           limit: vi.fn(() => Promise.resolve([{ id: "seq-1", orgId: "org-1", active: false }])),
         })),
       })),
@@ -244,6 +252,8 @@ describe("processSequenceSteps — email flow", () => {
       and: vi.fn((...args) => ({ and: args })),
       asc: vi.fn((a) => ({ asc: a })),
       inArray: vi.fn((a, b) => ({ inArray: [a, b] })),
+      isNull: vi.fn((a) => ({ isNull: a })),
+      count: vi.fn(() => "count()"),
     }));
 
     // Re-mock r2
@@ -334,6 +344,8 @@ describe("processSequenceSteps — email flow", () => {
       and: vi.fn((...args) => ({ and: args })),
       asc: vi.fn((a) => ({ asc: a })),
       inArray: vi.fn((a, b) => ({ inArray: [a, b] })),
+      isNull: vi.fn((a) => ({ isNull: a })),
+      count: vi.fn(() => "count()"),
     }));
 
     vi.doMock("@/lib/r2", () => ({
@@ -411,6 +423,8 @@ describe("processSequenceSteps — email flow", () => {
       and: vi.fn((...args) => ({ and: args })),
       asc: vi.fn((a) => ({ asc: a })),
       inArray: vi.fn((a, b) => ({ inArray: [a, b] })),
+      isNull: vi.fn((a) => ({ isNull: a })),
+      count: vi.fn(() => "count()"),
     }));
 
     vi.doMock("@/lib/r2", () => ({
@@ -495,6 +509,8 @@ describe("processSequenceSteps — email flow", () => {
       and: vi.fn((...args) => ({ and: args })),
       asc: vi.fn((a) => ({ asc: a })),
       inArray: vi.fn((a, b) => ({ inArray: [a, b] })),
+      isNull: vi.fn((a) => ({ isNull: a })),
+      count: vi.fn(() => "count()"),
     }));
 
     vi.doMock("@/lib/r2", () => ({
@@ -590,6 +606,7 @@ async function loadSequencesWithWhatsApp(dbMock: any) {
     asc: vi.fn((a) => ({ asc: a })),
     inArray: vi.fn((a, b) => ({ inArray: [a, b] })),
     isNull: vi.fn((a) => ({ isNull: a })),
+    count: vi.fn(() => "count()"),
   }));
   vi.doMock("@/lib/whatsapp", () => ({
     sendWhatsAppMessage: sendWhatsAppMock,

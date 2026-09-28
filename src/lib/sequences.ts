@@ -1,11 +1,14 @@
 import "server-only";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db, schema } from "@/db";
 import { logEvent } from "@/lib/audit";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { sendMail } from "@/lib/email";
 import { replacePlaceholders, buildEmailHtml, buildEmailHtmlFromRich, formatWhatsAppMessage } from "@/lib/message-format";
+
+/** Max send attempts per step before the enrollment is paused as failed. */
+const MAX_STEP_FAILURES = 3;
 
 /**
  * Enroll a lead in a sequence. Creates the enrollment record.
@@ -29,6 +32,19 @@ export async function enrollLeadInSequence(
 
   if (!seq) return { ok: false, message: "Sequence not found" };
   if (!seq.active) return { ok: false, message: "Sequence is not active" };
+
+  // A sequence with no steps would enroll, then instantly "complete" on the
+  // next run without sending anything — a silent failure for the user.
+  const [{ value: stepCount }] = await db
+    .select({ value: count() })
+    .from(schema.sequenceSteps)
+    .where(eq(schema.sequenceSteps.sequenceId, sequenceId));
+  if (stepCount === 0) {
+    return {
+      ok: false,
+      message: "This sequence has no steps — add a step before enrolling leads",
+    };
+  }
 
   // Check lead isn't unsubscribed
   const [lead] = await db
@@ -415,6 +431,29 @@ export async function processSequenceSteps(opts?: {
             } catch {
               // best-effort cleanup
             }
+            // After repeated failures (e.g. a permanently invalid address),
+            // pause the enrollment instead of retrying every cron run forever.
+            const failRows = await db
+              .select({ value: count() })
+              .from(schema.sequenceEmailEvents)
+              .where(
+                and(
+                  eq(schema.sequenceEmailEvents.enrollmentId, enrollment.id),
+                  eq(schema.sequenceEmailEvents.stepId, nextStep.id),
+                  eq(schema.sequenceEmailEvents.eventType, "failed"),
+                ),
+              );
+            if ((failRows[0]?.value ?? 0) >= MAX_STEP_FAILURES) {
+              await db
+                .update(schema.sequenceEnrollments)
+                .set({
+                  status: "paused",
+                  pausedReason: "failed",
+                  pausedAt: now,
+                  updatedAt: now,
+                })
+                .where(eq(schema.sequenceEnrollments.id, enrollment.id));
+            }
           }
           // Create a reminder record for tracking (only if email was actually sent).
           if (emailSent) {
@@ -476,6 +515,32 @@ export async function processSequenceSteps(opts?: {
           channel: "whatsapp",
           lastError: whatsappError,
         });
+        // After repeated API failures, pause rather than retry every cron run.
+        // (Skipped steps — no phone/config — advance permanently and don't count.)
+        if (stepOutcome === "failed") {
+          const waFailRows = await db
+            .select({ value: count() })
+            .from(schema.reminders)
+            .where(
+              and(
+                eq(schema.reminders.leadId, enrollment.leadId),
+                eq(schema.reminders.sequenceStepId, nextStep.id),
+                eq(schema.reminders.channel, "whatsapp"),
+                eq(schema.reminders.status, "failed"),
+              ),
+            );
+          if ((waFailRows[0]?.value ?? 0) >= MAX_STEP_FAILURES) {
+            await db
+              .update(schema.sequenceEnrollments)
+              .set({
+                status: "paused",
+                pausedReason: "failed",
+                pausedAt: now,
+                updatedAt: now,
+              })
+              .where(eq(schema.sequenceEnrollments.id, enrollment.id));
+          }
+        }
         break;
       }
 

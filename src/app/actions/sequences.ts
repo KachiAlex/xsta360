@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { verifySession, getOrgPlan, planHasFeature } from "@/lib/dal";
 
@@ -312,6 +312,14 @@ export async function runSequenceNow(
     )
     .limit(1);
   if (!seq) return { message: "Sequence not found" };
+
+  const [{ value: stepCount }] = await db
+    .select({ value: count() })
+    .from(schema.sequenceSteps)
+    .where(eq(schema.sequenceSteps.sequenceId, sequenceId));
+  if (stepCount === 0) {
+    return { message: "This sequence has no steps — add one first, then run it" };
+  }
 
   const result = await processSequenceSteps({ orgId: ctx.orgId, sequenceId });
 

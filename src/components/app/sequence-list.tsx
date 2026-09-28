@@ -236,6 +236,9 @@ function SequenceItem({
             <Badge tone={sequence.active ? "won" : "neutral"}>
               {sequence.active ? "Active" : "Paused"}
             </Badge>
+            {sequence.steps.length === 0 && (
+              <Badge tone="lost">No steps — nothing will send</Badge>
+            )}
           </div>
           {sequence.description && (
             <div className="text-xs text-ink-soft mt-0.5">{sequence.description}</div>
@@ -409,7 +412,13 @@ function SequenceItem({
             ))}
 
             {/* Add-leads picker */}
-            {sequence.active && (
+            {sequence.active && sequence.steps.length === 0 && (
+              <p className="text-[11px] text-stamp pt-1">
+                Add at least one step below before enrolling leads — enrollments in an
+                empty sequence complete instantly without sending anything.
+              </p>
+            )}
+            {sequence.active && sequence.steps.length > 0 && (
               <div className="pt-1">
                 {!showPicker ? (
                   <button
