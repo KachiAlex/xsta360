@@ -36,10 +36,19 @@ export function RichTextEditor({
   const [imageUrl, setImageUrl] = useState("");
   const [imageAlt, setImageAlt] = useState("");
 
-  // Sync editor content on mount.
+  // Sync editor content from defaultValue — but never while the user is
+  // typing. Re-assigning innerHTML destroys the DOM selection and collapses
+  // the caret to position 0, which makes new characters appear *before*
+  // already-typed text. Only apply external changes when unfocused.
   useEffect(() => {
-    if (editorRef.current && defaultValue) {
-      editorRef.current.innerHTML = defaultValue;
+    const el = editorRef.current;
+    if (
+      el &&
+      defaultValue !== undefined &&
+      document.activeElement !== el &&
+      el.innerHTML !== defaultValue
+    ) {
+      el.innerHTML = defaultValue;
     }
   }, [defaultValue]);
 
