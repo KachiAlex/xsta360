@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 export interface AttachmentDoc {
   id: string;
@@ -9,10 +9,14 @@ export interface AttachmentDoc {
   mimeType: string;
 }
 
+// Email attachments beyond ~10 MB hurt deliverability — many inboxes reject
+// larger messages outright.
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
+
 /**
  * Attachment picker for sequence email steps.
- * Lets users select from existing org-level documents to attach to the email.
- * Selected document IDs are stored in a hidden input as a JSON array.
+ * Select existing org documents or upload a new file inline — uploaded files
+ * are auto-selected and stored as a JSON array of document IDs.
  */
 export function AttachmentPicker({
   documents,
@@ -24,9 +28,19 @@ export function AttachmentPicker({
   onChange: (ids: string[]) => void;
 }) {
   const [showPicker, setShowPicker] = useState(false);
+  const [uploadedDocs, setUploadedDocs] = useState<AttachmentDoc[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const selectedDocs = documents.filter((d) => selectedIds.includes(d.id));
-  const availableDocs = documents.filter((d) => !selectedIds.includes(d.id));
+  // Docs uploaded this session aren't in the server-loaded `documents` prop
+  // yet — merge them so they render as selectable/selected.
+  const allDocs = [
+    ...documents,
+    ...uploadedDocs.filter((u) => !documents.some((d) => d.id === u.id)),
+  ];
+  const selectedDocs = allDocs.filter((d) => selectedIds.includes(d.id));
+  const availableDocs = allDocs.filter((d) => !selectedIds.includes(d.id));
 
   function toggle(id: string) {
     if (selectedIds.includes(id)) {
@@ -36,15 +50,77 @@ export function AttachmentPicker({
     }
   }
 
-  if (documents.length === 0) {
-    return (
-      <div>
-        <p className="text-xs text-ink-soft">
-          No documents available to attach. Upload documents in the Documents page first.
-        </p>
-      </div>
-    );
+  async function uploadFile(file: File) {
+    setUploadError(null);
+    if (file.size > MAX_ATTACHMENT_SIZE) {
+      setUploadError(
+        `"${file.name}" is ${formatSize(file.size)} — email attachments should stay under 10 MB for deliverability.`,
+      );
+      return;
+    }
+    setUploading(true);
+    try {
+      const mime = file.type || "application/octet-stream";
+      const initRes = await fetch("/api/documents/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          mimeType: mime,
+          sizeBytes: file.size,
+          leadId: null,
+        }),
+      });
+      if (!initRes.ok) {
+        const err = await initRes.json().catch(() => ({}));
+        throw new Error(err.error || "Could not initialize upload");
+      }
+      const { uploadUrl, docId } = await initRes.json();
+
+      const putRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": mime },
+        body: file,
+      });
+      if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
+
+      const doc: AttachmentDoc = {
+        id: docId,
+        fileName: file.name,
+        sizeBytes: file.size,
+        mimeType: mime,
+      };
+      setUploadedDocs((prev) => [...prev, doc]);
+      onChange([...selectedIds, doc.id]);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
   }
+
+  const uploadButton = (
+    <>
+      <input
+        ref={fileRef}
+        type="file"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) uploadFile(f);
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        disabled={uploading}
+        className="text-xs font-semibold text-[var(--accent)] hover:text-ink border border-rule rounded px-2.5 py-1.5 min-h-[36px] hover:bg-paper-2 transition-colors disabled:opacity-50"
+      >
+        {uploading ? "Uploading…" : "↑ Upload file"}
+      </button>
+    </>
+  );
 
   return (
     <div>
@@ -71,15 +147,25 @@ export function AttachmentPicker({
         </div>
       )}
 
-      {/* Add attachment button */}
-      {availableDocs.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setShowPicker(!showPicker)}
-          className="text-xs font-semibold text-ink-soft hover:text-ink border border-rule rounded px-2.5 py-1.5 min-h-[36px] hover:bg-paper-2 transition-colors"
-        >
-          + Add attachment
-        </button>
+      {/* Actions */}
+      <div className="flex items-center gap-2">
+        {availableDocs.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowPicker(!showPicker)}
+            className="text-xs font-semibold text-ink-soft hover:text-ink border border-rule rounded px-2.5 py-1.5 min-h-[36px] hover:bg-paper-2 transition-colors"
+          >
+            + From documents
+          </button>
+        )}
+        {uploadButton}
+      </div>
+
+      {uploadError && <p className="text-xs text-stamp mt-1.5">{uploadError}</p>}
+      {allDocs.length === 0 && !uploading && (
+        <p className="text-[11px] text-ink-soft mt-1.5">
+          No documents yet — upload one above to attach it, or add files on the Documents page.
+        </p>
       )}
 
       {/* Document picker dropdown */}
