@@ -319,7 +319,7 @@ function SequenceItem({
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono text-ink-soft">
-                    Day {step.delayDays}
+                    {idx === 0 ? `Day ${step.delayDays}` : `+${step.delayDays}d`}
                   </span>
                   <Badge tone="neutral">{step.action}</Badge>
                   {step.subject && <span className="text-xs font-semibold">{step.subject}</span>}
@@ -488,6 +488,9 @@ function SequenceItem({
             <div>
               <Label>Delay (days)</Label>
               <Input name="delayDays" type="number" defaultValue="0" />
+              <p className="text-[11px] text-ink-soft mt-1">
+                Days to wait after enrollment for the first step, or after the previous step for the rest.
+              </p>
             </div>
             <div>
               <Label>Action</Label>

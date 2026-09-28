@@ -224,8 +224,13 @@ export async function processSequenceSteps(opts?: {
     const nextStep = steps[nextStepIndex];
     if (!nextStep) continue;
 
-    // Check if enough days have passed since enrollment.
-    const dueDate = new Date(enrollment.enrolledAt.getTime() + nextStep.delayDays * 86_400_000);
+    // Delay anchors to enrollment for step 0, and to when the previous
+    // step fired for all later steps.
+    const anchor =
+      nextStepIndex === 0
+        ? enrollment.enrolledAt
+        : (enrollment.lastStepAt ?? enrollment.enrolledAt);
+    const dueDate = new Date(anchor.getTime() + nextStep.delayDays * 86_400_000);
     if (now < dueDate) continue;
 
     // Use prefetched lead.
@@ -577,11 +582,13 @@ export async function processSequenceSteps(opts?: {
       },
     });
 
-    // Advance to next step.
+    // Advance to next step — record when this step fired so the next
+    // step's delay counts from now, not from enrollment.
     await db
       .update(schema.sequenceEnrollments)
       .set({
         currentStep: enrollment.currentStep + 1,
+        lastStepAt: now,
         updatedAt: now,
       })
       .where(eq(schema.sequenceEnrollments.id, enrollment.id));

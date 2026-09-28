@@ -730,8 +730,11 @@ export const sequenceEnrollments = pgTable(
     }),
     // Current step position (0 = not started yet).
     currentStep: integer("current_step").notNull().default(0),
+    // When the last step fired — delays for steps > 0 anchor to this,
+    // not to enrolledAt (delay = "days after the previous step").
+    lastStepAt: timestamp("last_step_at", { withTimezone: true }),
     status: text("status").notNull().default("active"),
-    // Why the enrollment was paused: "reply", "bounce", "unsubscribed", "manual".
+    // Why the enrollment was paused: "reply", "bounce", "unsubscribed", "manual", "failed".
     pausedReason: text("paused_reason"),
     pausedAt: timestamp("paused_at", { withTimezone: true }),
     // Reply/bounce tracking.
