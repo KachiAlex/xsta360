@@ -581,7 +581,13 @@ export async function resumeEnrollment(
   if (!z.string().uuid().safeParse(enrollmentId).success) return { message: "Invalid ID" };
   await db
     .update(schema.sequenceEnrollments)
-    .set({ status: "active", pausedReason: null, pausedAt: null, updatedAt: new Date() })
+    .set({
+      status: "active",
+      pausedReason: null,
+      pausedAt: null,
+      completedAt: null,
+      updatedAt: new Date(),
+    })
     .where(
       and(
         eq(schema.sequenceEnrollments.id, enrollmentId),

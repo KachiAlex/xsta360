@@ -374,7 +374,7 @@ function SequenceItem({
                   {e.status}
                 </Badge>
                 <span className="text-[11px] font-mono text-ink-soft">
-                  {e.status === "completed" ? `${sequence.steps.length}/${sequence.steps.length}` : `${e.currentStep}/${sequence.steps.length}`} steps
+                  {e.currentStep}/{sequence.steps.length} steps
                 </span>
                 <span className="ml-auto flex gap-1">
                   {e.status === "active" && (
@@ -386,13 +386,15 @@ function SequenceItem({
                       Pause
                     </button>
                   )}
-                  {e.status === "paused" && (
+                  {/* Paused — or completed with new steps still pending. */}
+                  {(e.status === "paused" ||
+                    (e.status === "completed" && e.currentStep < sequence.steps.length)) && (
                     <button
                       type="button"
                       className="text-[11px] text-[var(--accent)] hover:text-ink px-1.5 py-1 rounded active:bg-paper-2"
                       onClick={() => enrollmentAction(e.enrollmentId, resumeEnrollment)}
                     >
-                      Resume
+                      {e.status === "completed" ? "Resume (new steps)" : "Resume"}
                     </button>
                   )}
                   {e.status !== "completed" && e.status !== "cancelled" && (
