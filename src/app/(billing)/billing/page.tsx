@@ -6,6 +6,7 @@ import { PaystackCheckout } from "@/components/app/paystack-checkout";
 import { PlanPicker, type PlanOption } from "@/components/app/plan-picker";
 import { Price } from "@/components/app/price";
 import { normalizeCurrency } from "@/lib/currency";
+import { FEATURE_LABELS, FEATURE_ORDER, BASE_FEATURES } from "@/lib/plan-features";
 
 export const metadata: Metadata = {
   title: "Billing & plans",
@@ -13,33 +14,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
   alternates: { canonical: "/billing" },
 };
-
-const FEATURE_LABELS: Record<string, string> = {
-  leads: "Lead management",
-  contact_card: "Digital contact card",
-  custom_fields: "Custom fields",
-  follow_ups: "Follow-up reminders",
-  pipeline: "Pipeline board",
-  tasks: "To-dos & notes",
-  reports: "Reports & analytics",
-  sequences: "Sequences",
-  api_access: "API access",
-  sso: "SSO",
-  dedicated_support: "Dedicated support",
-};
-const FEATURE_ORDER = [
-  "leads",
-  "contact_card",
-  "custom_fields",
-  "follow_ups",
-  "pipeline",
-  "tasks",
-  "reports",
-  "sequences",
-  "api_access",
-  "sso",
-  "dedicated_support",
-];
 
 export default async function BillingPage() {
   const ctx = await requireAuth();
@@ -79,8 +53,6 @@ export default async function BillingPage() {
 
   const planOptions: PlanOption[] = allPlans.map((p) => {
     const feats = (p.features ?? {}) as Record<string, unknown>;
-    // Base features included on every plan (core CRM functionality).
-    const BASE_FEATURES = ["leads", "follow_ups", "pipeline", "tasks"];
     return {
       id: p.id,
       name: p.name,

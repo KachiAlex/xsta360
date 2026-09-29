@@ -1,5 +1,13 @@
 import Link from "next/link";
 import { Logo } from "@/components/app/logo";
+import { db, schema } from "@/db";
+import { eq, asc } from "drizzle-orm";
+import { normalizeCurrency, formatPrice } from "@/lib/currency";
+import { FEATURE_LABELS, FEATURE_ORDER, BASE_FEATURES } from "@/lib/plan-features";
+
+// Re-render at most once a minute so superadmin pricing changes go live
+// without a redeploy.
+export const revalidate = 60;
 
 const FEATURES = [
   { tag: "Lead management", title: "Capture from anywhere", body: "Manual entry, CSV import, or an embeddable web form that drops leads straight into your pipeline — tagged and ready." },
@@ -10,7 +18,26 @@ const FEATURES = [
   { tag: "Manager view", title: "Visibility, not micromanagement", body: "See who's on top of their follow-ups and who needs support — without asking for a status update." },
 ];
 
-export default function Home() {
+export default async function Home() {
+  // Pricing is authored in the superadmin portal (plans table) and rendered
+  // live here — if the DB is unreachable the section just doesn't render
+  // rather than taking the landing page down.
+  let plans: (typeof schema.plans.$inferSelect)[] = [];
+  try {
+    plans = await db
+      .select()
+      .from(schema.plans)
+      .where(eq(schema.plans.active, true))
+      .orderBy(asc(schema.plans.position));
+  } catch {
+    plans = [];
+  }
+  const cheapest = plans.length > 0
+    ? plans.reduce((a, b) => (b.basePriceMonthly < a.basePriceMonthly ? b : a))
+    : null;
+  const currency = cheapest ? normalizeCurrency(cheapest.currency) : "₦";
+  const popularIdx = Math.floor(plans.length / 2);
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
@@ -21,9 +48,11 @@ export default function Home() {
       "Sales management hub for teams that close. Capture leads, log remarks, set follow-up reminders, track your pipeline, and never let a deal go cold.",
     offers: {
       "@type": "Offer",
-      price: "1500",
+      price: cheapest ? String(cheapest.basePriceMonthly) : "1500",
       priceCurrency: "NGN",
-      description: "Starts at ₦1,500/month with a 7-day free trial. No card required.",
+      description: cheapest
+        ? `Starts at ${formatPrice(cheapest.basePriceMonthly, cheapest.currency)}/month${cheapest.trialDays > 0 ? ` with a ${cheapest.trialDays}-day free trial` : ""}. No card required.`
+        : "Starts at ₦1,500/month with a 7-day free trial. No card required.",
     },
     publisher: {
       "@type": "Organization",
@@ -48,6 +77,7 @@ export default function Home() {
         <Logo size="lg" />
         <div className="nav-links flex gap-3 sm:gap-8 items-center text-sm">
           <a href="#features" className="no-underline text-ink-soft font-medium hover:text-ink hidden sm:inline">Features</a>
+          <a href="#pricing" className="no-underline text-ink-soft font-medium hover:text-ink hidden sm:inline">Pricing</a>
           <a href="#how" className="no-underline text-ink-soft font-medium hover:text-ink hidden sm:inline">How it works</a>
           <Link href="/login" className="btn btn-ghost inline-block font-semibold text-sm px-3 sm:px-5 py-2 sm:py-2.5 rounded-[3px] border-[1.5px] border-ink bg-transparent text-ink hover:bg-paper-2 min-h-[40px] flex items-center">Sign in</Link>
           <Link href="/signup" className="btn btn-primary inline-block font-semibold text-sm px-3 sm:px-5 py-2 sm:py-2.5 rounded-[3px] border-[1.5px] border-ink bg-ink text-paper hover:bg-stamp-deep hover:border-stamp-deep min-h-[40px] flex items-center">Start free</Link>
@@ -141,6 +171,80 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* PRICING — driven live from the plans table (superadmin portal) */}
+      {plans.length > 0 && (
+        <section className="section max-w-[1180px] mx-auto px-4 sm:px-12 pb-10 sm:pb-[100px]" id="pricing">
+          <div className="section-head max-w-[620px] mb-6 sm:mb-12">
+            <div className="eyebrow font-mono text-[13px] tracking-wider text-stamp uppercase font-semibold flex items-center gap-2.5 mb-3.5">
+              <span className="w-6 h-px bg-stamp" />
+              Pricing
+            </div>
+            <h2 className="font-mono text-[clamp(22px,4vw,36px)] m-0 mb-3.5">Simple plans that scale with your team.</h2>
+            <p className="text-ink-soft text-sm sm:text-base m-0">
+              Every plan starts with a free trial — no card required. Pricing is per workspace: a base fee covers the admin, then a flat rate per additional member.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-rule border border-rule">
+            {plans.map((plan, i) => {
+              const feats = (plan.features ?? {}) as Record<string, unknown>;
+              const maxMembers = typeof feats.max_members === "number" ? (feats.max_members as number) : null;
+              const included = FEATURE_ORDER.filter(
+                (key) => feats[key] === true || BASE_FEATURES.includes(key),
+              );
+              const symbol = normalizeCurrency(plan.currency);
+              return (
+                <div
+                  key={plan.id}
+                  className={`relative bg-paper px-5 sm:px-6 py-6 sm:py-8 flex flex-col ${
+                    i === popularIdx ? "lg:-my-px lg:py-9 outline outline-2 outline-ink z-10" : ""
+                  }`}
+                >
+                  {i === popularIdx && (
+                    <span className="absolute -top-3 left-5 font-mono text-[10px] uppercase tracking-wider bg-ink text-paper px-2.5 py-1">
+                      Popular
+                    </span>
+                  )}
+                  <h4 className="font-mono text-sm uppercase tracking-wider text-ink-soft m-0 mb-3">{plan.name}</h4>
+                  <div className="font-mono m-0 mb-1">
+                    <span className="font-sans text-lg align-top">{symbol}</span>
+                    <span className="text-[32px] font-bold tabular-nums">{plan.basePriceMonthly.toLocaleString("en-US")}</span>
+                    <span className="text-sm text-ink-soft">/mo</span>
+                  </div>
+                  <p className="text-xs text-ink-soft m-0 mb-4">
+                    covers the workspace admin · +{formatPrice(plan.perSeatPriceMonthly, plan.currency)}/mo per extra member
+                  </p>
+                  <ul className="m-0 mb-4 p-0 list-none space-y-1.5 text-[13px] text-ink-soft flex-1">
+                    <li className="flex gap-2">
+                      <span className="text-register">✓</span>
+                      {maxMembers === null ? "Unlimited members" : `Up to ${maxMembers} members`}
+                    </li>
+                    {included.map((key) => (
+                      <li key={key} className="flex gap-2">
+                        <span className="text-register">✓</span>
+                        {FEATURE_LABELS[key] ?? key}
+                      </li>
+                    ))}
+                  </ul>
+                  {plan.trialDays > 0 && (
+                    <p className="text-[11px] font-mono text-stamp m-0 mb-3">{plan.trialDays}-day free trial</p>
+                  )}
+                  <Link
+                    href="/signup"
+                    className={`btn inline-block font-semibold text-sm px-4 py-2.5 rounded-[3px] border-[1.5px] text-center min-h-[44px] ${
+                      i === popularIdx
+                        ? "border-ink bg-ink text-paper hover:bg-stamp-deep hover:border-stamp-deep"
+                        : "border-ink bg-transparent text-ink hover:bg-paper-2"
+                    }`}
+                  >
+                    Start free
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* CONTEXT STRIP */}
       <section className="context bg-ink text-paper py-10 sm:py-16 px-4 sm:px-12">
