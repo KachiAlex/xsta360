@@ -4,7 +4,7 @@ import { db, schema } from "@/db";
 import { eq, asc } from "drizzle-orm";
 import { normalizeCurrency, formatPrice } from "@/lib/currency";
 import { FEATURE_LABELS, FEATURE_ORDER, BASE_FEATURES } from "@/lib/plan-features";
-import { SiteFooter, CONTACT_EMAIL, CONTACT_PHONE_DISPLAY } from "@/components/app/site-footer";
+import { SiteFooter, CONTACT_EMAIL, CONTACT_PHONE_DISPLAY, CONTACT_WHATSAPP } from "@/components/app/site-footer";
 
 // Re-render at most once a minute so superadmin pricing changes go live
 // without a redeploy.
@@ -280,7 +280,7 @@ export default async function Home() {
           Questions?{" "}
           <a href={`mailto:${CONTACT_EMAIL}`} className="text-ink font-semibold hover:text-stamp">{CONTACT_EMAIL}</a>
           {" · "}
-          <a href={`tel:+2347089881454`} className="text-ink font-semibold hover:text-stamp">{CONTACT_PHONE_DISPLAY}</a>
+          <a href={CONTACT_WHATSAPP} target="_blank" rel="noopener noreferrer" className="text-ink font-semibold hover:text-stamp">WhatsApp {CONTACT_PHONE_DISPLAY}</a>
         </p>
       </section>
 

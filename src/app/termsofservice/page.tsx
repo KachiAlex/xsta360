@@ -94,8 +94,8 @@ export default function TermsPage() {
         <h2>9. Governing law and contact</h2>
         <p>
           These terms are governed by the laws of the Federal Republic of Nigeria. Questions:{" "}
-          <a href="mailto:admin@kreatixtech.com">admin@kreatixtech.com</a> or call{" "}
-          <a href="tel:+2347089881454">+234 708 988 1454</a>.
+          <a href="mailto:admin@kreatixtech.com">admin@kreatixtech.com</a> or message us on WhatsApp at{" "}
+          <a href="https://wa.me/2347089881454" target="_blank" rel="noopener noreferrer">+234 708 988 1454</a>.
         </p>
       </section>
     </LegalShell>

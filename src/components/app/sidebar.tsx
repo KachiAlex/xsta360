@@ -114,8 +114,13 @@ export function Sidebar({ orgName, userName, userInitials, role, todayCount }: S
             <a href="mailto:admin@kreatixtech.com" className="underline underline-offset-2 hover:text-paper">
               admin@kreatixtech.com
             </a>
-            <a href="tel:+2347089881454" className="block hover:text-paper mt-0.5">
-              +234 708 988 1454
+            <a
+              href="https://wa.me/2347089881454"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block hover:text-paper mt-0.5"
+            >
+              WhatsApp: +234 708 988 1454
             </a>
           </div>
           <form action={signout}>

@@ -3,6 +3,8 @@ import Link from "next/link";
 export const CONTACT_EMAIL = "admin@kreatixtech.com";
 export const CONTACT_PHONE = "+2347089881454";
 export const CONTACT_PHONE_DISPLAY = "+234 708 988 1454";
+// wa.me needs digits only (no + or spaces) — opens a WhatsApp chat.
+export const CONTACT_WHATSAPP = `https://wa.me/${CONTACT_PHONE.replace(/[^0-9]/g, "")}`;
 
 /**
  * Shared public-site footer — contact details, legal links, and the
@@ -16,8 +18,8 @@ export function SiteFooter() {
           <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-ink font-semibold text-ink">
             ✉ {CONTACT_EMAIL}
           </a>
-          <a href={`tel:${CONTACT_PHONE}`} className="hover:text-ink font-semibold text-ink">
-            ☎ {CONTACT_PHONE_DISPLAY}
+          <a href={CONTACT_WHATSAPP} target="_blank" rel="noopener noreferrer" className="hover:text-ink font-semibold text-ink">
+            💬 WhatsApp: {CONTACT_PHONE_DISPLAY}
           </a>
         </span>
         <span className="flex gap-4">
