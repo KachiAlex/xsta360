@@ -4,6 +4,7 @@ import { db, schema } from "@/db";
 import { eq, asc } from "drizzle-orm";
 import { normalizeCurrency, formatPrice } from "@/lib/currency";
 import { FEATURE_LABELS, FEATURE_ORDER, BASE_FEATURES } from "@/lib/plan-features";
+import { SiteFooter, CONTACT_EMAIL, CONTACT_PHONE_DISPLAY } from "@/components/app/site-footer";
 
 // Re-render at most once a minute so superadmin pricing changes go live
 // without a redeploy.
@@ -95,8 +96,14 @@ export default async function Home() {
           <span className="block text-ink-soft">Follow Up.</span>
           <span className="block text-register">Close.</span>
         </h1>
-        <p className="hero-sub text-base sm:text-[19px] text-ink-soft max-w-[560px] m-0 mb-8 sm:mb-10">
+        <p className="hero-sub text-base sm:text-[19px] text-ink-soft max-w-[560px] m-0 mb-3">
           Deals don&apos;t die from rejection. They die from silence. Xsta360 makes sure no lead ever goes cold on your watch — from first contact to closed-won.
+        </p>
+        <p className="font-mono text-[12px] text-ink-soft m-0 mb-8 sm:mb-10">
+          Built by{" "}
+          <a href="https://kreatix.tech" target="_blank" rel="noopener noreferrer" className="text-ink font-semibold hover:text-stamp transition-colors">
+            Kreatix Technologies
+          </a>
         </p>
         <div className="hero-ctas flex gap-3 sm:gap-4 mb-10 sm:mb-[72px] flex-wrap">
           <Link href="/signup" className="btn btn-primary inline-block font-semibold text-sm sm:text-[15px] px-5 sm:px-[26px] py-3 sm:py-3.5 rounded-[3px] border-[1.5px] border-ink bg-ink text-paper hover:bg-stamp-deep hover:border-stamp-deep min-h-[48px] flex items-center">Start free — no card needed</Link>
@@ -269,27 +276,16 @@ export default async function Home() {
         <h2 className="font-mono text-[clamp(24px,5vw,44px)] m-0 mb-4">Stop losing deals to silence.</h2>
         <p className="text-ink-soft text-sm sm:text-base m-0 mb-8">Set up your first pipeline in under five minutes.</p>
         <Link href="/signup" className="btn btn-primary inline-block font-semibold text-[15px] px-[26px] py-3.5 rounded-[3px] border-[1.5px] border-ink bg-ink text-paper hover:bg-stamp-deep hover:border-stamp-deep min-h-[52px] flex items-center">Start free — no card needed</Link>
+        <p className="font-mono text-[13px] text-ink-soft mt-8 mb-0">
+          Questions?{" "}
+          <a href={`mailto:${CONTACT_EMAIL}`} className="text-ink font-semibold hover:text-stamp">{CONTACT_EMAIL}</a>
+          {" · "}
+          <a href={`tel:+2347089881454`} className="text-ink font-semibold hover:text-stamp">{CONTACT_PHONE_DISPLAY}</a>
+        </p>
       </section>
 
       {/* FOOTER */}
-      <footer className="border-t border-rule px-4 sm:px-12 py-6 sm:py-8 flex justify-between items-center text-[13px] text-ink-soft font-mono flex-wrap gap-3">
-        <span>© {new Date().getFullYear()} XSTA360</span>
-        <span className="flex gap-4">
-          <Link href="/privacy" className="hover:text-ink">Privacy</Link>
-          <Link href="/termsofservice" className="hover:text-ink">Terms</Link>
-        </span>
-        <span>
-          Powered by{" "}
-          <a
-            href="https://kreatix.tech"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-ink font-semibold hover:text-stamp transition-colors"
-          >
-            Kreatix Technologies
-          </a>
-        </span>
-      </footer>
+      <SiteFooter />
     </>
   );
 }

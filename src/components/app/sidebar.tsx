@@ -109,6 +109,15 @@ export function Sidebar({ orgName, userName, userInitials, role, todayCount }: S
               <div className="text-[11px] text-[#9fae9f] capitalize">{role}</div>
             </div>
           </div>
+          <div className="mt-3 text-[11px] leading-relaxed text-[#9fae9f] px-1">
+            Need help?{" "}
+            <a href="mailto:admin@kreatixtech.com" className="underline underline-offset-2 hover:text-paper">
+              admin@kreatixtech.com
+            </a>
+            <a href="tel:+2347089881454" className="block hover:text-paper mt-0.5">
+              +234 708 988 1454
+            </a>
+          </div>
           <form action={signout}>
             <button
               type="submit"
@@ -117,6 +126,17 @@ export function Sidebar({ orgName, userName, userInitials, role, todayCount }: S
               Sign out
             </button>
           </form>
+          <div className="mt-3 px-1 font-mono text-[10px] tracking-wide text-[#6f7d70]">
+            A product of{" "}
+            <a
+              href="https://kreatix.tech"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#9fae9f] hover:text-paper font-semibold"
+            >
+              Kreatix Technologies
+            </a>
+          </div>
         </div>
       </aside>
     </>

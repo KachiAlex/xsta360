@@ -15,7 +15,7 @@ export default function PrivacyPage() {
           Xsta360 is a multi-tenant sales management application operated by Kreatix Technologies
           (&quot;we&quot;, &quot;us&quot;). It helps teams capture leads, log activity, manage
           pipelines, and send follow-up reminders. This policy explains what we collect, why, and
-          the choices you have. Questions: <a href="mailto:privacy@kreatix.tech">privacy@kreatix.tech</a>.
+          the choices you have. Questions: <a href="mailto:admin@kreatixtech.com">admin@kreatixtech.com</a>.
         </p>
       </section>
 
@@ -72,7 +72,7 @@ export default function PrivacyPage() {
           Workspace and lead data is retained while your account is active. Organization admins can
           delete leads, documents, and members at any time. To delete an entire workspace and all
           associated data, contact us at{" "}
-          <a href="mailto:privacy@kreatix.tech">privacy@kreatix.tech</a> — we will erase it within
+          <a href="mailto:admin@kreatixtech.com">admin@kreatixtech.com</a> — we will erase it within
           30 days, except where retention is required by law (e.g. payment records).
         </p>
       </section>

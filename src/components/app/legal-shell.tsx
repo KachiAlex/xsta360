@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/app/logo";
+import { SiteFooter } from "@/components/app/site-footer";
 
 /**
  * Shared shell for public legal pages (privacy, terms of service).
@@ -32,19 +33,7 @@ export function LegalShell({
         </div>
       </main>
 
-      <footer className="border-t border-rule px-4 sm:px-12 py-6 sm:py-8 flex justify-between items-center text-[13px] text-ink-soft font-mono flex-wrap gap-3">
-        <span>© {new Date().getFullYear()} XSTA360</span>
-        <span className="flex gap-4">
-          <Link href="/privacy" className="hover:text-ink">Privacy</Link>
-          <Link href="/termsofservice" className="hover:text-ink">Terms</Link>
-        </span>
-        <span>
-          Powered by{" "}
-          <a href="https://kreatix.tech" target="_blank" rel="noopener noreferrer" className="text-ink font-semibold hover:text-stamp transition-colors">
-            Kreatix Technologies
-          </a>
-        </span>
-      </footer>
+      <SiteFooter />
     </>
   );
 }
