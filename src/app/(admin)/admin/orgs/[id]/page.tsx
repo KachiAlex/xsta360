@@ -126,7 +126,7 @@ export default async function AdminOrgDetailPage({
               </div>
             </>
           )}
-          {billing.daysLeftInTrial !== null && (
+          {billing.plan.status === "trialing" && billing.daysLeftInTrial !== null && (
             <div className="mt-2 text-xs text-amber bg-amber/10 px-3 py-2 rounded">
               {billing.daysLeftInTrial > 0
                 ? `Free trial — ${billing.daysLeftInTrial} day${billing.daysLeftInTrial !== 1 ? "s" : ""} left (ends ${billing.trialEndsAt?.toLocaleDateString("en-US", { month: "short", day: "numeric" })})`

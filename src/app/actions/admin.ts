@@ -210,11 +210,47 @@ export async function manageSubscription(
       return { message: "Subscription removed — org is now on Free" };
     }
 
+    // Normalize fields for the target plan + status. Activating a sub ends
+    // the trial and clears any grace window; lifetime plans never renew so
+    // they carry no billing period.
+    const [targetPlan] = await db
+      .select({ billingInterval: schema.plans.billingInterval })
+      .from(schema.plans)
+      .where(eq(schema.plans.id, planId))
+      .limit(1);
+    const isLifetime = targetPlan?.billingInterval === "lifetime";
+
+    const [currentSub] = await db
+      .select({ id: schema.subscriptions.id, currentPeriodEnd: schema.subscriptions.currentPeriodEnd })
+      .from(schema.subscriptions)
+      .where(
+        subId
+          ? and(eq(schema.subscriptions.id, subId), eq(schema.subscriptions.orgId, orgId))
+          : eq(schema.subscriptions.orgId, orgId),
+      )
+      .limit(1);
+
+    const updateSet = {
+      planId,
+      status,
+      // Activating a sub ends the trial and clears failed-payment grace.
+      trialEndsAt: status === "trialing" ? undefined : null,
+      graceEndsAt: status === "active" ? null : undefined,
+      // Lifetime never renews; a monthly sub that has no period yet gets 30d.
+      currentPeriodEnd: isLifetime
+        ? null
+        : status === "active" && !currentSub?.currentPeriodEnd
+          ? addMonths(new Date(), 1)
+          : undefined,
+      canceledAt: status === "canceled" ? new Date() : status === "active" ? null : undefined,
+      updatedAt: new Date(),
+    };
+
     if (subId) {
       // Update existing subscription.
       await db
         .update(schema.subscriptions)
-        .set({ planId, status, updatedAt: new Date() })
+        .set(updateSet)
         .where(and(eq(schema.subscriptions.id, subId), eq(schema.subscriptions.orgId, orgId)));
       await logEvent(null, "subscription_updated", {
         actorId: ctx.userId,
@@ -230,7 +266,7 @@ export async function manageSubscription(
       if (existing) {
         await db
           .update(schema.subscriptions)
-          .set({ planId, status, updatedAt: new Date() })
+          .set(updateSet)
           .where(and(eq(schema.subscriptions.id, existing.id), eq(schema.subscriptions.orgId, orgId)));
         await logEvent(null, "subscription_updated", {
           actorId: ctx.userId,
