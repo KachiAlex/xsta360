@@ -25,6 +25,7 @@ export function OrgSettingsForm({
   emailDomainRecords,
   emailFromAddress,
   emailDomainEnabled,
+  teamReportEmails,
 }: {
   currency: string;
   replyToEmail: string | null;
@@ -35,6 +36,7 @@ export function OrgSettingsForm({
   emailDomainRecords: Record<string, { host_name: string; type: string; value: string; status: boolean }> | null;
   emailFromAddress: string | null;
   emailDomainEnabled: boolean;
+  teamReportEmails: boolean;
 }) {
   const [state, action, pending] = useActionState<OrgFormState, FormData>(updateOrgSettings, {});
   const [fields, setFields] = useState<CustomFieldDef[]>(customFieldDefs || []);
@@ -72,6 +74,26 @@ export function OrgSettingsForm({
           records={emailDomainRecords}
           fromAddress={emailFromAddress}
         />
+      </div>
+
+      {/* Automated team reports */}
+      <div className="border-t border-rule pt-4">
+        <label className="flex items-start gap-2.5 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            name="teamReportEmails"
+            value="true"
+            defaultChecked={teamReportEmails}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-semibold">Email team activity reports to workspace admins</span>
+            <span className="block text-xs text-ink-soft mt-0.5">
+              Admins get a daily scorecard each morning (calls, emails, follow-ups, stage moves,
+              deals won/lost) plus a weekly pipeline summary every Monday.
+            </span>
+          </span>
+        </label>
       </div>
 
       {/* WhatsApp config */}

@@ -108,6 +108,7 @@ src/
     lead-detail.ts — lead detail + history timeline
     pipeline.ts    — kanban board query
     reports.ts     — source attribution + per-rep stats
+    team-report.ts — shared team-activity scorecard/feed queries (reports page + report emails)
     email.ts       — transactional email (Resend or console)
 ```
 
@@ -117,6 +118,17 @@ The `/api/cron/reminders` route scans due reminders and sends emails. Hit it wit
 curl -H "Authorization: Bearer $CRON_SECRET" http://xsta360.67-211-210-8.sslip.io/api/cron/reminders
 ```
 Set up an external scheduler (e.g. cron-job.org) to hit this every 5-10 minutes.
+
+## Team report cron
+`/api/cron/team-report` emails workspace admins a per-member activity scorecard —
+daily (previous local day) and weekly (previous Mon–Sun, sent on local Mondays).
+Windows use each org's `timezone`; sends are deduplicated via the
+`team_report_deliveries` table, so the endpoint is safe to hit repeatedly.
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" http://xsta360.67-211-210-8.sslip.io/api/cron/team-report
+```
+Schedule it hourly — reports go out once the org's local time is past 7am.
+Orgs can opt out via Settings → "Email team activity reports" (`team_report_emails`).
 
 ## Server deployment (Docker)
 

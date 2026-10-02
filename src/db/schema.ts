@@ -149,6 +149,8 @@ export const organizations = pgTable("organizations", {
   emailFromAddress: text("email_from_address"),
   // IANA timezone for date bucketing (e.g. "Africa/Lagos"). Defaults to Lagos.
   timezone: text("timezone").notNull().default("Africa/Lagos"),
+  // Automated daily/weekly team-activity report emails to workspace admins.
+  teamReportEmails: boolean("team_report_emails").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -994,5 +996,27 @@ export const processedReferences = pgTable(
   (t) => ({
     // Prevent the same reference from being processed twice for the same org.
     orgRefIdx: uniqueIndex("processed_references_org_ref_idx").on(t.orgId, t.reference),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Team report deliveries (idempotency for the daily/weekly report cron)
+// ---------------------------------------------------------------------------
+
+export const teamReportDeliveries = pgTable(
+  "team_report_deliveries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    // "daily" or "weekly".
+    reportType: text("report_type").notNull(),
+    // Period covered, e.g. "2026-03-14" for daily, "2026-W12" for weekly.
+    periodKey: text("period_key").notNull(),
+    // Number of admin recipients emailed.
+    recipients: integer("recipients").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    uniqOrgPeriod: uniqueIndex("team_report_deliveries_uniq").on(t.orgId, t.reportType, t.periodKey),
   }),
 );

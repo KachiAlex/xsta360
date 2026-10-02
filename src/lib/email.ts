@@ -208,6 +208,169 @@ export async function sendDigestEmail(data: DigestEmailData): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Team report email (daily/weekly admin summary)
+// ---------------------------------------------------------------------------
+
+export interface TeamReportMemberRow {
+  name: string;
+  activitiesLogged: number;
+  remarksLogged: number;
+  remindersDone: number;
+  remindersOverdue: number;
+  stageMoves: number;
+  won: number;
+  lost: number;
+}
+
+export interface TeamReportEmailData {
+  to: string;
+  userName: string;
+  orgName: string;
+  /** "daily" = last 24h digest; "weekly" = 7-day summary. */
+  period: "daily" | "weekly";
+  rangeLabel: string;
+  members: TeamReportMemberRow[];
+  totals: {
+    newLeads: number;
+    activitiesLogged: number;
+    won: number;
+    wonValue: number;
+    lost: number;
+    remindersOverdue: number;
+  };
+  highlights: {
+    topWin: { leadName: string; value: number; repName: string } | null;
+    lostDeals: { leadName: string; value: number; repName: string }[];
+    inactiveMembers: string[];
+    quietLeads: { leadName: string; repName: string; daysQuiet: number }[];
+  };
+  /** Weekly only — pipeline snapshot. */
+  pipeline?: { openValue: number; weightedValue: number; wonValue: number };
+  currency: string;
+  appUrl: string;
+}
+
+export async function sendTeamReportEmail(data: TeamReportEmailData): Promise<void> {
+  const cur = data.currency;
+  const money = (v: number) => `${cur}${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
+  const memberRows = data.members
+    .map(
+      (m) => `
+        <tr>
+          <td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9;"><strong>${escapeHtml(m.name)}</strong></td>
+          <td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9; text-align: center;">${m.activitiesLogged}</td>
+          <td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9; text-align: center;">${m.remarksLogged}</td>
+          <td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9; text-align: center;">${m.remindersDone}</td>
+          <td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9; text-align: center;${m.remindersOverdue > 0 ? " color: #B23A2E; font-weight: bold;" : ""}">${m.remindersOverdue}</td>
+          <td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9; text-align: center;">${m.stageMoves}</td>
+          <td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9; text-align: center; color: #2F7D5B; font-weight: bold;">${m.won || "—"}</td>
+          <td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9; text-align: center;${m.lost > 0 ? " color: #B23A2E;" : ""}">${m.lost || "—"}</td>
+        </tr>`,
+    )
+    .join("");
+
+  const highlightLines: string[] = [];
+  if (data.highlights.topWin) {
+    const w = data.highlights.topWin;
+    highlightLines.push(
+      `<li style="margin-bottom: 6px;">🏆 <strong>${escapeHtml(w.repName)}</strong> closed <strong>${escapeHtml(w.leadName)}</strong>${w.value > 0 ? ` for ${money(w.value)}` : ""}</li>`,
+    );
+  }
+  for (const d of data.highlights.lostDeals) {
+    highlightLines.push(
+      `<li style="margin-bottom: 6px;">Lost: ${escapeHtml(d.leadName)} (${escapeHtml(d.repName)})${d.value > 0 ? ` — ${money(d.value)}` : ""}</li>`,
+    );
+  }
+  if (data.highlights.inactiveMembers.length > 0) {
+    highlightLines.push(
+      `<li style="margin-bottom: 6px;">No activity logged: ${data.highlights.inactiveMembers.map(escapeHtml).join(", ")}</li>`,
+    );
+  }
+  if (data.highlights.quietLeads.length > 0) {
+    highlightLines.push(
+      `<li style="margin-bottom: 6px;">Quiet leads (7+ days untouched): ${data.highlights.quietLeads
+        .map((q) => `${escapeHtml(q.leadName)} (${escapeHtml(q.repName)}, ${q.daysQuiet}d)`)
+        .join(", ")}</li>`,
+    );
+  }
+
+  const pipelineBlock =
+    data.pipeline && data.period === "weekly"
+      ? `
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 20px 0;">
+        <div style="padding: 12px; background: #F3F0E6; border-radius: 4px;">
+          <div style="font-size: 20px; font-weight: bold; color: #1E2A22; font-family: monospace;">${money(data.pipeline.openValue)}</div>
+          <div style="font-size: 11px; color: #4A5750;">Open pipeline</div>
+        </div>
+        <div style="padding: 12px; background: #F3F0E6; border-radius: 4px;">
+          <div style="font-size: 20px; font-weight: bold; color: #2F7D5B; font-family: monospace;">${money(data.pipeline.weightedValue)}</div>
+          <div style="font-size: 11px; color: #4A5750;">Weighted forecast</div>
+        </div>
+        <div style="padding: 12px; background: #F3F0E6; border-radius: 4px;">
+          <div style="font-size: 20px; font-weight: bold; color: #2F7D5B; font-family: monospace;">${money(data.pipeline.wonValue)}</div>
+          <div style="font-size: 11px; color: #4A5750;">Won (all-time)</div>
+        </div>
+      </div>`
+      : "";
+
+  const subject =
+    data.period === "weekly"
+      ? `Weekly team report — ${data.orgName} · ${data.rangeLabel}`
+      : `Team report — ${data.orgName} · ${data.rangeLabel}`;
+
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
+      <h2 style="color: #1E2A22; font-family: 'IBM Plex Mono', monospace; margin-bottom: 4px;">
+        ${data.period === "weekly" ? "Weekly team report" : "Team report"}
+      </h2>
+      <p style="color: #9AA39A; font-size: 13px; margin-top: 0;">
+        ${escapeHtml(data.orgName)} · ${escapeHtml(data.rangeLabel)}
+      </p>
+
+      <p style="color: #4A5750; font-size: 14px;">
+        ${data.totals.newLeads} new lead${data.totals.newLeads !== 1 ? "s" : ""},
+        ${data.totals.activitiesLogged} activit${data.totals.activitiesLogged !== 1 ? "ies" : "y"} logged,
+        ${data.totals.won} won${data.totals.wonValue > 0 ? ` (${money(data.totals.wonValue)})` : ""},
+        ${data.totals.lost} lost,
+        ${data.totals.remindersOverdue} overdue follow-up${data.totals.remindersOverdue !== 1 ? "s" : ""}.
+      </p>
+
+      ${pipelineBlock}
+
+      <table style="width: 100%; font-size: 13px; color: #4A5750; border-collapse: collapse; margin: 16px 0;">
+        <tr style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #9AA39A;">
+          <th style="text-align: left; padding: 6px 0; border-bottom: 2px solid #E3DEC9;">Member</th>
+          <th style="text-align: center; padding: 6px 0; border-bottom: 2px solid #E3DEC9;">Acts</th>
+          <th style="text-align: center; padding: 6px 0; border-bottom: 2px solid #E3DEC9;">Notes</th>
+          <th style="text-align: center; padding: 6px 0; border-bottom: 2px solid #E3DEC9;">Done</th>
+          <th style="text-align: center; padding: 6px 0; border-bottom: 2px solid #E3DEC9;">Overdue</th>
+          <th style="text-align: center; padding: 6px 0; border-bottom: 2px solid #E3DEC9;">Moves</th>
+          <th style="text-align: center; padding: 6px 0; border-bottom: 2px solid #E3DEC9;">Won</th>
+          <th style="text-align: center; padding: 6px 0; border-bottom: 2px solid #E3DEC9;">Lost</th>
+        </tr>
+        ${memberRows}
+      </table>
+
+      ${highlightLines.length > 0 ? `
+      <div style="background: #FBF9F2; border: 1px solid #E3DEC9; border-radius: 4px; padding: 14px 16px; margin: 16px 0;">
+        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #9AA39A; margin-bottom: 8px;">Highlights</div>
+        <ul style="margin: 0; padding-left: 18px; font-size: 13px; color: #4A5750;">
+          ${highlightLines.join("")}
+        </ul>
+      </div>` : ""}
+
+      <a href="${data.appUrl}/reports" style="display: inline-block; margin-top: 16px; padding: 10px 20px; background: #1E2A22; color: #F3F0E6; text-decoration: none; border-radius: 3px; font-weight: 600;">
+        Open team report
+      </a>
+      <p style="color: #9AA39A; font-size: 12px; margin-top: 32px;">— Xsta360 · Manage. Follow Up. Close.</p>
+    </div>
+  `;
+
+  await sendMail(data.to, subject, html);
+}
+
+// ---------------------------------------------------------------------------
 // Contact card lead notifications
 // ---------------------------------------------------------------------------
 

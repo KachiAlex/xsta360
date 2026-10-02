@@ -141,6 +141,7 @@ export default async function SettingsPage() {
               emailDomainRecords={org[0].emailDomainRecords as any}
               emailFromAddress={org[0].emailFromAddress}
               emailDomainEnabled={Boolean(process.env.BREVO_API_KEY)}
+              teamReportEmails={org[0].teamReportEmails}
             />
           </Panel>
         )}

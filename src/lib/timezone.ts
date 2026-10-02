@@ -67,7 +67,7 @@ export function endOfDayInZone(timezone: string = "Africa/Lagos"): Date {
 }
 
 /** Start of day for a specific date in the target timezone. */
-function startOfDayForDate(timezone: string, year: number, month: number, day: number): Date {
+export function startOfDayForDate(timezone: string, year: number, month: number, day: number): Date {
   // Use a reference instant within that day to get the correct DST offset.
   const ref = new Date(Date.UTC(year, month, day, 12, 0, 0));
   const offsetMs = getOffsetMs(timezone, ref);

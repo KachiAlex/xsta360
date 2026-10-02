@@ -204,6 +204,7 @@ export async function updateOrgSettings(
   const whatsappPhoneNumberId = String(formData.get("whatsappPhoneNumberId") || "");
   const whatsappWabaId = String(formData.get("whatsappWabaId") || "");
   const whatsappApiKey = String(formData.get("whatsappApiKey") || "");
+  const teamReportEmails = formData.get("teamReportEmails") === "true";
   const customFieldsJson = String(formData.get("customFields") || "[]");
 
   let customFieldDefs: unknown = [];
@@ -247,6 +248,7 @@ export async function updateOrgSettings(
     .set({
       currency,
       replyToEmail,
+      teamReportEmails,
       customFieldDefs: customFieldDefs as any,
       whatsappConfig: whatsappConfig as any,
       updatedAt: new Date(),
