@@ -142,6 +142,27 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* VIDEO — product walkthrough */}
+      <section className="max-w-[1180px] mx-auto px-4 sm:px-12 pb-12 sm:pb-20">
+        <div className="section-head max-w-[620px] mb-6 sm:mb-10">
+          <div className="eyebrow font-mono text-[13px] tracking-wider text-stamp uppercase font-semibold flex items-center gap-2.5 mb-3.5">
+            <span className="w-6 h-px bg-stamp" />
+            See it in action
+          </div>
+          <h2 className="font-mono text-[clamp(22px,4vw,36px)] m-0 mb-3.5">Watch how Xsta360 works</h2>
+        </div>
+        <div className="relative w-full aspect-video border border-rule rounded-md overflow-hidden bg-paper-2">
+          <iframe
+            src="https://app.trupeer.ai/embed/gbpDIGPHV/doc?app=69f9261c487f9d6e7dbfc075"
+            className="absolute inset-0 w-full h-full border-0"
+            allowFullScreen
+            allow="autoplay; fullscreen; encrypted-media; clipboard-write"
+            loading="lazy"
+            title="Xsta360 CRM User Guide"
+          />
+        </div>
+      </section>
+
       {/* STEPS */}
       <div className="steps max-w-[1180px] mx-auto px-4 sm:px-12 pt-8 pb-10 sm:pb-[100px] grid grid-cols-1 sm:grid-cols-3 gap-0 border-t border-rule">
         <div className="step-card px-4 sm:px-8 py-6 sm:py-10 sm:border-r border-rule border-b sm:border-b-0">
