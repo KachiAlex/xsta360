@@ -96,6 +96,9 @@ export async function verifySession(): Promise<AuthContext | null> {
 export async function requireAuth(): Promise<AuthContext> {
   const ctx = await verifySession();
   if (!ctx) redirect("/login");
+  // Superadmin sessions are confined to /admin — the workspace app has no
+  // org context for them (they carry a placeholder orgId).
+  if (ctx.isSuperadmin) redirect("/admin");
   return ctx;
 }
 
