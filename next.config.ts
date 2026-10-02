@@ -10,8 +10,8 @@ const cspDirectives = [
   "font-src 'self'",
   // Scripts: self + Next.js inline scripts + Facebook SDK (WhatsApp embedded signup).
   "script-src 'self' 'unsafe-inline' https://connect.facebook.net",
-  // Allow Paystack checkout iframe + Facebook embedded signup dialogs.
-  "frame-src 'self' https://paystack.com https://standard.paystack.com https://www.facebook.com https://web.facebook.com",
+  // Allow Paystack checkout iframe + Facebook embedded signup dialogs + Trupeer video embeds.
+  "frame-src 'self' https://paystack.com https://standard.paystack.com https://www.facebook.com https://web.facebook.com https://app.trupeer.ai",
   // Connect to self + Paystack API + Facebook Graph/Login.
   "connect-src 'self' https://api.paystack.co https://standard.paystack.com https://graph.facebook.com https://www.facebook.com https://web.facebook.com",
   // Form actions: self + Paystack.
