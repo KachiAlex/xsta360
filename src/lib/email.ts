@@ -415,7 +415,8 @@ export interface ReceiptEmailData {
   currency: string;
   reference: string;
   memberCount: number;
-  nextBillingDate: Date;
+  /** null = lifetime plan — no future billing. */
+  nextBillingDate: Date | null;
   appUrl: string;
 }
 
@@ -433,7 +434,7 @@ export async function sendReceiptEmail(data: ReceiptEmailData): Promise<void> {
         <tr><td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9;">Members</td><td style="text-align: right; padding: 8px 0; border-bottom: 1px solid #E3DEC9;">${data.memberCount}</td></tr>
         <tr><td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9;">Amount</td><td style="text-align: right; padding: 8px 0; border-bottom: 1px solid #E3DEC9;"><strong>${data.currency}${data.amount.toLocaleString()}</strong></td></tr>
         <tr><td style="padding: 8px 0; border-bottom: 1px solid #E3DEC9;">Reference</td><td style="text-align: right; padding: 8px 0; border-bottom: 1px solid #E3DEC9; font-family: monospace; font-size: 12px;">${escapeHtml(data.reference)}</td></tr>
-        <tr><td style="padding: 8px 0;">Next billing</td><td style="text-align: right; padding: 8px 0;">${data.nextBillingDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</td></tr>
+        <tr><td style="padding: 8px 0;">Next billing</td><td style="text-align: right; padding: 8px 0;">${data.nextBillingDate ? data.nextBillingDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "Never — lifetime access"}</td></tr>
       </table>
       <a href="${data.appUrl}/billing" style="display: inline-block; margin-top: 8px; padding: 10px 20px; background: #1E2A22; color: #F3F0E6; text-decoration: none; border-radius: 3px; font-weight: 600;">
         View billing

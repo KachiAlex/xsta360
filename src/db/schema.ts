@@ -162,6 +162,10 @@ export const plans = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull().unique(),
+    // Billing interval: "monthly" = recurring base + per-seat billing,
+    // "lifetime" = one-time fixed payment (basePriceMonthly is the one-time
+    // price; per-seat and trial fields are ignored).
+    billingInterval: text("billing_interval").notNull().default("monthly"),
     // Hybrid per-seat pricing:
     // basePriceMonthly = what the workspace admin pays (e.g. ₦1000)
     // perSeatPriceMonthly = what each additional member costs (e.g. ₦500)

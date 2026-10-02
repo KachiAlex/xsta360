@@ -98,6 +98,7 @@ export async function GET(request: Request) {
       trialEndsAt: schema.subscriptions.trialEndsAt,
       trialNoticeAt: schema.subscriptions.trialNoticeAt,
       graceEndsAt: schema.subscriptions.graceEndsAt,
+      billingInterval: schema.plans.billingInterval,
       basePrice: schema.plans.basePriceMonthly,
       perSeat: schema.plans.perSeatPriceMonthly,
       currency: schema.plans.currency,
@@ -109,6 +110,7 @@ export async function GET(request: Request) {
 
   let remindersSent = 0;
   for (const sub of trialingSubs) {
+    if (sub.billingInterval === "lifetime") continue; // one-time plans never bill
     if (!sub.trialEndsAt) continue;
     const daysLeft = Math.ceil((sub.trialEndsAt.getTime() - now.getTime()) / DAY_MS);
     // Only send at exactly 3 or 1 days left, and not if we already emailed recently.
@@ -159,7 +161,7 @@ export async function GET(request: Request) {
   // 2. Convert expired trials: charge if a card is on file, else past_due
   //    (trial expiry is a hard block — no grace).
   // ---------------------------------------------------------------------
-  const trialsDue = trialingSubs.filter((s) => s.trialEndsAt && s.trialEndsAt <= now && (!s.graceEndsAt || s.graceEndsAt <= now));
+  const trialsDue = trialingSubs.filter((s) => s.billingInterval !== "lifetime" && s.trialEndsAt && s.trialEndsAt <= now && (!s.graceEndsAt || s.graceEndsAt <= now));
 
   for (const sub of trialsDue) {
     if (!sub.authCode || !sub.email) {
@@ -282,6 +284,7 @@ export async function GET(request: Request) {
       email: schema.subscriptions.paystackCustomerEmail,
       periodEnd: schema.subscriptions.currentPeriodEnd,
       graceEndsAt: schema.subscriptions.graceEndsAt,
+      billingInterval: schema.plans.billingInterval,
       basePrice: schema.plans.basePriceMonthly,
       perSeat: schema.plans.perSeatPriceMonthly,
       currency: schema.plans.currency,
@@ -292,7 +295,7 @@ export async function GET(request: Request) {
     .where(eq(schema.subscriptions.status, "active"));
 
   const chargeable = dueSubs.filter(
-    (s) => s.authCode && s.email && s.periodEnd && s.periodEnd <= now && (!s.graceEndsAt || s.graceEndsAt <= now),
+    (s) => s.billingInterval !== "lifetime" && s.authCode && s.email && s.periodEnd && s.periodEnd <= now && (!s.graceEndsAt || s.graceEndsAt <= now),
   );
 
   for (const sub of chargeable) {

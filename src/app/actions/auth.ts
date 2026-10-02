@@ -176,11 +176,12 @@ export async function signup(
       await tx.insert(schema.lostReasons).values(
         DEFAULT_LOST_REASONS.map((r) => ({ ...r, orgId: org.id, isDefault: r.position === 0 })),
       );
-      // Auto-assign the first active plan as a trialing subscription (free trial).
+      // Auto-assign the first active monthly plan as a trialing subscription
+      // (free trial). Lifetime plans are one-time purchases — never a trial.
       const [defaultPlan] = await tx
         .select({ id: schema.plans.id, trialDays: schema.plans.trialDays })
         .from(schema.plans)
-        .where(eq(schema.plans.active, true))
+        .where(and(eq(schema.plans.active, true), eq(schema.plans.billingInterval, "monthly")))
         .orderBy(schema.plans.position)
         .limit(1);
       if (defaultPlan) {

@@ -99,18 +99,33 @@ export default async function AdminOrgDetailPage({
             <span className="text-ink-soft">Plan</span>
             <span className="font-semibold">{billing.plan.planName}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-ink-soft">Base (workspace admin)</span>
-            <span className="font-mono">{billing.plan.currency}{billing.plan.basePriceMonthly.toLocaleString()}/mo</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-ink-soft">Additional members ({Math.max(0, billing.memberCount - 1)} × {billing.plan.currency}{billing.plan.perSeatPriceMonthly.toLocaleString()})</span>
-            <span className="font-mono">{billing.plan.currency}{(Math.max(0, billing.memberCount - 1) * billing.plan.perSeatPriceMonthly).toLocaleString()}/mo</span>
-          </div>
-          <div className="border-t border-rule pt-2 flex justify-between text-sm">
-            <span className="font-semibold">Total / month</span>
-            <span className="font-mono font-bold text-register">{billing.plan.currency}{billing.monthlyAmount.toLocaleString()}/mo</span>
-          </div>
+          {billing.plan.billingInterval === "lifetime" ? (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="text-ink-soft">One-time price</span>
+                <span className="font-mono">{billing.plan.currency}{billing.plan.basePriceMonthly.toLocaleString()}</span>
+              </div>
+              <div className="border-t border-rule pt-2 flex justify-between text-sm">
+                <span className="font-semibold">Billing</span>
+                <span className="font-mono font-bold text-register">Lifetime — no renewals</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="text-ink-soft">Base (workspace admin)</span>
+                <span className="font-mono">{billing.plan.currency}{billing.plan.basePriceMonthly.toLocaleString()}/mo</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-ink-soft">Additional members ({Math.max(0, billing.memberCount - 1)} × {billing.plan.currency}{billing.plan.perSeatPriceMonthly.toLocaleString()})</span>
+                <span className="font-mono">{billing.plan.currency}{(Math.max(0, billing.memberCount - 1) * billing.plan.perSeatPriceMonthly).toLocaleString()}/mo</span>
+              </div>
+              <div className="border-t border-rule pt-2 flex justify-between text-sm">
+                <span className="font-semibold">Total / month</span>
+                <span className="font-mono font-bold text-register">{billing.plan.currency}{billing.monthlyAmount.toLocaleString()}/mo</span>
+              </div>
+            </>
+          )}
           {billing.daysLeftInTrial !== null && (
             <div className="mt-2 text-xs text-amber bg-amber/10 px-3 py-2 rounded">
               {billing.daysLeftInTrial > 0
@@ -204,7 +219,9 @@ export default async function AdminOrgDetailPage({
                 }`}>
                   {m.role === "admin" ? "Workspace Admin" : m.role}
                 </span>
-                {m.role === "admin" ? (
+                {billing.plan.billingInterval === "lifetime" ? (
+                  <span className="text-xs font-mono text-ink-soft">included</span>
+                ) : m.role === "admin" ? (
                   <span className="text-xs font-mono text-ink-soft">
                     {billing.plan.currency}{billing.plan.basePriceMonthly.toLocaleString()}/mo
                   </span>

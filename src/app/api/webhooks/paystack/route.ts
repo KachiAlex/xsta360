@@ -136,12 +136,22 @@ export async function POST(request: Request) {
             const txnPlanId = metadata.planId as string | undefined;
             const isPlanUpgrade = metadata.isPlanUpgrade === true;
 
+            // Interval of the plan being paid for — init always sets
+            // metadata.planId; fall back to the subscription's current plan.
+            const [chargedPlan] = await tx
+              .select({ billingInterval: schema.plans.billingInterval })
+              .from(schema.plans)
+              .where(eq(schema.plans.id, txnPlanId ?? sub?.planId ?? ""))
+              .limit(1);
+            const lifetimeAccess = chargedPlan?.billingInterval === "lifetime";
+
             if (sub) {
               // Extend from max(now, existingPeriodEnd) to not lose early payments.
+              // Lifetime plans: null period end — one-time payment, no renewals.
               const baseDate = sub.currentPeriodEnd && sub.currentPeriodEnd > now
                 ? sub.currentPeriodEnd
                 : now;
-              const extendedPeriodEnd = addMonths(baseDate, 1);
+              const extendedPeriodEnd = lifetimeAccess ? null : addMonths(baseDate, 1);
 
               await tx
                 .update(schema.subscriptions)
@@ -217,7 +227,7 @@ export async function POST(request: Request) {
             currency: billing.plan.currency,
             reference,
             memberCount: billing.memberCount,
-            nextBillingDate: addMonths(now, 1),
+            nextBillingDate: billing.plan.billingInterval === "lifetime" ? null : addMonths(now, 1),
             appUrl: process.env.APP_URL ?? "http://localhost:3000",
           }).catch((e) => console.error("Webhook receipt email failed:", e));
         }

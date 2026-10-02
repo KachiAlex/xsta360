@@ -9,6 +9,7 @@ export default async function AdminSubscriptionsPage() {
       orgName: schema.organizations.name,
       planName: schema.plans.name,
       planId: schema.plans.id,
+      billingInterval: schema.plans.billingInterval,
       basePrice: schema.plans.basePriceMonthly,
       perSeat: schema.plans.perSeatPriceMonthly,
       currency: schema.plans.currency,
@@ -85,10 +86,17 @@ export default async function AdminSubscriptionsPage() {
                 return (
                   <tr key={s.id} className="hover:bg-paper-2/30">
                     <td className="px-4 py-3 font-semibold">{s.orgName}</td>
-                    <td className="px-4 py-3">{s.planName}</td>
+                    <td className="px-4 py-3">
+                      {s.planName}
+                      {s.billingInterval === "lifetime" && (
+                        <span className="ml-1.5 text-[10px] font-semibold text-amber bg-amber/10 px-1.5 py-0.5 rounded uppercase">Lifetime</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 font-mono text-ink-soft">{members}</td>
                     <td className="px-4 py-3 font-mono font-semibold text-register">
-                      {s.currency}{monthly.toLocaleString()}
+                      {s.billingInterval === "lifetime"
+                        ? `${s.currency}${s.basePrice.toLocaleString()} once`
+                        : `${s.currency}${monthly.toLocaleString()}`}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
@@ -142,7 +150,11 @@ export default async function AdminSubscriptionsPage() {
                 </div>
                 <div className="flex justify-between text-xs text-ink-soft">
                   <span>{s.planName} · {members} members</span>
-                  <span className="font-mono font-semibold text-register">{s.currency}{monthly.toLocaleString()}/mo</span>
+                  <span className="font-mono font-semibold text-register">
+                    {s.billingInterval === "lifetime"
+                      ? `${s.currency}${s.basePrice.toLocaleString()} once`
+                      : `${s.currency}${monthly.toLocaleString()}/mo`}
+                  </span>
                 </div>
               </a>
             );

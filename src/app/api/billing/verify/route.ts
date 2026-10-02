@@ -68,6 +68,19 @@ export async function POST(request: Request) {
 
     const billing = await getOrgBilling(ctx.orgId);
 
+    // The plan that will be active after this payment — upgrade checkouts
+    // carry the target planId, otherwise it's the org's current plan.
+    const activePlanId = isPlanUpgrade && txnPlanId ? txnPlanId : billing.plan.planId;
+    const [activePlan] = activePlanId && activePlanId !== "none"
+      ? await db
+          .select({ billingInterval: schema.plans.billingInterval })
+          .from(schema.plans)
+          .where(eq(schema.plans.id, activePlanId))
+          .limit(1)
+      : [undefined];
+    // Lifetime plans get no period end — the cron never bills them again.
+    const lifetimeAccess = activePlan?.billingInterval === "lifetime";
+
     // Save authorization code + customer code for recurring billing.
     const now = new Date();
 
@@ -105,10 +118,11 @@ export async function POST(request: Request) {
       await db.transaction(async (tx) => {
         if (existingSub) {
           // Extend from max(now, existingPeriodEnd) to not lose early payments.
+          // Lifetime plans: null period end — a one-time payment, no renewals.
           const baseDate = existingSub.currentPeriodEnd && existingSub.currentPeriodEnd > now
             ? existingSub.currentPeriodEnd
             : now;
-          const periodEnd = addMonths(baseDate, 1);
+          const periodEnd = lifetimeAccess ? null : addMonths(baseDate, 1);
 
           await tx
             .update(schema.subscriptions)
@@ -130,7 +144,6 @@ export async function POST(request: Request) {
             .where(eq(schema.subscriptions.id, existingSub.id));
         } else {
           // Create subscription if none exists.
-          const periodEnd = addMonths(now, 1);
           const planId = billing.plan.planId !== "none"
             ? billing.plan.planId
             : (await tx.select().from(schema.plans).limit(1))[0]?.id;
@@ -138,6 +151,16 @@ export async function POST(request: Request) {
           if (!planId) {
             throw new Error("No plan configured");
           }
+
+          // Re-check interval for the plan actually being activated (the
+          // fallback path may have picked a different plan than activePlan).
+          const [insertPlan] = planId === activePlanId
+            ? [activePlan]
+            : await tx
+                .select({ billingInterval: schema.plans.billingInterval })
+                .from(schema.plans)
+                .where(eq(schema.plans.id, planId))
+                .limit(1);
 
           await tx.insert(schema.subscriptions).values({
             orgId: ctx.orgId,
@@ -150,7 +173,7 @@ export async function POST(request: Request) {
             lastPaymentAmount: txn.amount,
             lastPaymentReference: reference,
             currentPeriodStart: now,
-            currentPeriodEnd: periodEnd,
+            currentPeriodEnd: insertPlan?.billingInterval === "lifetime" ? null : addMonths(now, 1),
           });
         }
 
@@ -236,7 +259,7 @@ export async function POST(request: Request) {
         currency: updatedBilling.plan.currency,
         reference,
         memberCount: billing.memberCount,
-        nextBillingDate: subNow?.currentPeriodEnd ?? now,
+        nextBillingDate: lifetimeAccess ? null : (subNow?.currentPeriodEnd ?? now),
         appUrl: process.env.APP_URL ?? "http://localhost:3000",
       }).catch((e) => console.error("Receipt email failed:", e));
     }

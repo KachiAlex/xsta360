@@ -29,6 +29,7 @@ export default async function AdminOrgsPage({
       orgId: schema.subscriptions.orgId,
       planName: schema.plans.name,
       status: schema.subscriptions.status,
+      billingInterval: schema.plans.billingInterval,
       basePrice: schema.plans.basePriceMonthly,
       perSeat: schema.plans.perSeatPriceMonthly,
       currency: schema.plans.currency,
@@ -92,7 +93,11 @@ export default async function AdminOrgsPage({
                   <td className="px-4 py-3 font-mono text-ink-soft">{org.memberCount}</td>
                   <td className="px-4 py-3">{sub?.planName ?? <span className="text-ink-soft">Free</span>}</td>
                   <td className="px-4 py-3 font-mono font-semibold text-register">
-                    {sub ? `${sub.currency}${monthly.toLocaleString()}` : "—"}
+                    {sub
+                      ? sub.billingInterval === "lifetime"
+                        ? `${sub.currency}${sub.basePrice.toLocaleString()} once`
+                        : `${sub.currency}${monthly.toLocaleString()}`
+                      : "—"}
                   </td>
                   <td className="px-4 py-3">
                     {sub ? (
@@ -145,7 +150,13 @@ export default async function AdminOrgsPage({
               </div>
               <div className="flex justify-between text-xs text-ink-soft">
                 <span>{org.memberCount} members · {sub?.planName ?? "Free"}</span>
-                {sub && <span className="font-mono font-semibold text-register">{sub.currency}{monthly.toLocaleString()}/mo</span>}
+                {sub && (
+                  <span className="font-mono font-semibold text-register">
+                    {sub.billingInterval === "lifetime"
+                      ? `${sub.currency}${sub.basePrice.toLocaleString()} once`
+                      : `${sub.currency}${monthly.toLocaleString()}/mo`}
+                  </span>
+                )}
               </div>
             </Link>
           );

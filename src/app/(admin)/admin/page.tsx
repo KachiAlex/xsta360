@@ -35,6 +35,7 @@ export default async function AdminOverviewPage() {
   const activeOrgBilling = await db
     .select({
       orgId: schema.subscriptions.orgId,
+      billingInterval: schema.plans.billingInterval,
       basePrice: schema.plans.basePriceMonthly,
       perSeat: schema.plans.perSeatPriceMonthly,
       currency: schema.plans.currency,
@@ -55,6 +56,7 @@ export default async function AdminOverviewPage() {
 
   let mrr = 0;
   for (const b of activeOrgBilling) {
+    if (b.billingInterval === "lifetime") continue; // one-time revenue, not MRR
     const members = memberCountMap.get(b.orgId) ?? 1;
     mrr += b.basePrice + Math.max(0, members - 1) * b.perSeat;
   }

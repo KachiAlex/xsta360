@@ -100,9 +100,14 @@ export async function changePlan(
   }
   const currentMonthly = billing.monthlyAmount;
   const additionalSeats = Math.max(0, billing.memberCount - 1);
-  const newMonthly = plan.basePriceMonthly + additionalSeats * plan.perSeatPriceMonthly;
+  const isLifetimeTarget = plan.billingInterval === "lifetime";
+  // Lifetime plans bill a single fixed amount — no per-seat math.
+  const newMonthly = isLifetimeTarget
+    ? plan.basePriceMonthly
+    : plan.basePriceMonthly + additionalSeats * plan.perSeatPriceMonthly;
 
-  const isUpgrade = newMonthly > currentMonthly;
+  // Switching to a lifetime plan always requires the one-time payment.
+  const isUpgrade = isLifetimeTarget || newMonthly > currentMonthly;
   const hasSavedCard = !!sub.paystackAuthorizationCode;
 
   // ── Downgrade or same price: switch immediately, takes effect next cycle ──
@@ -159,7 +164,8 @@ export async function changePlan(
             planId,
             status: "active",
             currentPeriodStart: now,
-            currentPeriodEnd: addMonths(baseDate, 1),
+            // Lifetime plans never expire — null period end = no renewal charges.
+            currentPeriodEnd: isLifetimeTarget ? null : addMonths(baseDate, 1),
             lastPaymentAt: now,
             lastPaymentAmount: nairaToKobo(newMonthly),
             lastPaymentReference: reference,

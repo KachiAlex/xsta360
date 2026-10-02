@@ -33,8 +33,11 @@ export default async function Home() {
   } catch {
     plans = [];
   }
-  const cheapest = plans.length > 0
-    ? plans.reduce((a, b) => (b.basePriceMonthly < a.basePriceMonthly ? b : a))
+  // "Cheapest" for the JSON-LD offer = lowest monthly price — a one-time
+  // lifetime plan would otherwise dominate the "starts at ₦X/month" claim.
+  const monthlyPlans = plans.filter((p) => p.billingInterval !== "lifetime");
+  const cheapest = monthlyPlans.length > 0
+    ? monthlyPlans.reduce((a, b) => (b.basePriceMonthly < a.basePriceMonthly ? b : a))
     : null;
   const currency = cheapest ? normalizeCurrency(cheapest.currency) : "₦";
   const popularIdx = Math.floor(plans.length / 2);
@@ -189,7 +192,7 @@ export default async function Home() {
             </div>
             <h2 className="font-mono text-[clamp(22px,4vw,36px)] m-0 mb-3.5">Simple plans that scale with your team.</h2>
             <p className="text-ink-soft text-sm sm:text-base m-0">
-              Every plan starts with a free trial — no card required. Pricing is per workspace: a base fee covers the admin, then a flat rate per additional member.
+              Monthly plans start with a free trial — no card required. Or go lifetime: one fixed payment, access forever.
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-rule border border-rule">
@@ -216,10 +219,14 @@ export default async function Home() {
                   <div className="font-mono m-0 mb-1">
                     <span className="font-sans text-lg align-top">{symbol}</span>
                     <span className="text-[32px] font-bold tabular-nums">{plan.basePriceMonthly.toLocaleString("en-US")}</span>
-                    <span className="text-sm text-ink-soft">/mo</span>
+                    <span className="text-sm text-ink-soft">
+                      {plan.billingInterval === "lifetime" ? " one-time" : "/mo"}
+                    </span>
                   </div>
                   <p className="text-xs text-ink-soft m-0 mb-4">
-                    covers the workspace admin · +{formatPrice(plan.perSeatPriceMonthly, plan.currency)}/mo per extra member
+                    {plan.billingInterval === "lifetime"
+                      ? "pay once — lifetime access for your whole workspace, no monthly fees"
+                      : <>covers the workspace admin · +{formatPrice(plan.perSeatPriceMonthly, plan.currency)}/mo per extra member</>}
                   </p>
                   <ul className="m-0 mb-4 p-0 list-none space-y-1.5 text-[13px] text-ink-soft flex-1">
                     <li className="flex gap-2">
@@ -233,9 +240,11 @@ export default async function Home() {
                       </li>
                     ))}
                   </ul>
-                  {plan.trialDays > 0 && (
+                  {plan.billingInterval === "lifetime" ? (
+                    <p className="text-[11px] font-mono text-amber m-0 mb-3">One-time payment · never renews</p>
+                  ) : plan.trialDays > 0 ? (
                     <p className="text-[11px] font-mono text-stamp m-0 mb-3">{plan.trialDays}-day free trial</p>
-                  )}
+                  ) : null}
                   <Link
                     href="/signup"
                     className={`btn inline-block font-semibold text-sm px-4 py-2.5 rounded-[3px] border-[1.5px] text-center min-h-[44px] ${
@@ -244,7 +253,7 @@ export default async function Home() {
                         : "border-ink bg-transparent text-ink hover:bg-paper-2"
                     }`}
                   >
-                    Start free
+                    {plan.billingInterval === "lifetime" ? "Get lifetime access" : "Start free"}
                   </Link>
                 </div>
               );

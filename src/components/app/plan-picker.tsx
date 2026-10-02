@@ -10,6 +10,8 @@ import { Modal } from "@/components/ui/modal";
 export interface PlanOption {
   id: string;
   name: string;
+  /** "monthly" = recurring; "lifetime" = one-time fixed payment. */
+  billingInterval: string;
   basePriceMonthly: number;
   perSeatPriceMonthly: number;
   currency: string;
@@ -58,10 +60,15 @@ export function PlanPicker({
       <div className="grid gap-3 sm:grid-cols-2">
         {plans.map((p) => {
           const isCurrent = p.id === currentPlanId;
-          const newMonthly = p.basePriceMonthly + additionalMembers * p.perSeatPriceMonthly;
+          const isLifetime = p.billingInterval === "lifetime";
+          const newMonthly = isLifetime
+            ? p.basePriceMonthly
+            : p.basePriceMonthly + additionalMembers * p.perSeatPriceMonthly;
           const currentPlan = plans.find((x) => x.id === currentPlanId);
           const currentMonthly = currentPlan
-            ? currentPlan.basePriceMonthly + additionalMembers * currentPlan.perSeatPriceMonthly
+            ? (currentPlan.billingInterval === "lifetime"
+                ? currentPlan.basePriceMonthly
+                : currentPlan.basePriceMonthly + additionalMembers * currentPlan.perSeatPriceMonthly)
             : 0;
           const isUpgrade = newMonthly > currentMonthly;
 
@@ -84,9 +91,11 @@ export function PlanPicker({
                 <span className="font-bold text-lg">
                   <Price amount={p.basePriceMonthly} currency={p.currency} />
                 </span>
-                <span className="text-ink-soft">/mo</span>
+                <span className="text-ink-soft">{isLifetime ? " one-time" : "/mo"}</span>
                 <span className="block text-xs text-ink-soft mt-0.5">
-                  + <Price amount={p.perSeatPriceMonthly} currency={p.currency} />/extra member
+                  {isLifetime
+                    ? "Pay once — lifetime access"
+                    : <>+ <Price amount={p.perSeatPriceMonthly} currency={p.currency} />/extra member</>}
                 </span>
               </div>
               <ul className="text-xs space-y-1">
@@ -132,26 +141,38 @@ export function PlanPicker({
         >
           <div className="space-y-4">
             <div className="border border-rule rounded-md p-3 bg-paper space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-ink-soft">Base price</span>
-                <span>
-                  <Price amount={selectedPlan.basePriceMonthly} currency={selectedPlan.currency} />/mo
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-ink-soft">Extra members</span>
-                <span>{additionalMembers} × <Price amount={selectedPlan.perSeatPriceMonthly} currency={selectedPlan.currency} />/mo</span>
-              </div>
-              <div className="border-t border-rule pt-2 flex justify-between font-semibold">
-                <span>New monthly total</span>
-                <span className="text-register">
-                  <Price
-                    amount={selectedPlan.basePriceMonthly + additionalMembers * selectedPlan.perSeatPriceMonthly}
-                    currency={selectedPlan.currency}
-                  />
-                  /mo
-                </span>
-              </div>
+              {selectedPlan.billingInterval === "lifetime" ? (
+                <div className="flex justify-between font-semibold">
+                  <span>Lifetime access</span>
+                  <span className="text-register">
+                    <Price amount={selectedPlan.basePriceMonthly} currency={selectedPlan.currency} />
+                    {" "}one-time
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-ink-soft">Base price</span>
+                    <span>
+                      <Price amount={selectedPlan.basePriceMonthly} currency={selectedPlan.currency} />/mo
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-ink-soft">Extra members</span>
+                    <span>{additionalMembers} × <Price amount={selectedPlan.perSeatPriceMonthly} currency={selectedPlan.currency} />/mo</span>
+                  </div>
+                  <div className="border-t border-rule pt-2 flex justify-between font-semibold">
+                    <span>New monthly total</span>
+                    <span className="text-register">
+                      <Price
+                        amount={selectedPlan.basePriceMonthly + additionalMembers * selectedPlan.perSeatPriceMonthly}
+                        currency={selectedPlan.currency}
+                      />
+                      /mo
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
 
             <div>
@@ -174,13 +195,29 @@ export function PlanPicker({
             </div>
 
             {(() => {
+              const isLifetime = selectedPlan.billingInterval === "lifetime";
               const currentPlan = plans.find((x) => x.id === currentPlanId);
               const currentMonthly = currentPlan
-                ? currentPlan.basePriceMonthly + additionalMembers * currentPlan.perSeatPriceMonthly
+                ? (currentPlan.billingInterval === "lifetime"
+                    ? currentPlan.basePriceMonthly
+                    : currentPlan.basePriceMonthly + additionalMembers * currentPlan.perSeatPriceMonthly)
                 : 0;
-              const newMonthly = selectedPlan.basePriceMonthly + additionalMembers * selectedPlan.perSeatPriceMonthly;
-              const isUpgrade = newMonthly > currentMonthly;
+              const newMonthly = isLifetime
+                ? selectedPlan.basePriceMonthly
+                : selectedPlan.basePriceMonthly + additionalMembers * selectedPlan.perSeatPriceMonthly;
+              const isUpgrade = isLifetime || newMonthly > currentMonthly;
 
+              if (isLifetime) {
+                return (
+                  <div className="bg-amber/10 border border-amber/20 rounded-md px-3 py-2.5 text-xs text-[#9c6014]">
+                    {hasSavedCard ? (
+                      <>Lifetime plan — we&rsquo;ll charge <strong><Price amount={newMonthly} currency={selectedPlan.currency} /></strong> to your saved card once. No monthly billing after that.</>
+                    ) : (
+                      <>Lifetime plan — you&rsquo;ll be redirected to Paystack to pay <strong><Price amount={newMonthly} currency={selectedPlan.currency} /></strong> once. No monthly billing after that.</>
+                    )}
+                  </div>
+                );
+              }
               if (isUpgrade) {
                 return (
                   <div className="bg-amber/10 border border-amber/20 rounded-md px-3 py-2.5 text-xs text-[#9c6014]">

@@ -65,7 +65,13 @@ export async function POST(request: Request) {
       targetPlanId = newPlan.id;
       targetPlanName = newPlan.name;
       const additionalSeats = Math.max(0, billing.memberCount - 1);
-      amountNaira = newPlan.basePriceMonthly + additionalSeats * newPlan.perSeatPriceMonthly;
+      // Lifetime plans charge the fixed one-time price — no per-seat math.
+      amountNaira = newPlan.billingInterval === "lifetime"
+        ? newPlan.basePriceMonthly
+        : newPlan.basePriceMonthly + additionalSeats * newPlan.perSeatPriceMonthly;
+    } else if (billing.plan.billingInterval === "lifetime") {
+      // Paying for the org's current lifetime plan — the one-time price.
+      amountNaira = billing.plan.basePriceMonthly;
     } else if (typeof body.amount === "number" && body.amount > 0) {
       amountNaira = body.amount;
     }

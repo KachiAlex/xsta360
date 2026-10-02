@@ -27,9 +27,10 @@ function addMonths(date: Date, months: number): Date {
 
 const PlanSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").trim(),
+  billingInterval: z.enum(["monthly", "lifetime"]).default("monthly"),
   basePriceMonthly: z.coerce.number().int().min(0),
-  perSeatPriceMonthly: z.coerce.number().int().min(0),
-  trialDays: z.coerce.number().int().min(0),
+  perSeatPriceMonthly: z.coerce.number().int().min(0).default(0),
+  trialDays: z.coerce.number().int().min(0).default(0),
   currency: z.string().min(1).max(3).default("₦"),
   features: z.string().nullish(),
   position: z.coerce.number().int().min(0).default(0),
@@ -42,9 +43,10 @@ export async function createPlan(
   const ctx = await requireSuperadmin();
   const parsed = PlanSchema.safeParse({
     name: formData.get("name"),
+    billingInterval: formData.get("billingInterval") ?? "monthly",
     basePriceMonthly: formData.get("basePriceMonthly"),
-    perSeatPriceMonthly: formData.get("perSeatPriceMonthly"),
-    trialDays: formData.get("trialDays"),
+    perSeatPriceMonthly: formData.get("perSeatPriceMonthly") ?? 0,
+    trialDays: formData.get("trialDays") ?? 0,
     currency: formData.get("currency") ?? "₦",
     features: formData.get("features"),
     position: formData.get("position") ?? 0,
@@ -52,6 +54,9 @@ export async function createPlan(
   if (!parsed.success) {
     return { message: parsed.error.issues[0]?.message ?? "Invalid input", error: true };
   }
+
+  // Lifetime plans bill a single fixed amount — per-seat and trial don't apply.
+  const isLifetime = parsed.data.billingInterval === "lifetime";
 
   let features = {};
   if (parsed.data.features) {
@@ -67,9 +72,10 @@ export async function createPlan(
       .insert(schema.plans)
       .values({
         name: parsed.data.name,
+        billingInterval: parsed.data.billingInterval,
         basePriceMonthly: parsed.data.basePriceMonthly,
-        perSeatPriceMonthly: parsed.data.perSeatPriceMonthly,
-        trialDays: parsed.data.trialDays,
+        perSeatPriceMonthly: isLifetime ? 0 : parsed.data.perSeatPriceMonthly,
+        trialDays: isLifetime ? 0 : parsed.data.trialDays,
         currency: parsed.data.currency,
         features,
         position: parsed.data.position,
@@ -98,9 +104,10 @@ export async function updatePlan(
 
   const parsed = PlanSchema.safeParse({
     name: formData.get("name"),
+    billingInterval: formData.get("billingInterval") ?? "monthly",
     basePriceMonthly: formData.get("basePriceMonthly"),
-    perSeatPriceMonthly: formData.get("perSeatPriceMonthly"),
-    trialDays: formData.get("trialDays"),
+    perSeatPriceMonthly: formData.get("perSeatPriceMonthly") ?? 0,
+    trialDays: formData.get("trialDays") ?? 0,
     currency: formData.get("currency") ?? "₦",
     features: formData.get("features"),
     position: formData.get("position") ?? 0,
@@ -108,6 +115,9 @@ export async function updatePlan(
   if (!parsed.success) {
     return { message: parsed.error.issues[0]?.message ?? "Invalid input", error: true };
   }
+
+  // Lifetime plans bill a single fixed amount — per-seat and trial don't apply.
+  const isLifetime = parsed.data.billingInterval === "lifetime";
 
   let features: Record<string, unknown> | undefined = undefined;
   if (parsed.data.features) {
@@ -123,9 +133,10 @@ export async function updatePlan(
       .update(schema.plans)
       .set({
         name: parsed.data.name,
+        billingInterval: parsed.data.billingInterval,
         basePriceMonthly: parsed.data.basePriceMonthly,
-        perSeatPriceMonthly: parsed.data.perSeatPriceMonthly,
-        trialDays: parsed.data.trialDays,
+        perSeatPriceMonthly: isLifetime ? 0 : parsed.data.perSeatPriceMonthly,
+        trialDays: isLifetime ? 0 : parsed.data.trialDays,
         currency: parsed.data.currency,
         position: parsed.data.position,
         ...(features !== undefined ? { features } : {}),
@@ -227,18 +238,22 @@ export async function manageSubscription(
         });
       } else {
         const [plan] = await db
-          .select({ trialDays: schema.plans.trialDays })
+          .select({ trialDays: schema.plans.trialDays, billingInterval: schema.plans.billingInterval })
           .from(schema.plans)
           .where(eq(schema.plans.id, planId))
           .limit(1);
         const trialDays = plan?.trialDays ?? 14;
+        const isLifetime = plan?.billingInterval === "lifetime";
         await db.insert(schema.subscriptions).values({
           orgId,
           planId,
           status,
           trialEndsAt: status === "trialing" ? new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000) : null,
           currentPeriodStart: status === "active" ? new Date() : null,
-          currentPeriodEnd: status === "active" ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null,
+          // Lifetime plans never expire — null period end means no renewal charge.
+          currentPeriodEnd: status === "active" && !isLifetime
+            ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            : null,
         });
         await logEvent(null, "subscription_created", {
           actorId: ctx.userId,
@@ -323,7 +338,15 @@ export async function markSubscriptionPaid(
 
   try {
     const now = new Date();
-    const periodEnd = addMonths(now, 1);
+    const [sub] = await db
+      .select({ billingInterval: schema.plans.billingInterval })
+      .from(schema.subscriptions)
+      .innerJoin(schema.plans, eq(schema.subscriptions.planId, schema.plans.id))
+      .where(and(eq(schema.subscriptions.id, subId), eq(schema.subscriptions.orgId, orgId)))
+      .limit(1);
+    if (!sub) return { message: "Subscription not found", error: true };
+    // Lifetime plans don't renew — no billing period end.
+    const periodEnd = sub.billingInterval === "lifetime" ? null : addMonths(now, 1);
 
     const [updated] = await db
       .update(schema.subscriptions)

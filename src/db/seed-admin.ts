@@ -124,6 +124,25 @@ async function seedAdmin() {
       },
       position: 3,
     },
+    {
+      name: "Lifetime",
+      billingInterval: "lifetime" as const,
+      basePriceMonthly: 500000,  // ₦500,000 one-time — never bills again
+      perSeatPriceMonthly: 0,
+      trialDays: 0,
+      currency: "₦",
+      features: {
+        contact_card: true,
+        custom_fields: true,
+        reports: true,
+        sequences: true,
+        api_access: true,
+        sso: true,
+        dedicated_support: true,
+        max_members: null, // unlimited
+      },
+      position: 4,
+    },
   ];
 
   for (const plan of defaultPlans) {
@@ -137,6 +156,7 @@ async function seedAdmin() {
       await db
         .update(schema.plans)
         .set({
+          billingInterval: "billingInterval" in plan ? plan.billingInterval : "monthly",
           basePriceMonthly: plan.basePriceMonthly,
           perSeatPriceMonthly: plan.perSeatPriceMonthly,
           trialDays: plan.trialDays,

@@ -56,6 +56,7 @@ export default async function BillingPage() {
     return {
       id: p.id,
       name: p.name,
+      billingInterval: p.billingInterval,
       basePriceMonthly: p.basePriceMonthly,
       perSeatPriceMonthly: p.perSeatPriceMonthly,
       currency: normalizeCurrency(p.currency),
@@ -73,6 +74,9 @@ export default async function BillingPage() {
   const isTrial = billing.plan.status === "trialing";
   const isActive = billing.plan.status === "active";
   const isPastDue = billing.plan.status === "past_due";
+  const isLifetimePlan = billing.plan.billingInterval === "lifetime";
+  // Active lifetime plan = fully paid, nothing more ever due.
+  const lifetimePaid = isLifetimePlan && isActive;
 
   return (
     <div className="content flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-7 max-w-[1240px] w-full mx-auto space-y-6">
@@ -108,7 +112,9 @@ export default async function BillingPage() {
             <div>
               <div className="font-semibold text-sm text-register">Subscription active</div>
               <div className="text-xs text-register mt-0.5">
-                {sub?.currentPeriodEnd && `Next billing: ${sub.currentPeriodEnd.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`}
+                {isLifetimePlan
+                  ? "Lifetime access — no renewals, no further charges."
+                  : sub?.currentPeriodEnd && `Next billing: ${sub.currentPeriodEnd.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`}
               </div>
             </div>
           </div>
@@ -141,18 +147,30 @@ export default async function BillingPage() {
             <span className="text-ink-soft">Plan</span>
             <span className="font-semibold">{billing.plan.planName}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-ink-soft">Base price (admin)</span>
-            <Price amount={billing.plan.basePriceMonthly} currency={billing.plan.currency} />/mo
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-ink-soft">Per additional member</span>
-            <Price amount={billing.plan.perSeatPriceMonthly} currency={billing.plan.currency} />/mo
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-ink-soft">Free trial period</span>
-            <span className="font-mono">{billing.plan.trialDays} days</span>
-          </div>
+          {isLifetimePlan ? (
+            <div className="flex justify-between text-sm">
+              <span className="text-ink-soft">Billing</span>
+              <span>
+                <Price amount={billing.plan.basePriceMonthly} currency={billing.plan.currency} />
+                {" "}one-time — lifetime access
+              </span>
+            </div>
+          ) : (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="text-ink-soft">Base price (admin)</span>
+                <Price amount={billing.plan.basePriceMonthly} currency={billing.plan.currency} />/mo
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-ink-soft">Per additional member</span>
+                <Price amount={billing.plan.perSeatPriceMonthly} currency={billing.plan.currency} />/mo
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-ink-soft">Free trial period</span>
+                <span className="font-mono">{billing.plan.trialDays} days</span>
+              </div>
+            </>
+          )}
           <div className="flex justify-between text-sm">
             <span className="text-ink-soft">Member limit</span>
             <span className="font-mono">
@@ -186,26 +204,43 @@ export default async function BillingPage() {
           <h2 className="font-mono text-sm uppercase tracking-wider m-0">Current bill</h2>
         </div>
         <div className="p-4 space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-ink-soft">Workspace admin (you)</span>
-            <Price amount={billing.plan.basePriceMonthly} currency={billing.plan.currency} />/mo
-          </div>
-          {Math.max(0, billing.memberCount - 1) > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-ink-soft">
-                Additional members ({Math.max(0, billing.memberCount - 1)} × <Price amount={billing.plan.perSeatPriceMonthly} currency={billing.plan.currency} />)
-              </span>
-              <span className="font-mono">
-                <Price amount={(Math.max(0, billing.memberCount - 1) * billing.plan.perSeatPriceMonthly)} currency={billing.plan.currency} />/mo
-              </span>
-            </div>
+          {isLifetimePlan ? (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="text-ink-soft">Lifetime access — covers your whole workspace</span>
+                <Price amount={billing.plan.basePriceMonthly} currency={billing.plan.currency} />
+              </div>
+              <div className="border-t border-rule pt-2 flex justify-between">
+                <span className="font-semibold">Total (one-time)</span>
+                <span className="font-mono font-bold text-lg text-register">
+                  <Price amount={billing.plan.basePriceMonthly} currency={billing.plan.currency} />
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between text-sm">
+                <span className="text-ink-soft">Workspace admin (you)</span>
+                <Price amount={billing.plan.basePriceMonthly} currency={billing.plan.currency} />/mo
+              </div>
+              {Math.max(0, billing.memberCount - 1) > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-ink-soft">
+                    Additional members ({Math.max(0, billing.memberCount - 1)} × <Price amount={billing.plan.perSeatPriceMonthly} currency={billing.plan.currency} />)
+                  </span>
+                  <span className="font-mono">
+                    <Price amount={(Math.max(0, billing.memberCount - 1) * billing.plan.perSeatPriceMonthly)} currency={billing.plan.currency} />/mo
+                  </span>
+                </div>
+              )}
+              <div className="border-t border-rule pt-2 flex justify-between">
+                <span className="font-semibold">Total / month</span>
+                <span className="font-mono font-bold text-lg text-register">
+                  <Price amount={billing.monthlyAmount} currency={billing.plan.currency} />
+                </span>
+              </div>
+            </>
           )}
-          <div className="border-t border-rule pt-2 flex justify-between">
-            <span className="font-semibold">Total / month</span>
-            <span className="font-mono font-bold text-lg text-register">
-              <Price amount={billing.monthlyAmount} currency={billing.plan.currency} />
-            </span>
-          </div>
         </div>
       </div>
 
@@ -228,7 +263,9 @@ export default async function BillingPage() {
                   {m.role === "admin" ? "Admin" : m.role}
                 </span>
                 <span className="text-xs font-mono text-ink-soft">
-                  <Price amount={m.role === "admin" ? billing.plan.basePriceMonthly : billing.plan.perSeatPriceMonthly} currency={billing.plan.currency} className="text-xs" />/mo
+                  {isLifetimePlan
+                    ? "included"
+                    : <><Price amount={m.role === "admin" ? billing.plan.basePriceMonthly : billing.plan.perSeatPriceMonthly} currency={billing.plan.currency} className="text-xs" />/mo</>}
                 </span>
               </div>
             </div>
@@ -245,7 +282,18 @@ export default async function BillingPage() {
             </h2>
           </div>
           <div className="p-4 space-y-4">
-            {hasPaymentMethod ? (
+            {lifetimePaid ? (
+              <div className="text-sm text-ink-soft">
+                <p className="m-0 mb-2">
+                  ✓ Lifetime plan paid — no further charges. Your access never expires.
+                </p>
+                {sub?.lastPaymentAt && (
+                  <p className="text-xs m-0">
+                    Paid on {sub.lastPaymentAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </p>
+                )}
+              </div>
+            ) : hasPaymentMethod ? (
               <div className="text-sm text-ink-soft">
                 <p className="m-0 mb-2">
                   ✓ You have a saved payment method. We&rsquo;ll automatically charge
@@ -261,15 +309,19 @@ export default async function BillingPage() {
             ) : (
               <div className="text-sm text-ink-soft">
                 <p className="m-0">
-                  Add a payment method via Paystack to activate your subscription.
-                  You&rsquo;ll be charged{" "}
-                  <Price amount={billing.monthlyAmount} currency={billing.plan.currency} className="font-semibold text-ink" />
-                  {" "}now, and automatically billed each month.
+                  {isLifetimePlan ? (
+                    <>Pay <Price amount={billing.plan.basePriceMonthly} currency={billing.plan.currency} className="font-semibold text-ink" /> once via Paystack — lifetime access, no monthly billing.</>
+                  ) : (
+                    <>Add a payment method via Paystack to activate your subscription.
+                    You&rsquo;ll be charged{" "}
+                    <Price amount={billing.monthlyAmount} currency={billing.plan.currency} className="font-semibold text-ink" />
+                    {" "}now, and automatically billed each month.</>
+                  )}
                 </p>
               </div>
             )}
 
-            <PaystackCheckout />
+            {!lifetimePaid && <PaystackCheckout />}
 
             <div className="text-xs text-ink-soft pt-2 border-t border-rule">
               <p className="m-0">

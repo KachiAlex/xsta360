@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useActionState } from "react";
 import { createPlan, updatePlan, type SubFormState } from "@/app/actions/admin";
 
-interface PlanData {
+export interface PlanData {
   id: string;
   name: string;
+  billingInterval: string;
   basePriceMonthly: number;
   perSeatPriceMonthly: number;
   trialDays: number;
@@ -23,6 +25,8 @@ export function PlanForm({
 }) {
   const action = mode === "create" ? createPlan : updatePlan;
   const [state, formAction, pending] = useActionState<SubFormState, FormData>(action, {});
+  const [interval, setInterval] = useState(plan?.billingInterval ?? "monthly");
+  const isLifetime = interval === "lifetime";
 
   return (
     <form action={formAction} className="space-y-3">
@@ -30,7 +34,7 @@ export function PlanForm({
         <input type="hidden" name="planId" value={plan.id} />
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
             Plan name
@@ -39,9 +43,26 @@ export function PlanForm({
             type="text"
             name="name"
             defaultValue={plan?.name ?? ""}
-            placeholder="e.g. Starter, Pro, Enterprise"
+            placeholder="e.g. Starter, Pro, Lifetime"
             className="w-full text-sm border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
           />
+        </div>
+        <div>
+          <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
+            Billing type
+          </label>
+          <select
+            name="billingInterval"
+            value={interval}
+            onChange={(e) => setInterval(e.target.value)}
+            className="w-full text-sm border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
+          >
+            <option value="monthly">Monthly (recurring)</option>
+            <option value="lifetime">Lifetime (one-time)</option>
+          </select>
+          <p className="text-[11px] text-ink-soft mt-1">
+            {isLifetime ? "Single fixed payment, never renews" : "Billed every month"}
+          </p>
         </div>
         <div>
           <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
@@ -60,40 +81,49 @@ export function PlanForm({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
-            Base price / mo
+            {isLifetime ? "One-time price" : "Base price / mo"}
           </label>
           <input
             type="number"
             name="basePriceMonthly"
-            defaultValue={plan?.basePriceMonthly ?? 1000}
+            defaultValue={plan?.basePriceMonthly ?? (isLifetime ? 500000 : 1000)}
+            min={0}
             className="w-full text-sm border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
           />
-          <p className="text-[11px] text-ink-soft mt-1">What the workspace admin pays</p>
+          <p className="text-[11px] text-ink-soft mt-1">
+            {isLifetime ? "Charged once at checkout" : "What the workspace admin pays"}
+          </p>
         </div>
-        <div>
-          <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
-            Per-seat price / mo
-          </label>
-          <input
-            type="number"
-            name="perSeatPriceMonthly"
-            defaultValue={plan?.perSeatPriceMonthly ?? 500}
-            className="w-full text-sm border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
-          />
-          <p className="text-[11px] text-ink-soft mt-1">Each additional member</p>
-        </div>
-        <div>
-          <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
-            Trial days
-          </label>
-          <input
-            type="number"
-            name="trialDays"
-            defaultValue={plan?.trialDays ?? 30}
-            className="w-full text-sm border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
-          />
-          <p className="text-[11px] text-ink-soft mt-1">0 = no free trial</p>
-        </div>
+        {!isLifetime && (
+          <>
+            <div>
+              <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
+                Per-seat price / mo
+              </label>
+              <input
+                type="number"
+                name="perSeatPriceMonthly"
+                defaultValue={plan?.perSeatPriceMonthly ?? 500}
+                min={0}
+                className="w-full text-sm border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
+              />
+              <p className="text-[11px] text-ink-soft mt-1">Each additional member</p>
+            </div>
+            <div>
+              <label className="block text-xs font-mono uppercase tracking-wider text-ink-soft mb-1.5">
+                Trial days
+              </label>
+              <input
+                type="number"
+                name="trialDays"
+                defaultValue={plan?.trialDays ?? 30}
+                min={0}
+                className="w-full text-sm border border-rule bg-panel rounded px-3 py-2.5 min-h-[44px]"
+              />
+              <p className="text-[11px] text-ink-soft mt-1">0 = no free trial</p>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -127,21 +157,28 @@ export function PlanForm({
         <div className="font-mono text-[11px] uppercase tracking-wider text-ink-soft mb-1.5">
           Billing preview
         </div>
-        <div className="font-mono text-xs text-ink-soft">
-          <span id="preview-currency">{plan?.currency ?? "₦"}</span>
-          <span id="preview-base">{plan?.basePriceMonthly ?? 1000}</span>
-          {" (admin) + "}
-          <span id="preview-currency2">{plan?.currency ?? "₦"}</span>
-          <span id="preview-seat">{plan?.perSeatPriceMonthly ?? 500}</span>
-          {" × additional members"}
-        </div>
-        <div className="text-xs text-ink-soft mt-1">
-          e.g. 4 members = <span id="preview-currency3">{plan?.currency ?? "₦"}</span>
-          <span id="preview-total">
-            {(plan?.basePriceMonthly ?? 1000) + 3 * (plan?.perSeatPriceMonthly ?? 500)}
-          </span>
-          /mo
-        </div>
+        {isLifetime ? (
+          <div className="font-mono text-xs text-ink-soft">
+            {plan?.currency ?? "₦"}
+            {(plan?.basePriceMonthly ?? 500000).toLocaleString()} — charged once, lifetime access, no renewals
+          </div>
+        ) : (
+          <>
+            <div className="font-mono text-xs text-ink-soft">
+              {plan?.currency ?? "₦"}
+              {(plan?.basePriceMonthly ?? 1000).toLocaleString()}
+              {" (admin) + "}
+              {plan?.currency ?? "₦"}
+              {(plan?.perSeatPriceMonthly ?? 500).toLocaleString()}
+              {" × additional members"}
+            </div>
+            <div className="text-xs text-ink-soft mt-1">
+              e.g. 4 members = {plan?.currency ?? "₦"}
+              {((plan?.basePriceMonthly ?? 1000) + 3 * (plan?.perSeatPriceMonthly ?? 500)).toLocaleString()}
+              /mo
+            </div>
+          </>
+        )}
       </div>
 
       <div className="flex items-center gap-3">

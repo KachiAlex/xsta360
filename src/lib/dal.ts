@@ -140,6 +140,8 @@ export interface OrgPlan {
   planId: string;
   planName: string;
   status: SubscriptionStatus | null;
+  /** "monthly" = recurring base+per-seat billing; "lifetime" = one-time payment. */
+  billingInterval: string;
   basePriceMonthly: number;
   perSeatPriceMonthly: number;
   trialDays: number;
@@ -204,6 +206,7 @@ export async function getOrgPlan(orgId: string): Promise<OrgPlan> {
       planId: schema.plans.id,
       planName: schema.plans.name,
       status: schema.subscriptions.status,
+      billingInterval: schema.plans.billingInterval,
       basePriceMonthly: schema.plans.basePriceMonthly,
       perSeatPriceMonthly: schema.plans.perSeatPriceMonthly,
       trialDays: schema.plans.trialDays,
@@ -221,6 +224,7 @@ export async function getOrgPlan(orgId: string): Promise<OrgPlan> {
       planId: sub.planId,
       planName: sub.planName,
       status: sub.status,
+      billingInterval: sub.billingInterval,
       basePriceMonthly: sub.basePriceMonthly,
       perSeatPriceMonthly: sub.perSeatPriceMonthly,
       trialDays: sub.trialDays,
@@ -235,6 +239,7 @@ export async function getOrgPlan(orgId: string): Promise<OrgPlan> {
     planId: "none",
     planName: "Free",
     status: null,
+    billingInterval: "monthly",
     basePriceMonthly: 0,
     perSeatPriceMonthly: 0,
     trialDays: 0,
@@ -265,8 +270,12 @@ export async function getOrgBilling(orgId: string): Promise<{
 
   const memberCount = memberRow?.value ?? 0;
   // Base covers the admin (1 seat). Additional members are per-seat.
+  // Lifetime plans have no monthly charge — the amount is a one-time payment.
   const additionalSeats = Math.max(0, memberCount - 1);
-  const monthlyAmount = plan.basePriceMonthly + additionalSeats * plan.perSeatPriceMonthly;
+  const monthlyAmount =
+    plan.billingInterval === "lifetime"
+      ? 0
+      : plan.basePriceMonthly + additionalSeats * plan.perSeatPriceMonthly;
 
   let daysLeftInTrial: number | null = null;
   if (plan.trialEndsAt) {
