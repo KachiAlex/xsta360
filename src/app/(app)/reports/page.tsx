@@ -9,6 +9,7 @@ import { Topbar } from "@/components/app/topbar";
 import { Panel, PanelHead } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/app/empty-state";
+import { ExportReportButton } from "@/components/app/export-report-button";
 
 const SOURCE_LABELS: Record<string, string> = {
   referral: "Referral",
@@ -74,7 +75,7 @@ export default async function ReportsPage({
             title="Team activity"
             sub="What each member has been doing in the selected period"
           />
-          <div className="px-5 pt-4 flex flex-wrap gap-1.5">
+          <div className="px-5 pt-4 flex flex-wrap items-center gap-1.5">
             {RANGES.map((r) => (
               <Link
                 key={r.key}
@@ -88,6 +89,9 @@ export default async function ReportsPage({
                 {r.label}
               </Link>
             ))}
+            <span className="ml-auto">
+              <ExportReportButton range={range} />
+            </span>
           </div>
 
           <div className="p-4 sm:p-5">
