@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 
 export type PromoCode = typeof schema.promoCodes.$inferSelect;
@@ -54,6 +54,20 @@ export async function applyPromoToOrg(
   const now = new Date();
   const trialEndsAt = new Date(now.getTime() + promo.freeDays * 24 * 60 * 60 * 1000);
 
+  // Re-check inside the transaction — the code may have been deactivated or
+  // expired between validation and redemption.
+  const [fresh] = await tx
+    .select({ active: schema.promoCodes.active, expiresAt: schema.promoCodes.expiresAt })
+    .from(schema.promoCodes)
+    .where(eq(schema.promoCodes.id, promo.id))
+    .limit(1);
+  if (!fresh || !fresh.active || (fresh.expiresAt && fresh.expiresAt < now)) {
+    await tx
+      .delete(schema.promoRedemptions)
+      .where(eq(schema.promoRedemptions.id, redemption[0].id));
+    return { ok: false, error: "This promo code is no longer valid" };
+  }
+
   const [existing] = await tx
     .select({ id: schema.subscriptions.id })
     .from(schema.subscriptions)
@@ -86,10 +100,24 @@ export async function applyPromoToOrg(
     });
   }
 
-  await tx
+  // Conditional increment — the WHERE clause is the capacity check, so two
+  // concurrent redemptions of the last available use can't both succeed.
+  const bumped = await tx
     .update(schema.promoCodes)
     .set({ redeemedCount: sql`${schema.promoCodes.redeemedCount} + 1` })
-    .where(eq(schema.promoCodes.id, promo.id));
+    .where(
+      and(
+        eq(schema.promoCodes.id, promo.id),
+        sql`(${schema.promoCodes.maxRedemptions} is null or ${schema.promoCodes.redeemedCount} < ${schema.promoCodes.maxRedemptions})`,
+      ),
+    )
+    .returning({ id: schema.promoCodes.id });
+  if (bumped.length === 0) {
+    await tx
+      .delete(schema.promoRedemptions)
+      .where(eq(schema.promoRedemptions.id, redemption[0].id));
+    return { ok: false, error: "This promo code has been fully redeemed" };
+  }
 
   return { ok: true };
 }

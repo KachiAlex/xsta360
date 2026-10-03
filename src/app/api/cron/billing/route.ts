@@ -161,7 +161,9 @@ export async function GET(request: Request) {
   // 2. Convert expired trials: charge if a card is on file, else past_due
   //    (trial expiry is a hard block — no grace).
   // ---------------------------------------------------------------------
-  const trialsDue = trialingSubs.filter((s) => s.billingInterval !== "lifetime" && s.trialEndsAt && s.trialEndsAt <= now && (!s.graceEndsAt || s.graceEndsAt <= now));
+  // A trial on a lifetime plan still expires — promo/trial periods aren't
+  // the same as a purchased lifetime sub (status active, no period end).
+  const trialsDue = trialingSubs.filter((s) => s.trialEndsAt && s.trialEndsAt <= now && (!s.graceEndsAt || s.graceEndsAt <= now));
 
   for (const sub of trialsDue) {
     if (!sub.authCode || !sub.email) {
@@ -195,7 +197,7 @@ export async function GET(request: Request) {
       });
 
       if (chargeResult.status === "success") {
-        const periodEnd = addMonths(now, 1);
+        const periodEnd = sub.billingInterval === "lifetime" ? null : addMonths(now, 1);
         await db
           .update(schema.subscriptions)
           .set({
