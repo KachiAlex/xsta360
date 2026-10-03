@@ -153,10 +153,10 @@ export default async function Home() {
         </div>
         <div className="relative w-full aspect-video border border-rule rounded-md overflow-hidden bg-paper-2">
           <iframe
-            src="https://app.trupeer.ai/embed/gbpDIGPHV/doc?app=69f9261c487f9d6e7dbfc075"
+            src="https://www.youtube.com/embed/Ajs52vLvG8g"
             className="absolute inset-0 w-full h-full border-0"
             allowFullScreen
-            allow="autoplay; fullscreen; encrypted-media; clipboard-write"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             loading="lazy"
             title="Xsta360 CRM User Guide"
           />
