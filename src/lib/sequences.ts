@@ -2,6 +2,7 @@ import "server-only";
 import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db, schema } from "@/db";
+import { isSubscriptionBlocked } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
 import { sendMail } from "@/lib/email";
@@ -180,6 +181,14 @@ export async function processSequenceSteps(opts?: {
     .from(schema.sequenceEnrollments)
     .where(and(...enrollmentConditions));
 
+  // Skip enrollments in blocked orgs (lapsed/canceled subscription) — a
+  // locked-out tenant shouldn't keep sending drip emails/WhatsApps.
+  const enrollmentOrgIds = [...new Set(enrollments.map((e) => e.orgId))];
+  const blockedOrgIds = new Set<string>();
+  for (const orgId of enrollmentOrgIds) {
+    if (await isSubscriptionBlocked(orgId)) blockedOrgIds.add(orgId);
+  }
+
   // Prefetch all steps and leads in bulk to avoid N+1 queries.
   const sequenceIds = [...new Set(enrollments.map((e) => e.sequenceId))];
   const leadIds = [...new Set(enrollments.map((e) => e.leadId))];
@@ -208,6 +217,7 @@ export async function processSequenceSteps(opts?: {
   const leadsById = new Map(allLeads.map((l) => [l.id, l]));
 
   for (const enrollment of enrollments) {
+    if (blockedOrgIds.has(enrollment.orgId)) continue;
     // Use prefetched steps (already ordered by position).
     const steps = stepsBySeq.get(enrollment.sequenceId) ?? [];
 

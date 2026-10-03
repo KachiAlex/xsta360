@@ -102,6 +102,19 @@ export async function requireAuth(): Promise<AuthContext> {
   return ctx;
 }
 
+/**
+ * verifySession + subscription enforcement for server actions and data APIs.
+ * Returns null when the org is blocked (lapsed payment / canceled / expired
+ * trial) so mutating actions can't run for locked-out tenants. Billing
+ * actions must keep using verifySession — blocked users still need to pay.
+ */
+export async function verifyActiveSession(): Promise<AuthContext | null> {
+  const ctx = await verifySession();
+  if (!ctx || ctx.isSuperadmin) return ctx;
+  if (await isSubscriptionBlocked(ctx.orgId)) return null;
+  return ctx;
+}
+
 /** Require one of the given roles; redirect to dashboard if lacking. */
 export async function requireRole(...roles: Role[]): Promise<AuthContext> {
   const ctx = await requireAuth();
@@ -155,7 +168,9 @@ import { count as countFn } from "drizzle-orm";
 
 /**
  * Whether the org's subscription blocks access to the app.
- * Blocked when: past_due, canceled, or trialing past trialEndsAt.
+ * Blocked when: canceled; past_due once the grace window passes; trialing
+ * past trialEndsAt; or a monthly "active" sub whose paid period has ended
+ * (covers subs the renewal cron can't flag, e.g. no card on file).
  * No subscription row (pre-billing orgs) is allowed through.
  */
 export async function isSubscriptionBlocked(orgId: string): Promise<boolean> {
@@ -164,8 +179,11 @@ export async function isSubscriptionBlocked(orgId: string): Promise<boolean> {
       status: schema.subscriptions.status,
       trialEndsAt: schema.subscriptions.trialEndsAt,
       graceEndsAt: schema.subscriptions.graceEndsAt,
+      currentPeriodEnd: schema.subscriptions.currentPeriodEnd,
+      billingInterval: schema.plans.billingInterval,
     })
     .from(schema.subscriptions)
+    .innerJoin(schema.plans, eq(schema.subscriptions.planId, schema.plans.id))
     .where(eq(schema.subscriptions.orgId, orgId))
     .limit(1);
 
@@ -177,6 +195,15 @@ export async function isSubscriptionBlocked(orgId: string): Promise<boolean> {
     return !sub.graceEndsAt || sub.graceEndsAt <= now;
   }
   if (sub.status === "trialing" && sub.trialEndsAt && sub.trialEndsAt < now) return true;
+  // A monthly sub stays active only while inside its paid period.
+  if (
+    sub.status === "active" &&
+    sub.billingInterval === "monthly" &&
+    sub.currentPeriodEnd &&
+    sub.currentPeriodEnd < now
+  ) {
+    return true;
+  }
   return false;
 }
 

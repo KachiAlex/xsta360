@@ -5,7 +5,7 @@ import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { toString as qrToString } from "qrcode";
 import { db, schema } from "@/db";
-import { verifySession, type AuthContext } from "@/lib/dal";
+import { verifyActiveSession, getOrgPlan, planHasFeature, type AuthContext } from "@/lib/dal";
 import { getContactCardStats } from "@/lib/contact-cards";
 
 const ManageCardSchema = z.object({
@@ -56,7 +56,7 @@ export async function getMyContactCard(): Promise<{
   viewCount: number;
   leadCount: number;
 } | null> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return null;
 
   const [card] = await db
@@ -129,8 +129,13 @@ export async function createOrUpdateContactCard(
   _prev: ContactCardFormState,
   formData: FormData,
 ): Promise<ContactCardFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
+
+  const plan = await getOrgPlan(ctx.orgId);
+  if (!planHasFeature(plan, "contact_card")) {
+    return { message: `Contact cards aren't included on the ${plan.planName} plan. Upgrade to use them.` };
+  }
 
   const raw = {
     id: formData.get("id"),

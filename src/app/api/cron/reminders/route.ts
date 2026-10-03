@@ -1,6 +1,7 @@
 import { and, eq, lte, or } from "drizzle-orm";
 import { timingSafeEqual } from "crypto";
 import { db, schema } from "@/db";
+import { isSubscriptionBlocked } from "@/lib/dal";
 import { sendReminderEmail } from "@/lib/email";
 import { sendWhatsAppMessage, formatReminderMessage } from "@/lib/whatsapp";
 import { processSequenceSteps } from "@/lib/sequences";
@@ -75,9 +76,18 @@ export async function GET(request: Request) {
     )
     .limit(100);
 
+  // Skip reminders belonging to blocked orgs (lapsed/canceled subscription)
+  // — a locked-out tenant shouldn't keep sending follow-up emails/WhatsApps.
+  const dueOrgIds = [...new Set(due.map((r) => r.orgId))];
+  const blockedOrgIds = new Set<string>();
+  for (const orgId of dueOrgIds) {
+    if (await isSubscriptionBlocked(orgId)) blockedOrgIds.add(orgId);
+  }
+
   // Atomically claim due reminders by setting status to "processing".
   const claimed: typeof due = [];
   for (const r of due) {
+    if (blockedOrgIds.has(r.orgId)) continue;
     const [updated] = await db
       .update(schema.reminders)
       .set({ status: "processing", updatedAt: now })

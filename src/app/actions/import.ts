@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { verifySession } from "@/lib/dal";
+import { verifyActiveSession } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
 import { enrollLeadInSequence } from "@/lib/sequences";
 
@@ -30,7 +30,7 @@ export async function importLeads(
   _prev: ImportFormState,
   formData: FormData,
 ): Promise<ImportFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const rowsJson = String(formData.get("rows") ?? "[]");

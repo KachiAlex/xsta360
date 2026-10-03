@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { and, count, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { verifySession, getOrgPlan, planHasFeature } from "@/lib/dal";
+import { verifyActiveSession, getOrgPlan, planHasFeature } from "@/lib/dal";
 
 /** Returns an error state if the org's plan doesn't include sequences. */
 async function requireSequences(orgId: string): Promise<{ message: string } | null> {
@@ -47,7 +47,7 @@ export async function createSequence(
   _prev: SequenceFormState,
   formData: FormData,
 ): Promise<SequenceFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   const gate = await requireSequences(ctx.orgId);
   if (gate) return gate;
@@ -84,7 +84,7 @@ export async function deleteSequence(
   _prev: SequenceFormState,
   formData: FormData,
 ): Promise<SequenceFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const id = String(formData.get("id"));
@@ -102,7 +102,7 @@ export async function toggleSequenceActive(
   _prev: SequenceFormState,
   formData: FormData,
 ): Promise<SequenceFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   const gate = await requireSequences(ctx.orgId);
   if (gate) return gate;
@@ -131,7 +131,7 @@ export async function addSequenceStep(
   _prev: SequenceFormState,
   formData: FormData,
 ): Promise<SequenceFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   const gate = await requireSequences(ctx.orgId);
   if (gate) return gate;
@@ -204,7 +204,7 @@ export async function deleteSequenceStep(
   _prev: SequenceFormState,
   formData: FormData,
 ): Promise<SequenceFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const id = String(formData.get("id"));
@@ -228,7 +228,7 @@ export async function enrollLead(
   _prev: SequenceFormState,
   formData: FormData,
 ): Promise<SequenceFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   const gate = await requireSequences(ctx.orgId);
   if (gate) return gate;
@@ -267,7 +267,7 @@ export async function unenrollLead(
   _prev: SequenceFormState,
   formData: FormData,
 ): Promise<SequenceFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const enrollmentId = String(formData.get("enrollmentId") ?? formData.get("id"));
@@ -295,7 +295,7 @@ export async function runSequenceNow(
   _prev: SequenceFormState,
   formData: FormData,
 ): Promise<SequenceFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   const gate = await requireSequences(ctx.orgId);
   if (gate) return gate;
@@ -359,7 +359,7 @@ export async function updateSequenceStep(
   _prev: SequenceFormState,
   formData: FormData,
 ): Promise<SequenceFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   const gate = await requireSequences(ctx.orgId);
   if (gate) return gate;
@@ -439,7 +439,7 @@ export async function updateSequenceSettings(
   _prev: SequenceFormState,
   formData: FormData,
 ): Promise<SequenceFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   const gate = await requireSequences(ctx.orgId);
   if (gate) return gate;
@@ -497,7 +497,7 @@ export async function bulkEnrollLeads(
   _prev: SequenceFormState,
   formData: FormData,
 ): Promise<SequenceFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   const gate = await requireSequences(ctx.orgId);
   if (gate) return gate;
@@ -551,7 +551,7 @@ export async function pauseEnrollment(
   _prev: SequenceFormState,
   formData: FormData,
 ): Promise<SequenceFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const enrollmentId = String(formData.get("enrollmentId"));
@@ -574,7 +574,7 @@ export async function resumeEnrollment(
   _prev: SequenceFormState,
   formData: FormData,
 ): Promise<SequenceFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const enrollmentId = String(formData.get("enrollmentId"));
@@ -614,7 +614,7 @@ export async function createSequenceTemplate(
   _prev: SequenceFormState,
   formData: FormData,
 ): Promise<SequenceFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const parsed = CreateTemplateSchema.safeParse({
@@ -657,7 +657,7 @@ export async function deleteSequenceTemplate(
   _prev: SequenceFormState,
   formData: FormData,
 ): Promise<SequenceFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const id = String(formData.get("id"));
@@ -679,7 +679,7 @@ export async function createSequenceFromTemplate(
   _prev: SequenceFormState,
   formData: FormData,
 ): Promise<SequenceFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   const gate = await requireSequences(ctx.orgId);
   if (gate) return gate;

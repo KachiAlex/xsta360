@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { and, count, eq, isNull, gt } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { verifySession, can, getOrgBilling, getPlanMaxMembers } from "@/lib/dal";
+import { verifySession, verifyActiveSession, can, getOrgBilling, getPlanMaxMembers } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
 import { setOrg } from "@/lib/session";
 import { nanoid } from "nanoid";
@@ -50,7 +50,7 @@ export async function inviteMember(
   _prev: TeamFormState,
   formData: FormData,
 ): Promise<TeamFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "manage_team")) return { message: "Only admins can invite members" };
 
@@ -146,6 +146,8 @@ export async function acceptInvite(
   _prev: TeamFormState,
   formData: FormData,
 ): Promise<TeamFormState> {
+  // Deliberately not verifyActiveSession — a member of a blocked org must
+  // still be able to accept an invitation into a different workspace.
   const ctx = await verifySession();
   if (!ctx) return { message: "Not signed in" };
 
@@ -227,7 +229,7 @@ export async function revokeInvite(
   _prev: TeamFormState,
   formData: FormData,
 ): Promise<TeamFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "manage_team")) return { message: "Only admins can revoke invitations" };
 
@@ -259,7 +261,7 @@ export async function changeRole(
   _prev: TeamFormState,
   formData: FormData,
 ): Promise<TeamFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "manage_team")) return { message: "Only admins can change roles" };
 
@@ -322,7 +324,7 @@ export async function removeMember(
   _prev: TeamFormState,
   formData: FormData,
 ): Promise<TeamFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "manage_team")) return { message: "Only admins can remove members" };
 

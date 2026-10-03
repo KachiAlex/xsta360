@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { and, eq, inArray, not } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { verifySession, can, type AuthContext } from "@/lib/dal";
+import { verifyActiveSession, can, type AuthContext } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
 import { sendLeadAssignedEmail } from "@/lib/email";
 import { createNotification } from "@/lib/notifications";
@@ -102,7 +102,7 @@ export async function createLead(
   _prev: LeadFormState,
   formData: FormData,
 ): Promise<LeadFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const parsed = CreateLeadSchema.safeParse({
@@ -308,7 +308,7 @@ export async function updateLead(
   _prev: LeadFormState,
   formData: FormData,
 ): Promise<LeadFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const parsed = UpdateLeadSchema.safeParse({
@@ -469,7 +469,7 @@ export async function addRemark(
   _prev: LeadFormState,
   formData: FormData,
 ): Promise<LeadFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const parsed = RemarkSchema.safeParse({
@@ -547,7 +547,7 @@ export async function changeStage(
   _prev: LeadFormState,
   formData: FormData,
 ): Promise<LeadFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const parsed = StageChangeSchema.safeParse({
@@ -642,7 +642,7 @@ export async function snoozeReminder(
   _prev: LeadFormState,
   formData: FormData,
 ): Promise<LeadFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const parsed = SnoozeSchema.safeParse({
@@ -695,7 +695,7 @@ export async function completeReminder(
   _prev: LeadFormState,
   formData: FormData,
 ): Promise<LeadFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const reminderId = String(formData.get("reminderId"));
@@ -737,7 +737,7 @@ function escapeCsv(value: string): string {
 }
 
 export async function exportLeads(): Promise<{ csv: string; filename: string } | { error: string }> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { error: "Not signed in" };
 
   const { getLeads } = await import("@/lib/leads");
@@ -790,7 +790,7 @@ export async function assignLead(
   _prev: LeadFormState,
   formData: FormData,
 ): Promise<LeadFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "assign")) return { message: "Not allowed" };
 
@@ -919,7 +919,7 @@ export async function bulkDeleteLeads(
   _prev: BulkFormState,
   formData: FormData,
 ): Promise<BulkFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "delete")) return { message: "Not allowed" };
 
@@ -958,7 +958,7 @@ export async function bulkAssignLeads(
   _prev: BulkFormState,
   formData: FormData,
 ): Promise<BulkFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "assign")) return { message: "Not allowed" };
 
@@ -1005,7 +1005,7 @@ export async function bulkMoveStage(
   _prev: BulkFormState,
   formData: FormData,
 ): Promise<BulkFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "assign")) return { message: "Not allowed" };
 

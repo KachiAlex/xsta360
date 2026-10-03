@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { verifySession } from "@/lib/dal";
+import { verifyActiveSession } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
 import { enrollLeadInSequence } from "@/lib/sequences";
 
@@ -31,7 +31,7 @@ export async function createCategory(
   _prev: CategoryFormState,
   formData: FormData,
 ): Promise<CategoryFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (ctx.role !== "admin" && ctx.role !== "manager") {
     return { message: "Only admins and managers can create categories" };
@@ -83,7 +83,7 @@ export async function updateCategory(
   _prev: CategoryFormState,
   formData: FormData,
 ): Promise<CategoryFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (ctx.role !== "admin" && ctx.role !== "manager") {
     return { message: "Only admins and managers can update categories" };
@@ -135,7 +135,7 @@ export async function deleteCategory(
   _prev: CategoryFormState,
   formData: FormData,
 ): Promise<CategoryFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (ctx.role !== "admin" && ctx.role !== "manager") {
     return { message: "Only admins and managers can delete categories" };
@@ -165,7 +165,7 @@ export async function assignLeadToCategory(
   _prev: CategoryFormState,
   formData: FormData,
 ): Promise<CategoryFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const leadId = String(formData.get("leadId"));
@@ -263,7 +263,7 @@ export async function removeLeadFromCategory(
   _prev: CategoryFormState,
   formData: FormData,
 ): Promise<CategoryFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const leadId = String(formData.get("leadId"));
@@ -320,7 +320,7 @@ export async function bulkAssignCategory(
   _prev: CategoryFormState,
   formData: FormData,
 ): Promise<CategoryFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const categoryId = String(formData.get("categoryId"));

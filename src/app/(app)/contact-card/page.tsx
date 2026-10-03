@@ -1,4 +1,5 @@
-import { requireAuth } from "@/lib/dal";
+import { requireAuth, getOrgPlan, planHasFeature } from "@/lib/dal";
+import { UpgradePrompt } from "@/components/app/upgrade-prompt";
 import { getMyContactCard } from "@/app/actions/contact-cards";
 import { ContactCardManager } from "@/components/contact-card/contact-card-manager";
 import { Topbar } from "@/components/app/topbar";
@@ -6,7 +7,11 @@ import { Topbar } from "@/components/app/topbar";
 export const dynamic = "force-dynamic";
 
 export default async function ContactCardPage() {
-  await requireAuth();
+  const ctx = await requireAuth();
+  const plan = await getOrgPlan(ctx.orgId);
+  if (!planHasFeature(plan, "contact_card")) {
+    return <UpgradePrompt feature="contact_card" plan={plan} />;
+  }
   const card = await getMyContactCard();
 
   return (

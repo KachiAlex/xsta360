@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { and, eq, desc } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { verifySession } from "@/lib/dal";
+import { verifyActiveSession } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
 
 // ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ export async function createTodo(
   _prev: TaskFormState,
   formData: FormData,
 ): Promise<TaskFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const parsed = CreateTodoSchema.safeParse({
@@ -121,7 +121,7 @@ export async function completeTodo(
   _prev: TaskFormState,
   formData: FormData,
 ): Promise<TaskFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const todoId = String(formData.get("id"));
@@ -152,7 +152,7 @@ export async function reopenTodo(
   _prev: TaskFormState,
   formData: FormData,
 ): Promise<TaskFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const todoId = String(formData.get("id"));
@@ -176,7 +176,7 @@ export async function deleteTodo(
   _prev: TaskFormState,
   formData: FormData,
 ): Promise<TaskFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const todoId = String(formData.get("id"));
@@ -200,7 +200,7 @@ export async function createNote(
   _prev: TaskFormState,
   formData: FormData,
 ): Promise<TaskFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const parsed = CreateNoteSchema.safeParse({
@@ -257,7 +257,7 @@ export async function updateNote(
   _prev: TaskFormState,
   formData: FormData,
 ): Promise<TaskFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const parsed = UpdateNoteSchema.safeParse({
@@ -305,7 +305,7 @@ export async function deleteNote(
   _prev: TaskFormState,
   formData: FormData,
 ): Promise<TaskFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const noteId = String(formData.get("id"));
@@ -335,7 +335,7 @@ export async function toggleNotePin(
   _prev: TaskFormState,
   formData: FormData,
 ): Promise<TaskFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const parsed = UpdateNoteSchema.safeParse({ id: formData.get("id") });

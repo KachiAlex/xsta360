@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { verifySession } from "@/lib/dal";
+import { verifyActiveSession } from "@/lib/dal";
 import { getOrgDocuments, getLeadDocuments, getDocument } from "@/lib/document-queries";
 import { deleteFromR2, getDownloadUrl } from "@/lib/r2";
 
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * - Otherwise, returns org-level documents (leadId is null).
  */
 export async function GET(request: NextRequest) {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
  * DELETE /api/documents?id={uuid}
  */
 export async function DELETE(request: NextRequest) {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(request.url);

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { verifySession } from "@/lib/dal";
+import { verifyActiveSession } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
 
 export type DocFormState = {
@@ -21,7 +21,7 @@ export async function uploadLeadDocument(
   _prev: DocFormState,
   formData: FormData,
 ): Promise<DocFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const leadId = String(formData.get("leadId"));
@@ -69,7 +69,7 @@ export async function deleteLeadDocument(
   _prev: DocFormState,
   formData: FormData,
 ): Promise<DocFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const docId = String(formData.get("id"));
@@ -90,7 +90,7 @@ export async function markDocumentViewed(
   _prev: DocFormState,
   formData: FormData,
 ): Promise<DocFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const docId = String(formData.get("id"));

@@ -56,6 +56,12 @@ vi.mock("@/lib/audit", () => ({
   logEvent: vi.fn(() => Promise.resolve()),
 }));
 
+// Subscription enforcement — tests run as unblocked orgs by default.
+const isSubscriptionBlockedMock = vi.fn(() => Promise.resolve(false));
+vi.mock("@/lib/dal", () => ({
+  isSubscriptionBlocked: isSubscriptionBlockedMock,
+}));
+
 vi.mock("@/lib/whatsapp", () => ({
   sendWhatsAppMessage: vi.fn(() => Promise.resolve({ success: true })),
   formatWhatsAppMessage: vi.fn((body, org) => `${body}\n\n— ${org}`),

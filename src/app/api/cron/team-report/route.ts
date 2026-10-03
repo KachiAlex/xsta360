@@ -2,6 +2,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { timingSafeEqual } from "crypto";
 import { db, schema } from "@/db";
 import { sendTeamReportEmail } from "@/lib/email";
+import { isSubscriptionBlocked } from "@/lib/dal";
 import { getTeamReport } from "@/lib/team-report";
 import { getPipelineForecast } from "@/lib/forecast";
 import { startOfDayForDate } from "@/lib/timezone";
@@ -107,7 +108,7 @@ export async function GET(request: Request) {
     try {
       const tz = org.timezone ?? "Africa/Lagos";
       const local = getLocalParts(tz, now);
-      if (local.hour < SEND_HOUR) {
+      if (local.hour < SEND_HOUR || (await isSubscriptionBlocked(org.id))) {
         skipped++;
         continue;
       }

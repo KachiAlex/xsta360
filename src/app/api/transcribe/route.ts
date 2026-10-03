@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifySession } from "@/lib/dal";
+import { verifyActiveSession } from "@/lib/dal";
 import { transcribeAudio } from "@/lib/whisper";
 
 export const runtime = "nodejs";
@@ -8,7 +8,7 @@ export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   // Verify session.
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

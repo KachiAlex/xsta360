@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { verifySession } from "@/lib/dal";
+import { verifyActiveSession } from "@/lib/dal";
 import { getLeadTimeline } from "@/lib/dashboard";
 
 export async function GET(request: NextRequest) {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

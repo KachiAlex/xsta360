@@ -407,10 +407,55 @@ export async function GET(request: Request) {
     }
   }
 
+  // ---------------------------------------------------------------------
+  // 3b. Lapsed renewals without a card on file — an "active" monthly sub
+  //     whose period ended but has no saved authorization can never be
+  //     charged. Flag it past_due with a grace window + dunning email so it
+  //     doesn't ride free forever (isSubscriptionBlocked locks access once
+  //     grace ends, and paying via /billing restores it).
+  // ---------------------------------------------------------------------
+  const unchargeable = dueSubs.filter(
+    (s) =>
+      s.billingInterval !== "lifetime" &&
+      (!s.authCode || !s.email) &&
+      s.periodEnd &&
+      s.periodEnd <= now &&
+      (!s.graceEndsAt || s.graceEndsAt <= now),
+  );
+
+  for (const sub of unchargeable) {
+    try {
+      const { memberCount, amount: amountNaira } = await orgMonthlyAmount(sub.orgId, sub.basePrice, sub.perSeat);
+      const graceEndsAt = new Date(now.getTime() + GRACE_DAYS * DAY_MS);
+      await db
+        .update(schema.subscriptions)
+        .set({ status: "past_due", graceEndsAt, updatedAt: now })
+        .where(eq(schema.subscriptions.id, sub.id));
+
+      await logEvent(sub.orgId, "subscription_updated", {
+        meta: { action: "renewal_lapsed_no_card", memberCount },
+      });
+
+      const admin = await getOrgAdmin(sub.orgId);
+      if (admin) {
+        const [org] = await db.select({ name: schema.organizations.name }).from(schema.organizations).where(eq(schema.organizations.id, sub.orgId)).limit(1);
+        await sendPaymentFailedEmail({
+          to: admin.email, userName: admin.name, orgName: org?.name ?? "your workspace",
+          amount: amountNaira, currency: sub.currency, graceDays: GRACE_DAYS, appUrl,
+        }).catch((e) => console.error(`Dunning email failed for org ${sub.orgId}:`, e));
+      }
+
+      results.push({ orgId: sub.orgId, status: "lapsed_no_card" });
+    } catch (err) {
+      console.error(`Lapsed-renewal flagging failed for org ${sub.orgId}:`, err);
+    }
+  }
+
   return NextResponse.json({
     remindersSent,
     trialsProcessed: trialsDue.length,
     processed: chargeable.length,
+    lapsedNoCard: unchargeable.length,
     results,
     timestamp: now.toISOString(),
   });

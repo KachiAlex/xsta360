@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifySession, getUnreadCount, getUserNotifications } from "@/lib/dal";
+import { verifyActiveSession, getUnreadCount, getUserNotifications } from "@/lib/dal";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
  * Returns notifications for the current user + unread count.
  */
 export async function GET(request: Request) {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

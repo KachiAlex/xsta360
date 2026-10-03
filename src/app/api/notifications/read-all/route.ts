@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifySession, markAllAsRead } from "@/lib/dal";
+import { verifyActiveSession, markAllAsRead } from "@/lib/dal";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
  * Marks all notifications as read for the current user.
  */
 export async function POST() {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

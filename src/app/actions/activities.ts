@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { verifySession, type AuthContext } from "@/lib/dal";
+import { verifyActiveSession, type AuthContext } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
 
 // ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ export async function logActivity(
   _prev: ActivityFormState,
   formData: FormData,
 ): Promise<ActivityFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const parsed = LogActivitySchema.safeParse({
@@ -144,7 +144,7 @@ export async function completeReminderFromDashboard(
   _prev: ActivityFormState,
   formData: FormData,
 ): Promise<ActivityFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const reminderId = String(formData.get("reminderId"));
@@ -176,7 +176,7 @@ export async function snoozeReminderFromDashboard(
   _prev: ActivityFormState,
   formData: FormData,
 ): Promise<ActivityFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const reminderId = String(formData.get("reminderId"));
@@ -227,7 +227,7 @@ export async function setReminder(
   _prev: ActivityFormState,
   formData: FormData,
 ): Promise<ActivityFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const parsed = SetReminderSchema.safeParse({
@@ -287,7 +287,7 @@ export async function deleteReminder(
   _prev: ActivityFormState,
   formData: FormData,
 ): Promise<ActivityFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
 
   const reminderId = String(formData.get("reminderId"));

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { and, eq, count } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { verifySession, can } from "@/lib/dal";
+import { verifyActiveSession, can } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
 
 export type OrgFormState = { errors?: Record<string, string[]>; message?: string; ok?: boolean };
@@ -23,7 +23,7 @@ export async function addStage(
   _prev: OrgFormState,
   formData: FormData,
 ): Promise<OrgFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "configure")) return { message: "Only admins can configure stages" };
 
@@ -68,7 +68,7 @@ export async function updateStage(
   _prev: OrgFormState,
   formData: FormData,
 ): Promise<OrgFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "configure")) return { message: "Only admins can configure stages" };
 
@@ -108,7 +108,7 @@ export async function deleteStage(
   _prev: OrgFormState,
   formData: FormData,
 ): Promise<OrgFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "configure")) return { message: "Only admins can configure stages" };
 
@@ -152,7 +152,7 @@ export async function updateStageProbability(
   _prev: OrgFormState,
   formData: FormData,
 ): Promise<OrgFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "configure")) return { message: "Only admins can configure stages" };
 
@@ -194,7 +194,7 @@ export async function updateOrgSettings(
   _prev: OrgFormState,
   formData: FormData,
 ): Promise<OrgFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
 
@@ -276,7 +276,7 @@ export async function connectWhatsAppEmbedded(
   phoneNumberId: string,
   wabaId: string,
 ): Promise<OrgFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
 
@@ -333,7 +333,7 @@ export async function connectWhatsAppEmbedded(
 }
 
 export async function disconnectWhatsApp(): Promise<OrgFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
 
@@ -374,7 +374,7 @@ export async function getWhatsAppTemplates(): Promise<{
   templates?: import("@/lib/whatsapp").WhatsAppTemplate[];
   message?: string;
 }> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { ok: false, message: "Not signed in" };
 
   const config = await getOrgWhatsAppConfig(ctx.orgId);
@@ -391,7 +391,7 @@ export async function createWhatsAppTemplateAction(input: {
   body: string;
   examples?: string[];
 }): Promise<OrgFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
 
@@ -412,7 +412,7 @@ export async function createWhatsAppTemplateAction(input: {
 }
 
 export async function deleteWhatsAppTemplateAction(name: string): Promise<OrgFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
 
@@ -452,7 +452,7 @@ function platformDomains(): string[] {
 }
 
 export async function connectEmailDomain(domain: string): Promise<OrgFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
 
@@ -510,7 +510,7 @@ export async function connectEmailDomain(domain: string): Promise<OrgFormState> 
 }
 
 export async function checkEmailDomainStatus(): Promise<OrgFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
 
@@ -559,7 +559,7 @@ export async function checkEmailDomainStatus(): Promise<OrgFormState> {
 }
 
 export async function setEmailFromAddress(address: string): Promise<OrgFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
 
@@ -590,7 +590,7 @@ export async function setEmailFromAddress(address: string): Promise<OrgFormState
 }
 
 export async function removeEmailDomain(): Promise<OrgFormState> {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return { message: "Not signed in" };
   if (!can(ctx, "configure")) return { message: "Only admins can change org settings" };
 

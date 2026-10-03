@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { db, schema } from "@/db";
-import { verifySession } from "@/lib/dal";
+import { verifyActiveSession } from "@/lib/dal";
 import { getPresignedUploadUrl, buildPublicUrl } from "@/lib/r2";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ const MAX_SIZE = 100 * 1024 * 1024; // 100 MB
  *    the orphaned row can be cleaned up later
  */
 export async function POST(request: NextRequest) {
-  const ctx = await verifySession();
+  const ctx = await verifyActiveSession();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: { fileName?: string; mimeType?: string; sizeBytes?: number; leadId?: string };

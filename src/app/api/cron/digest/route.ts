@@ -2,6 +2,7 @@ import { and, eq, lte } from "drizzle-orm";
 import { timingSafeEqual } from "crypto";
 import { db, schema } from "@/db";
 import { sendDigestEmail } from "@/lib/email";
+import { isSubscriptionBlocked } from "@/lib/dal";
 import { getDashboardStats } from "@/lib/dashboard";
 import { getTaskSummary } from "@/lib/tasks";
 import { getPipelineForecast } from "@/lib/forecast";
@@ -50,7 +51,18 @@ export async function GET(request: Request) {
   let sent = 0;
   let skipped = 0;
 
+  // Skip members of blocked orgs — locked-out tenants get no digests.
+  const digestOrgIds = [...new Set(members.map((m) => m.orgId))];
+  const blockedOrgIds = new Set<string>();
+  for (const orgId of digestOrgIds) {
+    if (await isSubscriptionBlocked(orgId)) blockedOrgIds.add(orgId);
+  }
+
   for (const m of members) {
+    if (blockedOrgIds.has(m.orgId)) {
+      skipped++;
+      continue;
+    }
     // Get stats for this user.
     const [stats, taskSummary, forecast] = await Promise.all([
       getDashboardStats(m.orgId, m.userId),
