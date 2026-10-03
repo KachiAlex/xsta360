@@ -96,6 +96,7 @@ export const auditEventTypeEnum = pgEnum("audit_event_type", [
   "category_deleted",
   "lead_category_assigned",
   "lead_category_removed",
+  "promo_code_created",
 ]);
 export type AuditEventType = (typeof auditEventTypeEnum.enumValues)[number];
 
@@ -1018,5 +1019,40 @@ export const teamReportDeliveries = pgTable(
   },
   (t) => ({
     uniqOrgPeriod: uniqueIndex("team_report_deliveries_uniq").on(t.orgId, t.reportType, t.periodKey),
+  }),
+);
+
+// ---------------------------------------------------------------------------
+// Promo codes — superadmin-issued codes that grant a free period on a plan
+// (e.g. "LAUNCH90" → 90 days of Pro). Redeemable at signup or from /billing.
+// ---------------------------------------------------------------------------
+
+export const promoCodes = pgTable("promo_codes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: text("code").notNull().unique(),
+  // Plan the redeemed org is placed on for the free period.
+  planId: uuid("plan_id").notNull().references(() => plans.id, { onDelete: "cascade" }),
+  // Length of the free period in days.
+  freeDays: integer("free_days").notNull(),
+  // null = unlimited redemptions.
+  maxRedemptions: integer("max_redemptions"),
+  redeemedCount: integer("redeemed_count").notNull().default(0),
+  // null = never expires.
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const promoRedemptions = pgTable(
+  "promo_redemptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    promoCodeId: uuid("promo_code_id").notNull().references(() => promoCodes.id, { onDelete: "cascade" }),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    // An org can't redeem the same code twice.
+    uniqOrgCode: uniqueIndex("promo_redemptions_org_code_idx").on(t.orgId, t.promoCodeId),
   }),
 );

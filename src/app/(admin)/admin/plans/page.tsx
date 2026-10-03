@@ -1,7 +1,8 @@
 import { db, schema } from "@/db";
-import { count } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 import { PlanForm } from "@/components/admin/plan-form";
 import { PlanManager } from "@/components/admin/plan-manager";
+import { PromoCodeManager } from "@/components/admin/promo-code-manager";
 
 export default async function AdminPlansPage() {
   const plans = await db
@@ -33,6 +34,22 @@ export default async function AdminPlansPage() {
     subscriberCount: subCountMap.get(plan.id) ?? 0,
   }));
 
+  // Promo codes — code → free days on a plan.
+  const promos = await db
+    .select({
+      id: schema.promoCodes.id,
+      code: schema.promoCodes.code,
+      planName: schema.plans.name,
+      freeDays: schema.promoCodes.freeDays,
+      maxRedemptions: schema.promoCodes.maxRedemptions,
+      redeemedCount: schema.promoCodes.redeemedCount,
+      expiresAt: schema.promoCodes.expiresAt,
+      active: schema.promoCodes.active,
+    })
+    .from(schema.promoCodes)
+    .innerJoin(schema.plans, eq(schema.promoCodes.planId, schema.plans.id))
+    .orderBy(desc(schema.promoCodes.createdAt));
+
   return (
     <div className="space-y-5">
       <div>
@@ -60,6 +77,18 @@ export default async function AdminPlansPage() {
       ) : (
         <PlanManager plans={planRows} />
       )}
+
+      {/* Promo codes */}
+      <div>
+        <h2 className="font-mono text-base m-0 mb-1">Promo codes</h2>
+        <p className="text-sm text-ink-soft m-0 mb-3">
+          Give selected people a free period on a plan — share the code or a /signup?promo=CODE link.
+        </p>
+        <PromoCodeManager
+          promos={promos.map((p) => ({ ...p, expiresAt: p.expiresAt?.toISOString() ?? null }))}
+          plans={plans.map((p) => ({ id: p.id, name: p.name }))}
+        />
+      </div>
     </div>
   );
 }

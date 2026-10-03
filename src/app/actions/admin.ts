@@ -513,3 +513,112 @@ export async function reactivateUser(
     return { message: `Failed: ${msg}`, error: true };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Promo codes — grant a free period on a plan (e.g. "LAUNCH90" → 90 days).
+// ---------------------------------------------------------------------------
+
+const PromoCodeSchema = z.object({
+  code: z
+    .string()
+    .min(3, "Code must be at least 3 characters")
+    .max(32)
+    .regex(/^[A-Z0-9_-]+$/i, "Letters, numbers, dashes and underscores only"),
+  planId: z.string().uuid("Pick a plan"),
+  freeDays: z.coerce.number().int().min(1).max(3650),
+  maxRedemptions: z.coerce.number().int().min(1).nullish().or(z.literal("").transform(() => null)),
+  expiresAt: z.string().nullish(),
+});
+
+export async function createPromoCode(
+  _prev: SubFormState,
+  formData: FormData,
+): Promise<SubFormState> {
+  const ctx = await requireSuperadmin();
+  const parsed = PromoCodeSchema.safeParse({
+    code: formData.get("code"),
+    planId: formData.get("planId"),
+    freeDays: formData.get("freeDays"),
+    maxRedemptions: formData.get("maxRedemptions") || null,
+    expiresAt: formData.get("expiresAt") || null,
+  });
+  if (!parsed.success) {
+    return { message: parsed.error.issues[0]?.message ?? "Invalid input", error: true };
+  }
+
+  const code = parsed.data.code.trim().toUpperCase();
+  const expiresAt = parsed.data.expiresAt ? new Date(`${parsed.data.expiresAt}T23:59:59Z`) : null;
+
+  try {
+    const [promo] = await db
+      .insert(schema.promoCodes)
+      .values({
+        code,
+        planId: parsed.data.planId,
+        freeDays: parsed.data.freeDays,
+        maxRedemptions: parsed.data.maxRedemptions ?? null,
+        expiresAt,
+      })
+      .returning();
+
+    await logEvent(null, "promo_code_created", {
+      actorId: ctx.userId,
+      meta: { promoCodeId: promo.id, code, freeDays: promo.freeDays },
+    });
+    revalidatePath("/admin/plans");
+    return { message: `Promo code "${code}" created — ${promo.freeDays} days free per redemption` };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    if (msg.includes("duplicate") || msg.includes("unique")) {
+      return { message: `Code "${code}" already exists`, error: true };
+    }
+    return { message: `Failed: ${msg}`, error: true };
+  }
+}
+
+export async function togglePromoCode(
+  _prev: SubFormState,
+  formData: FormData,
+): Promise<SubFormState> {
+  await requireSuperadmin();
+  const promoId = String(formData.get("promoId") ?? "");
+  if (!z.string().uuid().safeParse(promoId).success) return { message: "Invalid ID", error: true };
+
+  const [promo] = await db
+    .select({ id: schema.promoCodes.id, active: schema.promoCodes.active, code: schema.promoCodes.code })
+    .from(schema.promoCodes)
+    .where(eq(schema.promoCodes.id, promoId))
+    .limit(1);
+  if (!promo) return { message: "Promo code not found", error: true };
+
+  await db
+    .update(schema.promoCodes)
+    .set({ active: !promo.active })
+    .where(eq(schema.promoCodes.id, promo.id));
+
+  revalidatePath("/admin/plans");
+  return { message: `"${promo.code}" ${promo.active ? "deactivated" : "reactivated"}` };
+}
+
+export async function deletePromoCode(
+  _prev: SubFormState,
+  formData: FormData,
+): Promise<SubFormState> {
+  await requireSuperadmin();
+  const promoId = String(formData.get("promoId") ?? "");
+  if (!z.string().uuid().safeParse(promoId).success) return { message: "Invalid ID", error: true };
+
+  const [promo] = await db
+    .select({ id: schema.promoCodes.id, code: schema.promoCodes.code, redeemedCount: schema.promoCodes.redeemedCount })
+    .from(schema.promoCodes)
+    .where(eq(schema.promoCodes.id, promoId))
+    .limit(1);
+  if (!promo) return { message: "Promo code not found", error: true };
+  if (promo.redeemedCount > 0) {
+    return { message: `"${promo.code}" has been redeemed ${promo.redeemedCount}× — deactivate it instead`, error: true };
+  }
+
+  await db.delete(schema.promoCodes).where(eq(schema.promoCodes.id, promo.id));
+  revalidatePath("/admin/plans");
+  return { message: `"${promo.code}" deleted` };
+}

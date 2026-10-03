@@ -5,6 +5,7 @@ import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { verifySession, getOrgBilling, getPlanMaxMembers } from "@/lib/dal";
+import { validatePromoCode, applyPromoToOrg } from "@/lib/promo";
 import { logEvent } from "@/lib/audit";
 import {
   chargeAuthorization,
@@ -214,4 +215,38 @@ export async function changePlan(
     message: `Upgrading to ${plan.name} requires payment. Redirecting to checkout...`,
     redirectUrl: `/billing?upgrade=${planId}`,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Promo codes — redeem a superadmin-issued code for a free period on a plan.
+// verifySession (not verifyActiveSession) so a blocked org can redeem its way
+// back in — that's the point of a promo.
+// ---------------------------------------------------------------------------
+
+export async function redeemPromoCode(
+  _prev: BillingFormState,
+  formData: FormData,
+): Promise<BillingFormState> {
+  const ctx = await verifySession();
+  if (!ctx) return { message: "Not signed in", error: true };
+  if (ctx.role !== "admin") return { message: "Only admins can redeem promo codes", error: true };
+
+  const check = await validatePromoCode(String(formData.get("promoCode") ?? ""));
+  if (!check.ok) return { message: check.error, error: true };
+
+  const result = await db.transaction((tx) => applyPromoToOrg(tx, ctx.orgId, check.promo));
+  if (!result.ok) return { message: result.error, error: true };
+
+  await logEvent(ctx.orgId, "subscription_updated", {
+    actorId: ctx.userId,
+    meta: {
+      action: "promo_redeemed",
+      code: check.promo.code,
+      planId: check.promo.planId,
+      freeDays: check.promo.freeDays,
+    },
+  });
+
+  revalidateAppPaths();
+  return { message: `Promo ${check.promo.code} applied — ${check.promo.freeDays} days free.` };
 }

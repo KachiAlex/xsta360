@@ -11,6 +11,7 @@ import { logEvent } from "@/lib/audit";
 import { nanoid } from "nanoid";
 import { headers } from "next/headers";
 import { rateLimit } from "@/lib/rate-limit";
+import { validatePromoCode, applyPromoToOrg } from "@/lib/promo";
 
 // ---------------------------------------------------------------------------
 // Validation schemas
@@ -141,6 +142,16 @@ export async function signup(
 
   const { name, email, orgName, password } = parsed.data;
 
+  // Optional promo code — validated up front so typos don't burn a signup.
+  const promoInput = String(formData.get("promoCode") ?? "").trim();
+  let promo: Awaited<ReturnType<typeof validatePromoCode>> | null = null;
+  if (promoInput) {
+    promo = await validatePromoCode(promoInput);
+    if (!promo.ok) {
+      return { errors: { promoCode: [promo.error] } };
+    }
+  }
+
   try {
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -176,25 +187,31 @@ export async function signup(
       await tx.insert(schema.lostReasons).values(
         DEFAULT_LOST_REASONS.map((r) => ({ ...r, orgId: org.id, isDefault: r.position === 0 })),
       );
-      // Auto-assign the first active monthly plan as a trialing subscription
-      // (free trial). Lifetime plans are one-time purchases — never a trial.
-      const [defaultPlan] = await tx
-        .select({ id: schema.plans.id, trialDays: schema.plans.trialDays })
-        .from(schema.plans)
-        .where(and(eq(schema.plans.active, true), eq(schema.plans.billingInterval, "monthly")))
-        .orderBy(schema.plans.position)
-        .limit(1);
-      if (defaultPlan) {
-        const trialEndsAt = new Date();
-        trialEndsAt.setDate(trialEndsAt.getDate() + defaultPlan.trialDays);
-        await tx.insert(schema.subscriptions).values({
-          orgId: org.id,
-          planId: defaultPlan.id,
-          status: "trialing",
-          trialEndsAt,
-          currentPeriodStart: new Date(),
-          currentPeriodEnd: trialEndsAt,
-        });
+      // Promo code wins over the default trial plan — grants the promo's
+      // plan with its own free-period length.
+      if (promo?.ok) {
+        await applyPromoToOrg(tx, org.id, promo.promo);
+      } else {
+        // Auto-assign the first active monthly plan as a trialing subscription
+        // (free trial). Lifetime plans are one-time purchases — never a trial.
+        const [defaultPlan] = await tx
+          .select({ id: schema.plans.id, trialDays: schema.plans.trialDays })
+          .from(schema.plans)
+          .where(and(eq(schema.plans.active, true), eq(schema.plans.billingInterval, "monthly")))
+          .orderBy(schema.plans.position)
+          .limit(1);
+        if (defaultPlan) {
+          const trialEndsAt = new Date();
+          trialEndsAt.setDate(trialEndsAt.getDate() + defaultPlan.trialDays);
+          await tx.insert(schema.subscriptions).values({
+            orgId: org.id,
+            planId: defaultPlan.id,
+            status: "trialing",
+            trialEndsAt,
+            currentPeriodStart: new Date(),
+            currentPeriodEnd: trialEndsAt,
+          });
+        }
       }
       return [{ org, user }] as const;
     });

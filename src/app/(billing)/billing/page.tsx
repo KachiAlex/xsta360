@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { PaystackCheckout } from "@/components/app/paystack-checkout";
 import { PlanPicker, type PlanOption } from "@/components/app/plan-picker";
 import { Price } from "@/components/app/price";
+import { PromoRedeem } from "@/components/app/promo-redeem";
 import { normalizeCurrency } from "@/lib/currency";
 import { FEATURE_LABELS, FEATURE_ORDER, BASE_FEATURES } from "@/lib/plan-features";
 
@@ -182,6 +183,18 @@ export default async function BillingPage() {
           </div>
         </div>
       </div>
+
+      {/* Promo code — admins can redeem a free period */}
+      {isAdmin && (
+        <div className="bg-panel border border-rule rounded-md">
+          <div className="px-4 py-3 border-b border-rule">
+            <h2 className="font-mono text-sm uppercase tracking-wider m-0">Have a promo code?</h2>
+          </div>
+          <div className="p-4">
+            <PromoRedeem />
+          </div>
+        </div>
+      )}
 
       {/* Plan picker — admins can upgrade/downgrade */}
       {isAdmin && planOptions.length > 1 && (
