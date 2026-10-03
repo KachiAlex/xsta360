@@ -229,6 +229,8 @@ export async function redeemPromoCode(
 ): Promise<BillingFormState> {
   const ctx = await verifySession();
   if (!ctx) return { message: "Not signed in", error: true };
+  // Superadmins carry a placeholder orgId — no real org to apply a promo to.
+  if (ctx.isSuperadmin) return { message: "Superadmins can't redeem promo codes", error: true };
   if (ctx.role !== "admin") return { message: "Only admins can redeem promo codes", error: true };
 
   const check = await validatePromoCode(String(formData.get("promoCode") ?? ""));

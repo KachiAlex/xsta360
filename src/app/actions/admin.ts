@@ -527,7 +527,11 @@ const PromoCodeSchema = z.object({
   planId: z.string().uuid("Pick a plan"),
   freeDays: z.coerce.number().int().min(1).max(3650),
   maxRedemptions: z.coerce.number().int().min(1).nullish().or(z.literal("").transform(() => null)),
-  expiresAt: z.string().nullish(),
+  // Date input submits YYYY-MM-DD — anything else is a crafted request.
+  expiresAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid expiry date")
+    .nullish(),
 });
 
 export async function createPromoCode(

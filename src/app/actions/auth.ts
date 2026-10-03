@@ -102,6 +102,16 @@ class EmailAlreadyRegisteredError extends Error {
   }
 }
 
+// Thrown inside the signup transaction when applying the promo code fails
+// (e.g. its last use was taken between validation and signup) — rolls the
+// whole signup back so the org isn't created without a subscription.
+class PromoApplyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PromoApplyError";
+  }
+}
+
 // Detect a Postgres unique-constraint violation (SQLSTATE 23505), which can
 // still occur if two concurrent signups race past the in-transaction check.
 function isUniqueViolation(err: unknown): boolean {
@@ -190,7 +200,10 @@ export async function signup(
       // Promo code wins over the default trial plan — grants the promo's
       // plan with its own free-period length.
       if (promo?.ok) {
-        await applyPromoToOrg(tx, org.id, promo.promo);
+        const applied = await applyPromoToOrg(tx, org.id, promo.promo);
+        if (!applied.ok) {
+          throw new PromoApplyError(applied.error ?? "Promo code could not be applied");
+        }
       } else {
         // Auto-assign the first active monthly plan as a trialing subscription
         // (free trial). Lifetime plans are one-time purchases — never a trial.
@@ -230,6 +243,9 @@ export async function signup(
     // Race lost: another concurrent signup inserted the email first.
     if (err instanceof EmailAlreadyRegisteredError || isUniqueViolation(err)) {
       return { errors: { email: ["An account with this email already exists"] } };
+    }
+    if (err instanceof PromoApplyError) {
+      return { errors: { promoCode: [err.message] } };
     }
     const message = err instanceof Error ? err.message : "Something went wrong";
     return { message: `Signup failed: ${message}` };

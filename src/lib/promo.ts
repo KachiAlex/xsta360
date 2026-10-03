@@ -69,10 +69,21 @@ export async function applyPromoToOrg(
   }
 
   const [existing] = await tx
-    .select({ id: schema.subscriptions.id })
+    .select({
+      id: schema.subscriptions.id,
+      status: schema.subscriptions.status,
+      trialEndsAt: schema.subscriptions.trialEndsAt,
+    })
     .from(schema.subscriptions)
     .where(eq(schema.subscriptions.orgId, orgId))
     .limit(1);
+
+  // A promo never shortens access: if the org is already trialing with more
+  // time left than the promo grants, keep the later end date.
+  const effectiveTrialEnd =
+    existing?.status === "trialing" && existing.trialEndsAt && existing.trialEndsAt > trialEndsAt
+      ? existing.trialEndsAt
+      : trialEndsAt;
 
   if (existing) {
     // Promo replaces whatever state the sub was in — fresh free period.
@@ -81,11 +92,11 @@ export async function applyPromoToOrg(
       .set({
         planId: promo.planId,
         status: "trialing",
-        trialEndsAt,
+        trialEndsAt: effectiveTrialEnd,
         graceEndsAt: null,
         canceledAt: null,
         currentPeriodStart: now,
-        currentPeriodEnd: trialEndsAt,
+        currentPeriodEnd: effectiveTrialEnd,
         updatedAt: now,
       })
       .where(eq(schema.subscriptions.id, existing.id));
