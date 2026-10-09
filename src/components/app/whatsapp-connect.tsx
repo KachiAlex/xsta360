@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Capacitor } from "@capacitor/core";
+import { Browser } from "@capacitor/browser";
 import {
   disconnectWhatsApp,
   listPendingWhatsAppAccounts,
@@ -71,7 +73,13 @@ export function WhatsAppConnect({
     setError(null);
     setPending(null);
     setStarted(true);
-    window.open(ONBOARD_URL, "_blank", "noopener,width=720,height=820");
+    // Facebook blocks OAuth inside embedded webviews — on the mobile app the
+    // Meta flow must open in the system browser (Chrome Custom Tab).
+    if (Capacitor.isNativePlatform()) {
+      Browser.open({ url: ONBOARD_URL });
+    } else {
+      window.open(ONBOARD_URL, "_blank", "noopener,width=720,height=820");
+    }
   }
 
   async function complete(wabaId?: string) {
