@@ -78,6 +78,65 @@ export async function sendWhatsAppMessage(
 }
 
 /**
+ * Send a WhatsApp message via a pre-approved template.
+ * Required for business-initiated messages — free-form text only delivers
+ * to numbers that messaged the business in the last 24 hours.
+ */
+export async function sendWhatsAppTemplateMessage(
+  config: WhatsAppConfig | null,
+  toPhone: string,
+  templateName: string,
+  params: string[],
+): Promise<{ success: boolean; error?: string }> {
+  if (!config?.enabled || !config.phoneNumberId || !config.apiKey) {
+    return { success: false, error: "WhatsApp not configured" };
+  }
+
+  const cleaned = toPhone.replace(/[^\d]/g, "");
+
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v20.0/${config.phoneNumberId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to: cleaned,
+          type: "template",
+          template: {
+            name: templateName,
+            language: { code: "en_US" },
+            ...(params.length > 0
+              ? {
+                  components: [
+                    {
+                      type: "body",
+                      parameters: params.map((text) => ({ type: "text", text: text || "—" })),
+                    },
+                  ],
+                }
+              : {}),
+          },
+        }),
+      },
+    );
+
+    if (!res.ok) {
+      const err = await res.text();
+      return { success: false, error: err };
+    }
+
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Unknown error" };
+  }
+}
+
+/**
  * Format a reminder message for WhatsApp.
  */
 export function formatReminderMessage(
@@ -121,6 +180,29 @@ function templatesReady(config: WhatsAppConfig | null): string | null {
   if (!config?.enabled || !config.apiKey) return "WhatsApp not configured";
   if (!config.wabaId) return "WhatsApp Business Account ID is required — add it in WhatsApp settings";
   return null;
+}
+
+/** Fetch a single template's status by name (null if it doesn't exist). */
+export async function getWhatsAppTemplate(
+  config: WhatsAppConfig | null,
+  name: string,
+): Promise<{ success: boolean; status?: string; error?: string }> {
+  const notReady = templatesReady(config);
+  if (notReady) return { success: false, error: notReady };
+
+  try {
+    const res = await fetch(
+      `${GRAPH_API}/${config!.wabaId}/message_templates?name=${encodeURIComponent(name)}&fields=id,name,status`,
+      { headers: { Authorization: `Bearer ${config!.apiKey}` } },
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { success: false, error: data?.error?.message ?? `HTTP ${res.status}` };
+    }
+    return { success: true, status: data.data?.[0]?.status };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Unknown error" };
+  }
 }
 
 /** List message templates on the org's WhatsApp Business Account. */

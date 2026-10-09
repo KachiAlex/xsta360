@@ -37,6 +37,7 @@ interface WaStatus {
   status: string;
   recipient_id: string;
   timestamp: string;
+  errors?: { code?: number; title?: string }[];
 }
 
 interface WaInboundMessage {
@@ -110,7 +111,12 @@ export async function POST(request: Request) {
 
         // Delivery receipts — logged for now (we don't store wamids yet).
         for (const status of value.statuses ?? []) {
-          console.log(`WhatsApp status: ${status.status} for ${status.id} → ${status.recipient_id}`);
+          const errs = (status.errors ?? [])
+            .map((e: { code?: number; title?: string }) => `${e.code} ${e.title ?? ""}`.trim())
+            .join("; ");
+          console.log(
+            `WhatsApp status: ${status.status} for ${status.id} → ${status.recipient_id}${errs ? ` [${errs}]` : ""}`,
+          );
         }
 
         // Inbound messages — pause sequences for the replying lead.

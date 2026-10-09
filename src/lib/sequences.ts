@@ -1,10 +1,15 @@
 import "server-only";
 import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 import { db, schema } from "@/db";
 import { isSubscriptionBlocked } from "@/lib/dal";
 import { logEvent } from "@/lib/audit";
-import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import {
+  sendWhatsAppMessage,
+  sendWhatsAppTemplateMessage,
+  getWhatsAppTemplate,
+  createWhatsAppTemplate,
+} from "@/lib/whatsapp";
 import { sendMail } from "@/lib/email";
 import { replacePlaceholders, buildEmailHtml, buildEmailHtmlFromRich, formatWhatsAppMessage } from "@/lib/message-format";
 
@@ -338,7 +343,8 @@ export async function processSequenceSteps(opts?: {
     // - "delivered": sent successfully → advance
     // - "skipped": permanent condition (no email/phone/config) → advance (retrying won't help)
     // - "failed": transient error (SMTP/WhatsApp API) → don't advance, retry next run
-    let stepOutcome: "delivered" | "skipped" | "failed" = "skipped";
+    // - "pending": waiting on Meta template approval → don't advance, retry next run (not a failure)
+    let stepOutcome: "delivered" | "skipped" | "failed" | "pending" = "skipped";
 
     switch (action) {
       case "email": {
@@ -491,24 +497,88 @@ export async function processSequenceSteps(opts?: {
 
       case "whatsapp": {
         // Send WhatsApp message directly to the lead.
+        // Meta only delivers free-form text to numbers that messaged us in the
+        // last 24h — cold sequence outreach must go through an approved message
+        // template, auto-created per step (named after the step + body hash so
+        // edits produce a fresh template submission).
         const whatsappConfig = org?.whatsappConfig as
-          | { enabled?: boolean; phoneNumberId?: string; apiKey?: string }
+          | { enabled?: boolean; phoneNumberId?: string; apiKey?: string; wabaId?: string }
           | undefined;
         let whatsappSuccess = false;
         let whatsappError: string | undefined;
         stepOutcome = "skipped"; // default: permanent skip if no config/phone
         if (whatsappConfig?.enabled && whatsappConfig.phoneNumberId && whatsappConfig.apiKey && lead.phone) {
           stepOutcome = "failed"; // has config+phone; failed unless send succeeds
-          const personalizedBody = replacePlaceholders(stepBody, msgCtx);
-          const msg = formatWhatsAppMessage(personalizedBody, orgName);
-          const result = await sendWhatsAppMessage(whatsappConfig, lead.phone, msg);
-          if (result.success) {
-            whatsappSent++;
-            whatsappSuccess = true;
-            stepOutcome = "delivered";
+          if (!whatsappConfig.wabaId) {
+            // No WABA — can only free-form send (delivers inside the 24h window).
+            const personalizedBody = replacePlaceholders(stepBody, msgCtx);
+            const msg = formatWhatsAppMessage(personalizedBody, orgName);
+            const result = await sendWhatsAppMessage(whatsappConfig, lead.phone, msg);
+            if (result.success) {
+              whatsappSuccess = true;
+              stepOutcome = "delivered";
+            } else {
+              whatsappError = result.error || "WhatsApp send failed";
+            }
           } else {
-            whatsappError = result.error || "WhatsApp send failed";
-            console.error(`Sequence WhatsApp failed for lead ${lead.id}:`, result.error);
+            // Template path — works for cold outreach once Meta approves it.
+            const tokens: string[] = [];
+            const positionalBody = stepBody.replace(/\{\{(\w+)\}\}/g, (_m, key: string) => {
+              tokens.push(key);
+              return `{{${tokens.length}}}`;
+            });
+            const templateText = `${positionalBody}\n\n— ${orgName}`;
+            const hash = createHash("sha256").update(templateText).digest("hex").slice(0, 8);
+            const templateName = `xsta_${nextStep.id.replace(/-/g, "").slice(0, 8)}_${hash}`;
+
+            let status: string | undefined;
+            const existing = await getWhatsAppTemplate(whatsappConfig, templateName);
+            if (existing.success) {
+              status = existing.status;
+              if (!status) {
+                const examples = tokens.map(
+                  (t) => replacePlaceholders(`{{${t}}}`, msgCtx) || "Sample",
+                );
+                const created = await createWhatsAppTemplate(whatsappConfig, {
+                  name: templateName,
+                  category: "MARKETING",
+                  language: "en_US",
+                  body: templateText,
+                  examples,
+                });
+                if (created.success) {
+                  const check = await getWhatsAppTemplate(whatsappConfig, templateName);
+                  status = check.status ?? "PENDING";
+                } else {
+                  whatsappError = `Template creation failed: ${created.error}`;
+                }
+              }
+            } else {
+              whatsappError = `Template lookup failed: ${existing.error}`;
+            }
+
+            if (status === "APPROVED") {
+              const params = tokens.map((t) => replacePlaceholders(`{{${t}}}`, msgCtx));
+              const result = await sendWhatsAppTemplateMessage(
+                whatsappConfig,
+                lead.phone,
+                templateName,
+                params,
+              );
+              if (result.success) {
+                whatsappSuccess = true;
+                stepOutcome = "delivered";
+              } else {
+                whatsappError = result.error || "WhatsApp send failed";
+                console.error(`Sequence WhatsApp failed for lead ${lead.id}:`, result.error);
+              }
+            } else if (status === "REJECTED" || status === "PAUSED" || status === "DISABLED") {
+              whatsappError = `WhatsApp template ${status.toLowerCase()} by Meta — edit the step text to resubmit`;
+            } else if (status) {
+              // PENDING / IN_APPEAL — wait for approval, retry next cron run.
+              stepOutcome = "pending";
+              whatsappError = "Waiting for Meta to approve the message template";
+            }
           }
         } else {
           whatsappError = !whatsappConfig?.enabled
@@ -517,19 +587,22 @@ export async function processSequenceSteps(opts?: {
               ? "No phone number"
               : "Missing WhatsApp config";
         }
-        // Create a reminder record for tracking.
-        await db.insert(schema.reminders).values({
-          leadId: enrollment.leadId,
-          orgId: enrollment.orgId,
-          assigneeId: lead.assigneeId,
-          dueAt: now,
-          note: `[Sequence] WhatsApp sent to lead: ${reminderNote}`,
-          status: whatsappSuccess ? "sent" : "failed",
-          sentAt: whatsappSuccess ? now : null,
-          sequenceStepId: nextStep.id,
-          channel: "whatsapp",
-          lastError: whatsappError,
-        });
+        // Create a reminder record for tracking — except while a template is
+        // still awaiting approval, to avoid piling up failed rows each cron run.
+        if (stepOutcome !== "pending") {
+          await db.insert(schema.reminders).values({
+            leadId: enrollment.leadId,
+            orgId: enrollment.orgId,
+            assigneeId: lead.assigneeId,
+            dueAt: now,
+            note: `[Sequence] WhatsApp sent to lead: ${reminderNote}`,
+            status: whatsappSuccess ? "sent" : "failed",
+            sentAt: whatsappSuccess ? now : null,
+            sequenceStepId: nextStep.id,
+            channel: "whatsapp",
+            lastError: whatsappError,
+          });
+        }
         // After repeated API failures, pause rather than retry every cron run.
         // (Skipped steps — no phone/config — advance permanently and don't count.)
         if (stepOutcome === "failed") {
@@ -577,8 +650,9 @@ export async function processSequenceSteps(opts?: {
     }
 
     // Only log and advance when the step was delivered or permanently skipped.
-    // On transient failure we leave currentStep unchanged so the cron retries.
-    if (stepOutcome === "failed") continue;
+    // On transient failure or pending template approval we leave currentStep
+    // unchanged so the cron retries.
+    if (stepOutcome === "failed" || stepOutcome === "pending") continue;
 
     await logEvent(enrollment.orgId, "sequence_step_sent", {
       leadId: enrollment.leadId,
