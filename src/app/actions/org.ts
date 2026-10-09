@@ -475,6 +475,24 @@ export async function completeHostedWhatsAppConnect(wabaId: string): Promise<Org
     // Non-fatal — messaging still works without webhook subscription.
   }
 
+  // Coexistence onboarding (WhatsApp Business app numbers) requires kicking
+  // off contact + history sync within 24h of the client finishing the flow —
+  // Meta can offboard the number otherwise. Harmless on regular WABAs.
+  for (const syncType of ["smb_app_state_sync", "history"]) {
+    try {
+      await fetch(`${GRAPH_API}/${phone.id}/smb_app_data`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${provider.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ messaging_product: "whatsapp", sync_type: syncType }),
+      });
+    } catch {
+      // Best-effort — only valid for coexistence-onboarded numbers.
+    }
+  }
+
   await db
     .update(schema.organizations)
     .set({
