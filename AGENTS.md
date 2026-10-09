@@ -47,6 +47,8 @@ Copy `.env.example` to `.env.local` and fill in:
 - `CRON_SECRET` — shared secret for the `/api/cron/reminders` and `/api/cron/billing` endpoints
 - `PAYSTACK_SECRET_KEY` — Paystack secret key (sk_test_... or sk_live_...)
 - `PAYSTACK_PUBLIC_KEY` — Paystack public key (pk_test_... or pk_live_...)
+- `NEXT_PUBLIC_META_APP_ID` / `NEXT_PUBLIC_META_CONFIG_ID` / `META_APP_SECRET` — WhatsApp Embedded Signup ("Connect with Facebook"). NEXT_PUBLIC_* are baked at build time — set before `docker compose build` / `pnpm build`. META_APP_SECRET also verifies webhook signatures.
+- `WHATSAPP_WEBHOOK_VERIFY_TOKEN` — shared token for Meta webhook verification on `/api/webhooks/whatsapp`
 
 ## Seed data
 ```bash

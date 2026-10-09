@@ -118,11 +118,10 @@ export function OrgSettingsForm({
           </div>
         )}
 
-        {/* Notice when one-click connect isn't live yet (pending Meta approval). */}
+        {/* Fallback when one-click connect isn't enabled on this server. */}
         {!embeddedSignupConfigured && (
           <p className="mb-3 text-[11px] text-ink-soft bg-paper-2 border border-rule rounded px-3 py-2">
-            ⏳ One-click WhatsApp connect is coming soon (pending Meta approval) — use manual setup
-            below for now; it works today.
+            One-click WhatsApp connect isn't enabled on this server — use the manual setup below.
           </p>
         )}
 

@@ -26,6 +26,9 @@ services:
         DATABASE_URL: postgresql://xsta360:${POSTGRES_PASSWORD:-xsta360_dev_pw}@db:5432/xsta360
         SESSION_SECRET: ${SESSION_SECRET}
         APP_URL: ${APP_URL:-http://67.211.210.8}
+        # Baked into the client bundle at build time — changing them requires a rebuild.
+        NEXT_PUBLIC_META_APP_ID: ${NEXT_PUBLIC_META_APP_ID:-}
+        NEXT_PUBLIC_META_CONFIG_ID: ${NEXT_PUBLIC_META_CONFIG_ID:-}
     restart: unless-stopped
     depends_on:
       db:
@@ -49,6 +52,9 @@ services:
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
       R2_BUCKET_NAME: ${R2_BUCKET_NAME:-xsta360-documents}
       R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+      # WhatsApp: code exchange (embedded signup) + webhook signature/verification.
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}
     ports:
       - "127.0.0.1:3009:3000"
 
