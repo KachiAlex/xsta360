@@ -1,47 +1,33 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { connectWhatsAppEmbedded, disconnectWhatsApp } from "@/app/actions/org";
+import {
+  disconnectWhatsApp,
+  listPendingWhatsAppAccounts,
+  completeHostedWhatsAppConnect,
+} from "@/app/actions/org";
 import { Button } from "@/components/ui/button";
-
-declare global {
-  interface Window {
-    FB?: any;
-    fbAsyncInit?: () => void;
-  }
-}
 
 const APP_ID = process.env.NEXT_PUBLIC_META_APP_ID ?? "";
 const CONFIG_ID = process.env.NEXT_PUBLIC_META_CONFIG_ID ?? "";
-const GRAPH_VERSION = "v21.0";
 
 /** True when the server has Meta app credentials configured. */
 export const embeddedSignupConfigured = Boolean(APP_ID && CONFIG_ID);
 
-let sdkPromise: Promise<void> | null = null;
-function loadFacebookSdk(): Promise<void> {
-  if (window.FB) return Promise.resolve();
-  if (sdkPromise) return sdkPromise;
-  sdkPromise = new Promise((resolve, reject) => {
-    window.fbAsyncInit = () => {
-      window.FB.init({
-        appId: APP_ID,
-        autoLogAppEvents: true,
-        xfbml: false,
-        version: GRAPH_VERSION,
-      });
-      resolve();
-    };
-    const script = document.createElement("script");
-    script.src = "https://connect.facebook.net/en_US/sdk.js";
-    script.async = true;
-    script.defer = true;
-    script.crossOrigin = "anonymous";
-    script.onerror = () => reject(new Error("Could not load the Facebook SDK"));
-    document.body.appendChild(script);
-  });
-  return sdkPromise;
+// Meta's hosted ("zero integration") embedded signup page — no JS SDK needed.
+// featureType whatsapp_business_app_onboarding lets clients onboard a number
+// that already runs the WhatsApp Business app (coexistence) without disconnecting it.
+const ONBOARD_URL =
+  `https://business.facebook.com/messaging/whatsapp/onboard/` +
+  `?app_id=${APP_ID}&config_id=${CONFIG_ID}` +
+  `&extras=${encodeURIComponent(
+    JSON.stringify({ version: "v4", sessionInfoVersion: "3", featureType: "whatsapp_business_app_onboarding" }),
+  )}`;
+
+interface PendingAccount {
+  id: string;
+  name?: string;
 }
 
 export function WhatsAppConnect({
@@ -54,83 +40,51 @@ export function WhatsAppConnect({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const sessionInfoRef = useRef<{ phone_number_id?: string; waba_id?: string }>({});
-  const cancelledRef = useRef(false);
+  const [started, setStarted] = useState(false);
+  const [pending, setPending] = useState<PendingAccount[] | null>(null);
 
-  // Meta posts WA_EMBEDDED_SIGNUP message events during the flow —
-  // capture the phone number + WABA ids, and cancel steps.
-  useEffect(() => {
-    function onMessage(event: MessageEvent) {
-      if (event.origin !== "https://www.facebook.com" && event.origin !== "https://web.facebook.com") return;
-      try {
-        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-        if (data?.type !== "WA_EMBEDDED_SIGNUP") return;
-        if (data.event === "FINISH" || data.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING") {
-          sessionInfoRef.current = data.data ?? {};
-        } else if (data.event === "CANCEL") {
-          cancelledRef.current = true;
-        }
-      } catch {
-        // Non-JSON message — ignore.
-      }
-    }
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, []);
+  function connect() {
+    setError(null);
+    setPending(null);
+    setStarted(true);
+    window.open(ONBOARD_URL, "_blank", "noopener,width=720,height=820");
+  }
 
-  async function connect() {
+  async function complete(wabaId?: string) {
     setBusy(true);
     setError(null);
-    sessionInfoRef.current = {};
-    cancelledRef.current = false;
     try {
-      await loadFacebookSdk();
-    } catch (e) {
-      setBusy(false);
-      setError(e instanceof Error ? e.message : "Could not load Facebook");
-      return;
-    }
-    // FB.login rejects async callbacks ("Expression is of type asyncfunction")
-    // — the SDK inspects the callback. Wrap the async body in a plain function.
-    const onLogin = async (response: any) => {
-      const code: string | undefined = response?.authResponse?.code;
-      const { phone_number_id, waba_id } = sessionInfoRef.current;
-      if (!code) {
-        setBusy(false);
-        setError(
-          cancelledRef.current
-            ? "Setup was cancelled before completion."
-            : "Facebook did not return an authorization code. Please try again.",
-        );
-        return;
+      if (!wabaId) {
+        const list = await listPendingWhatsAppAccounts();
+        if (!list.ok) {
+          setError(list.message ?? "Could not check for connected accounts");
+          return;
+        }
+        const accounts = list.accounts ?? [];
+        if (accounts.length === 0) {
+          setError(
+            "No new WhatsApp account detected yet — finish the Meta steps in the other tab, then try again.",
+          );
+          return;
+        }
+        if (accounts.length > 1) {
+          setPending(accounts);
+          return;
+        }
+        wabaId = accounts[0].id;
       }
-      if (!phone_number_id || !waba_id) {
-        setBusy(false);
-        setError("WhatsApp setup did not complete — no phone number was selected.");
-        return;
-      }
-      const result = await connectWhatsAppEmbedded(code, phone_number_id, waba_id);
-      setBusy(false);
+
+      const result = await completeHostedWhatsAppConnect(wabaId);
       if (result?.message) {
         setError(result.message);
       } else {
+        setPending(null);
+        setStarted(false);
         router.refresh();
       }
-    };
-    window.FB.login(
-      (response: any) => {
-        onLogin(response).catch((e) => {
-          setBusy(false);
-          setError(e instanceof Error ? e.message : "WhatsApp connection failed");
-        });
-      },
-      {
-        config_id: CONFIG_ID,
-        response_type: "code",
-        override_default_response_type: true,
-        extras: { setup: {}, featureType: "", sessionInfoVersion: "3" },
-      },
-    );
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function disconnect() {
@@ -160,14 +114,45 @@ export function WhatsAppConnect({
   }
 
   return (
-    <div>
-      <Button type="button" variant="ghost" size="sm" onClick={connect} disabled={busy}>
-        {busy ? "Connecting…" : "Connect with Facebook"}
-      </Button>
-      <p className="text-xs text-ink-soft mt-1.5">
+    <div className="space-y-2">
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button type="button" variant="ghost" size="sm" onClick={connect} disabled={busy}>
+          Connect with Facebook
+        </Button>
+        {started && (
+          <Button type="button" variant="primary" size="sm" onClick={() => complete()} disabled={busy}>
+            {busy ? "Linking…" : "Finish connection"}
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-ink-soft">
         One-click setup — Meta securely links your WhatsApp Business account to this workspace.
+        You can keep using the WhatsApp Business app on your phone.
       </p>
-      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+      {started && !pending && (
+        <p className="text-[11px] text-ink-soft">
+          A Meta tab just opened — complete the steps there, then come back and click
+          &quot;Finish connection&quot;.
+        </p>
+      )}
+      {pending && (
+        <div className="rounded border border-rule bg-paper-2 p-3 space-y-2">
+          <p className="text-xs font-medium">Which WhatsApp account is yours?</p>
+          {pending.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              disabled={busy}
+              onClick={() => complete(a.id)}
+              className="block w-full text-left text-xs px-3 py-2 rounded border border-rule bg-paper hover:border-stamp transition-colors"
+            >
+              <span className="font-semibold">{a.name || "WhatsApp Business Account"}</span>
+              <span className="text-ink-soft font-mono ml-2">{a.id}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
     </div>
   );
 }

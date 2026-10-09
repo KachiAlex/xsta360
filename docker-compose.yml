@@ -55,6 +55,10 @@ services:
       # WhatsApp: code exchange (embedded signup) + webhook signature/verification.
       META_APP_SECRET: ${META_APP_SECRET:-}
       WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}
+      # Tech Provider: system user token + business ID for claiming onboarded
+      # client WABAs after hosted embedded signup.
+      META_PROVIDER_TOKEN: ${META_PROVIDER_TOKEN:-}
+      META_BUSINESS_ID: ${META_BUSINESS_ID:-}
     ports:
       - "127.0.0.1:3009:3000"
 

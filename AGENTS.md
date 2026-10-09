@@ -49,6 +49,7 @@ Copy `.env.example` to `.env.local` and fill in:
 - `PAYSTACK_PUBLIC_KEY` — Paystack public key (pk_test_... or pk_live_...)
 - `NEXT_PUBLIC_META_APP_ID` / `NEXT_PUBLIC_META_CONFIG_ID` / `META_APP_SECRET` — WhatsApp Embedded Signup ("Connect with Facebook"). NEXT_PUBLIC_* are baked at build time — set before `docker compose build` / `pnpm build`. META_APP_SECRET also verifies webhook signatures.
 - `WHATSAPP_WEBHOOK_VERIFY_TOKEN` — shared token for Meta webhook verification on `/api/webhooks/whatsapp`
+- `META_PROVIDER_TOKEN` / `META_BUSINESS_ID` — Tech Provider credentials for hosted embedded signup: system user token (app + whatsapp_business_management/messaging) and your Meta Business Portfolio ID. Used to claim client WABAs after they complete the Meta-hosted onboarding link.
 
 ## Seed data
 ```bash

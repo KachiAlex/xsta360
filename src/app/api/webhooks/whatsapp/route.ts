@@ -96,6 +96,13 @@ export async function POST(request: Request) {
   try {
     for (const entry of payload.entry ?? []) {
       for (const change of entry.changes ?? []) {
+        // Hosted embedded signup lifecycle events (e.g. PARTNER_ADDED when a
+        // client completes onboarding). The claim flow queries the provider's
+        // client WABA list live, so we only log these — they're informational.
+        if (change.field === "account_update") {
+          console.log("WhatsApp account_update:", JSON.stringify(change.value));
+          continue;
+        }
         if (change.field !== "messages" || !change.value) continue;
         const value = change.value;
         const phoneNumberId = value.metadata?.phone_number_id;

@@ -352,6 +352,156 @@ export async function disconnectWhatsApp(): Promise<OrgFormState> {
 }
 
 // ---------------------------------------------------------------------------
+// Hosted embedded signup ("zero integration" link) — Meta's onboard URL opens
+// in a new tab; the client never sees IDs or tokens. When they finish, Meta
+// shares the WABA with our solution (Tech Provider), so we list the WABAs
+// attached to our provider business with a provider-level system user token
+// (META_PROVIDER_TOKEN / META_BUSINESS_ID) and let the org claim theirs.
+// ---------------------------------------------------------------------------
+
+const GRAPH_API = "https://graph.facebook.com/v21.0";
+
+function providerConfig(): { token: string; businessId: string } | null {
+  const token = process.env.META_PROVIDER_TOKEN;
+  const businessId = process.env.META_BUSINESS_ID;
+  if (!token || !businessId) return null;
+  return { token, businessId };
+}
+
+interface ProviderWaba {
+  id: string;
+  name?: string;
+}
+
+/** WABAs shared with our solution that no org has claimed yet. */
+async function unclaimedWabas(token: string, businessId: string): Promise<ProviderWaba[]> {
+  const res = await fetch(
+    `${GRAPH_API}/${businessId}/client_whatsapp_business_accounts?fields=id,name&limit=100`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? `Meta API error (HTTP ${res.status})`);
+  }
+
+  const orgs = await db
+    .select({ cfg: schema.organizations.whatsappConfig })
+    .from(schema.organizations);
+  const claimed = new Set(
+    orgs.map((o) => (o.cfg as { wabaId?: string } | null)?.wabaId).filter(Boolean),
+  );
+
+  return ((data.data ?? []) as ProviderWaba[]).filter((w) => !claimed.has(w.id));
+}
+
+export async function listPendingWhatsAppAccounts(): Promise<{
+  ok: boolean;
+  accounts?: ProviderWaba[];
+  message?: string;
+}> {
+  const ctx = await verifyActiveSession();
+  if (!ctx) return { ok: false, message: "Not signed in" };
+  if (!can(ctx, "configure")) return { ok: false, message: "Only admins can connect WhatsApp" };
+
+  const provider = providerConfig();
+  if (!provider) {
+    return { ok: false, message: "WhatsApp onboarding isn't fully configured on this server" };
+  }
+
+  try {
+    const accounts = await unclaimedWabas(provider.token, provider.businessId);
+    return { ok: true, accounts };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Could not list accounts" };
+  }
+}
+
+/**
+ * Claim a WABA the client just onboarded via the hosted link: pick its
+ * registered phone number, subscribe our app to its webhooks, and store the
+ * org's WhatsApp config. Sends then use the provider token on that WABA.
+ */
+export async function completeHostedWhatsAppConnect(wabaId: string): Promise<OrgFormState> {
+  const ctx = await verifyActiveSession();
+  if (!ctx) return { message: "Not signed in" };
+  if (!can(ctx, "configure")) return { message: "Only admins can connect WhatsApp" };
+
+  const provider = providerConfig();
+  if (!provider) {
+    return { message: "WhatsApp onboarding isn't fully configured on this server" };
+  }
+
+  const id = (wabaId ?? "").trim();
+  if (!/^\d+$/.test(id)) return { message: "Invalid WhatsApp account" };
+
+  // The WABA must be one of our unclaimed client accounts — never trust
+  // an arbitrary ID the client sends us.
+  let pending: ProviderWaba[];
+  try {
+    pending = await unclaimedWabas(provider.token, provider.businessId);
+  } catch (err) {
+    return { message: err instanceof Error ? err.message : "Could not verify the account" };
+  }
+  const waba = pending.find((w) => w.id === id);
+  if (!waba) {
+    return { message: "That WhatsApp account isn't available — it may already be connected" };
+  }
+
+  // Find the phone number registered on the WABA.
+  const phonesRes = await fetch(
+    `${GRAPH_API}/${id}/phone_numbers?fields=id,display_phone_number,verified_name,status`,
+    { headers: { Authorization: `Bearer ${provider.token}` } },
+  );
+  const phones = (await phonesRes.json().catch(() => ({}))) as {
+    data?: { id: string; display_phone_number?: string; status?: string }[];
+    error?: { message?: string };
+  };
+  if (!phonesRes.ok) {
+    return { message: phones.error?.message ?? "Could not read the WhatsApp number" };
+  }
+  const phone =
+    phones.data?.find((p) => p.status === "CONNECTED") ?? phones.data?.[0];
+  if (!phone) {
+    return { message: "No phone number found on that account yet — finish the Meta setup first" };
+  }
+
+  // Subscribe our app to the WABA's webhooks (reply auto-pause, receipts).
+  try {
+    await fetch(`${GRAPH_API}/${id}/subscribed_apps`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${provider.token}` },
+    });
+  } catch {
+    // Non-fatal — messaging still works without webhook subscription.
+  }
+
+  await db
+    .update(schema.organizations)
+    .set({
+      whatsappConfig: {
+        enabled: true,
+        phoneNumberId: phone.id,
+        wabaId: id,
+        apiKey: provider.token,
+        connectedVia: "hosted_embedded_signup",
+      } as any,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.organizations.id, ctx.orgId));
+
+  await logEvent(ctx.orgId, "org_settings_updated", {
+    actorId: ctx.userId,
+    meta: { whatsappConnected: true, via: "hosted_embedded_signup", wabaId: id },
+  });
+
+  revalidatePath("/settings");
+  return {
+    ok: true,
+    message: `Connected — ${phone.display_phone_number ?? "WhatsApp number"} is linked to this workspace`,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // WhatsApp message templates (whatsapp_business_management)
 // ---------------------------------------------------------------------------
 
