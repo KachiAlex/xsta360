@@ -90,31 +90,39 @@ export function WhatsAppConnect({
       setError(e instanceof Error ? e.message : "Could not load Facebook");
       return;
     }
-    window.FB.login(
-      async (response: any) => {
-        const code: string | undefined = response?.authResponse?.code;
-        const { phone_number_id, waba_id } = sessionInfoRef.current;
-        if (!code) {
-          setBusy(false);
-          setError(
-            cancelledRef.current
-              ? "Setup was cancelled before completion."
-              : "Facebook did not return an authorization code. Please try again.",
-          );
-          return;
-        }
-        if (!phone_number_id || !waba_id) {
-          setBusy(false);
-          setError("WhatsApp setup did not complete — no phone number was selected.");
-          return;
-        }
-        const result = await connectWhatsAppEmbedded(code, phone_number_id, waba_id);
+    // FB.login rejects async callbacks ("Expression is of type asyncfunction")
+    // — the SDK inspects the callback. Wrap the async body in a plain function.
+    const onLogin = async (response: any) => {
+      const code: string | undefined = response?.authResponse?.code;
+      const { phone_number_id, waba_id } = sessionInfoRef.current;
+      if (!code) {
         setBusy(false);
-        if (result?.message) {
-          setError(result.message);
-        } else {
-          router.refresh();
-        }
+        setError(
+          cancelledRef.current
+            ? "Setup was cancelled before completion."
+            : "Facebook did not return an authorization code. Please try again.",
+        );
+        return;
+      }
+      if (!phone_number_id || !waba_id) {
+        setBusy(false);
+        setError("WhatsApp setup did not complete — no phone number was selected.");
+        return;
+      }
+      const result = await connectWhatsAppEmbedded(code, phone_number_id, waba_id);
+      setBusy(false);
+      if (result?.message) {
+        setError(result.message);
+      } else {
+        router.refresh();
+      }
+    };
+    window.FB.login(
+      (response: any) => {
+        onLogin(response).catch((e) => {
+          setBusy(false);
+          setError(e instanceof Error ? e.message : "WhatsApp connection failed");
+        });
       },
       {
         config_id: CONFIG_ID,
