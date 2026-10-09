@@ -375,13 +375,19 @@ interface ProviderWaba {
 
 /** WABAs shared with our solution that no org has claimed yet. */
 async function unclaimedWabas(token: string, businessId: string): Promise<ProviderWaba[]> {
-  const res = await fetch(
-    `${GRAPH_API}/${businessId}/client_whatsapp_business_accounts?fields=id,name&limit=100`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data?.error?.message ?? `Meta API error (HTTP ${res.status})`);
+  // Client WABAs are shared to us by customer businesses; owned WABAs cover
+  // self-onboarding, where the "customer" business is our own.
+  const wabas: ProviderWaba[] = [];
+  for (const edge of ["client_whatsapp_business_accounts", "owned_whatsapp_business_accounts"]) {
+    const res = await fetch(
+      `${GRAPH_API}/${businessId}/${edge}?fields=id,name&limit=100`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.error?.message ?? `Meta API error (HTTP ${res.status})`);
+    }
+    wabas.push(...((data.data ?? []) as ProviderWaba[]));
   }
 
   const orgs = await db
@@ -391,7 +397,7 @@ async function unclaimedWabas(token: string, businessId: string): Promise<Provid
     orgs.map((o) => (o.cfg as { wabaId?: string } | null)?.wabaId).filter(Boolean),
   );
 
-  return ((data.data ?? []) as ProviderWaba[]).filter((w) => !claimed.has(w.id));
+  return wabas.filter((w) => !claimed.has(w.id));
 }
 
 export async function listPendingWhatsAppAccounts(): Promise<{
