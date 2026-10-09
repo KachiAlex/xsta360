@@ -515,6 +515,7 @@ export async function processSequenceSteps(opts?: {
             const msg = formatWhatsAppMessage(personalizedBody, orgName);
             const result = await sendWhatsAppMessage(whatsappConfig, lead.phone, msg);
             if (result.success) {
+              whatsappSent++;
               whatsappSuccess = true;
               stepOutcome = "delivered";
             } else {
@@ -566,6 +567,7 @@ export async function processSequenceSteps(opts?: {
                 params,
               );
               if (result.success) {
+                whatsappSent++;
                 whatsappSuccess = true;
                 stepOutcome = "delivered";
               } else {
