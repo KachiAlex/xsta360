@@ -30,6 +30,30 @@ interface PendingAccount {
   name?: string;
 }
 
+function Step({ n, title, detail, active, done }: {
+  n: number;
+  title: string;
+  detail?: string;
+  active?: boolean;
+  done?: boolean;
+}) {
+  return (
+    <div className="flex gap-2.5">
+      <span
+        className={`mt-0.5 inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
+          done ? "bg-won text-white" : active ? "bg-stamp text-white" : "bg-rule text-ink-soft"
+        }`}
+      >
+        {done ? "✓" : n}
+      </span>
+      <div>
+        <p className={`text-xs ${active ? "font-semibold text-ink" : "text-ink-soft"}`}>{title}</p>
+        {detail && <p className="text-[11px] text-ink-soft mt-0.5">{detail}</p>}
+      </div>
+    </div>
+  );
+}
+
 export function WhatsAppConnect({
   connected,
   phoneNumberId,
@@ -63,7 +87,7 @@ export function WhatsAppConnect({
         const accounts = list.accounts ?? [];
         if (accounts.length === 0) {
           setError(
-            "No new WhatsApp account detected yet — finish the Meta steps in the other tab, then try again.",
+            "No new WhatsApp account detected yet. Make sure you finished every step in the Meta tab — including verifying your phone number — then try again.",
           );
           return;
         }
@@ -114,29 +138,52 @@ export function WhatsAppConnect({
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-3 flex-wrap">
-        <Button type="button" variant="ghost" size="sm" onClick={connect} disabled={busy}>
-          Connect with Facebook
-        </Button>
-        {started && (
+    <div className="rounded border border-rule bg-paper-2/50 p-3 space-y-3">
+      {!started && (
+        <>
+          <div>
+            <p className="text-xs font-semibold">Connect your WhatsApp Business number</p>
+            <p className="text-[11px] text-ink-soft mt-0.5">
+              Takes about 2 minutes. Meta handles the setup securely — there&apos;s nothing to copy or configure yourself.
+            </p>
+          </div>
+          <div className="text-[11px] text-ink-soft space-y-1">
+            <p className="font-medium text-ink">Before you start, have ready:</p>
+            <ul className="list-disc pl-4 space-y-0.5">
+              <li>Your <strong>Facebook login</strong> for your business</li>
+              <li>
+                The phone that runs your <strong>WhatsApp Business app</strong> — you can keep using it
+                after connecting. <em>Or</em> a number that isn&apos;t on WhatsApp at all.
+              </li>
+            </ul>
+          </div>
+          <Button type="button" variant="primary" size="sm" onClick={connect} disabled={busy}>
+            Connect with Facebook
+          </Button>
+        </>
+      )}
+
+      {started && (
+        <div className="space-y-2.5">
+          <Step n={1} title="Connect with Facebook" detail="Done — the Meta tab opened." done />
+          <Step
+            n={2}
+            title="Complete Meta's setup in the new tab"
+            detail="Sign in → choose your own business → connect your number (scan the QR code or use the access code with your WhatsApp Business app) → verify."
+            active
+          />
+          <Step n={3} title="Come back here and finish" detail="We'll link the account you just set up." />
           <Button type="button" variant="primary" size="sm" onClick={() => complete()} disabled={busy}>
             {busy ? "Linking…" : "Finish connection"}
           </Button>
-        )}
-      </div>
-      <p className="text-xs text-ink-soft">
-        One-click setup — Meta securely links your WhatsApp Business account to this workspace.
-        You can keep using the WhatsApp Business app on your phone.
-      </p>
-      {started && !pending && (
-        <p className="text-[11px] text-ink-soft">
-          A Meta tab just opened — complete the steps there, then come back and click
-          &quot;Finish connection&quot;.
-        </p>
+          <p className="text-[11px] text-ink-soft">
+            Tip: if Meta asks which business to use, pick <strong>your own</strong> business portfolio.
+          </p>
+        </div>
       )}
+
       {pending && (
-        <div className="rounded border border-rule bg-paper-2 p-3 space-y-2">
+        <div className="rounded border border-rule bg-paper p-3 space-y-2">
           <p className="text-xs font-medium">Which WhatsApp account is yours?</p>
           {pending.map((a) => (
             <button
@@ -152,7 +199,7 @@ export function WhatsAppConnect({
           ))}
         </div>
       )}
-      {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
 }
