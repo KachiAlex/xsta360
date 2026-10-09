@@ -123,15 +123,30 @@ export function WhatsAppConnect({
 
   if (connected) {
     return (
-      <div className="flex items-center gap-3 flex-wrap">
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-won">
-          <span className="inline-block h-2 w-2 rounded-full bg-won" />
-          Connected
-        </span>
-        <span className="text-xs text-ink-soft font-mono">Phone ID: {phoneNumberId}</span>
-        <Button type="button" variant="ghost" size="sm" onClick={disconnect} disabled={busy}>
-          {busy ? "Disconnecting…" : "Disconnect"}
-        </Button>
+      <div className="space-y-2">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-won">
+            <span className="inline-block h-2 w-2 rounded-full bg-won" />
+            Connected
+          </span>
+          <span className="text-xs text-ink-soft font-mono">Phone ID: {phoneNumberId}</span>
+          <Button type="button" variant="ghost" size="sm" onClick={disconnect} disabled={busy}>
+            {busy ? "Disconnecting…" : "Disconnect"}
+          </Button>
+        </div>
+        <p className="text-[11px] text-ink-soft">
+          Sequence messages go out as Meta-approved templates, billed per message to your WhatsApp
+          account. If sends aren&apos;t delivering, add a payment method in{" "}
+          <a
+            href="https://business.facebook.com/wa/manage/home/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-stamp underline underline-offset-2"
+          >
+            WhatsApp Manager
+          </a>{" "}
+          → Account tools → Payment.
+        </p>
         {error && <p className="text-xs text-red-600 w-full">{error}</p>}
       </div>
     );
@@ -154,6 +169,11 @@ export function WhatsAppConnect({
               <li>
                 The phone that runs your <strong>WhatsApp Business app</strong> — you can keep using it
                 after connecting. <em>Or</em> a number that isn&apos;t on WhatsApp at all.
+              </li>
+              <li>
+                A <strong>payment method</strong> on your WhatsApp account — Meta requires one before it
+                delivers outreach messages (billed per message, a few kobo each). You can add it after
+                connecting in WhatsApp Manager.
               </li>
             </ul>
           </div>
