@@ -17,10 +17,11 @@ import {
   type SequenceFormState,
 } from "@/app/actions/sequences";
 import { Button } from "@/components/ui/button";
-import { Label, Input, Textarea, Select } from "@/components/ui/field";
+import { Label, Input, Select } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import { PlaceholderHelp } from "@/components/app/placeholder-help";
 import { RichTextEditor } from "@/components/app/rich-text-editor";
+import { FormatTextarea } from "@/components/app/format-textarea";
 import { EmailPreview } from "@/components/app/email-preview";
 import { AttachmentPicker, type AttachmentDoc } from "@/components/app/attachment-picker";
 
@@ -69,6 +70,14 @@ interface LeadOption {
   company: string | null;
   phone: string | null;
   email: string | null;
+  categoryIds: string[];
+}
+
+interface CategoryOption {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
 }
 
 export function SequenceList({
@@ -77,12 +86,14 @@ export function SequenceList({
   orgName,
   enrollments,
   leads,
+  categories,
 }: {
   sequences: Sequence[];
   documents: AttachmentDoc[];
   orgName: string;
   enrollments: EnrollmentRow[];
   leads: LeadOption[];
+  categories: CategoryOption[];
 }) {
   const [showForm, setShowForm] = useState(false);
   const [state, action, pending] = useActionState<SequenceFormState, FormData>(createSequence, {});
@@ -130,6 +141,7 @@ export function SequenceList({
               orgName={orgName}
               enrollments={enrollments.filter((e) => e.sequenceId === seq.id)}
               leads={leads}
+              categories={categories}
             />
           ))}
         </div>
@@ -144,12 +156,14 @@ function SequenceItem({
   orgName,
   enrollments,
   leads,
+  categories,
 }: {
   sequence: Sequence;
   documents: AttachmentDoc[];
   orgName: string;
   enrollments: EnrollmentRow[];
   leads: LeadOption[];
+  categories: CategoryOption[];
 }) {
   const [, startTransition] = useTransition();
   const [showStepForm, setShowStepForm] = useState(false);
@@ -184,14 +198,16 @@ function SequenceItem({
     enrollments.filter((e) => e.status === "active" || e.status === "paused").map((e) => e.leadId),
   );
   const q = pickerQuery.trim().toLowerCase();
-  const pickableLeads = leads.filter(
+  // Leads that can still be enrolled — "All contacts" and category
+  // quick-selects draw from this set regardless of the search filter.
+  const enrollableLeads = leads.filter((l) => !committedLeadIds.has(l.id));
+  const pickableLeads = enrollableLeads.filter(
     (l) =>
-      !committedLeadIds.has(l.id) &&
-      (!q ||
-        l.name.toLowerCase().includes(q) ||
-        (l.company ?? "").toLowerCase().includes(q) ||
-        (l.phone ?? "").includes(q) ||
-        (l.email ?? "").toLowerCase().includes(q)),
+      !q ||
+      l.name.toLowerCase().includes(q) ||
+      (l.company ?? "").toLowerCase().includes(q) ||
+      (l.phone ?? "").includes(q) ||
+      (l.email ?? "").toLowerCase().includes(q),
   );
 
   function toggleLeadPick(id: string) {
@@ -199,6 +215,20 @@ function SequenceItem({
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAllContacts() {
+    setSelectedLeadIds(new Set(enrollableLeads.map((l) => l.id)));
+  }
+
+  function selectCategory(categoryId: string) {
+    setSelectedLeadIds((prev) => {
+      const next = new Set(prev);
+      for (const l of enrollableLeads) {
+        if (l.categoryIds.includes(categoryId)) next.add(l.id);
+      }
       return next;
     });
   }
@@ -420,7 +450,7 @@ function SequenceItem({
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
-                    disabled={!sequence.active || sequence.steps.length === 0}
+                    disabled={!sequence.active}
                     onClick={() => setShowPicker(true)}
                     className="text-xs text-[var(--accent)] hover:underline min-h-[36px] px-1.5 rounded active:bg-paper-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:no-underline"
                   >
@@ -429,11 +459,6 @@ function SequenceItem({
                   {!sequence.active && (
                     <span className="text-[11px] text-ink-soft">
                       Sequence is paused — activate it to enroll leads.
-                    </span>
-                  )}
-                  {sequence.active && sequence.steps.length === 0 && (
-                    <span className="text-[11px] text-stamp">
-                      Add a step below first — empty sequences send nothing.
                     </span>
                   )}
                 </div>
@@ -445,6 +470,47 @@ function SequenceItem({
                       onChange={(e) => setPickerQuery(e.currentTarget.value)}
                       autoFocus
                     />
+                    {sequence.steps.length === 0 && (
+                      <p className="text-[11px] text-ink-soft">
+                        No steps yet — enrolled leads will wait at the start until you add steps.
+                      </p>
+                    )}
+                    {/* Quick select: all contacts or everyone in a category (tag) */}
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        type="button"
+                        disabled={enrollableLeads.length === 0}
+                        onClick={selectAllContacts}
+                        className="text-xs px-2.5 py-1.5 min-h-[36px] rounded border border-rule bg-paper hover:bg-paper-2 transition-colors disabled:opacity-50"
+                      >
+                        All contacts ({enrollableLeads.length})
+                      </button>
+                      {categories.map((cat) => {
+                        const n = enrollableLeads.filter((l) => l.categoryIds.includes(cat.id)).length;
+                        if (n === 0) return null;
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => selectCategory(cat.id)}
+                            className="text-xs px-2.5 py-1.5 min-h-[36px] rounded border border-rule bg-paper hover:bg-paper-2 flex items-center gap-1 transition-colors"
+                          >
+                            <span>{cat.icon}</span>
+                            <span>{cat.name}</span>
+                            <span className="text-[10px] text-ink-soft">({n})</span>
+                          </button>
+                        );
+                      })}
+                      {selectedLeadIds.size > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLeadIds(new Set())}
+                          className="text-xs px-2.5 py-1.5 min-h-[36px] rounded border border-rule bg-paper hover:bg-paper-2 text-ink-soft transition-colors"
+                        >
+                          Clear ({selectedLeadIds.size})
+                        </button>
+                      )}
+                    </div>
                     <div className="max-h-48 overflow-y-auto divide-y divide-rule">
                       {pickableLeads.length === 0 && (
                         <p className="text-xs text-ink-soft py-2">No matching leads available to enroll.</p>
@@ -559,11 +625,12 @@ function SequenceItem({
                 onChange={setEmailBody}
               />
             ) : (
-              <Textarea
+              <FormatTextarea
                 name="body"
                 rows={3}
                 placeholder="Hi {{first_name}}, this is {{rep_name}} from {{org_name}}. Following up on our conversation..."
-                onChange={(e) => setEmailBody(e.currentTarget.value)}
+                value={emailBody}
+                onChange={setEmailBody}
               />
             )}
             {stepState.errors?.body && <p className="text-xs text-stamp mt-1">{stepState.errors.body[0]}</p>}

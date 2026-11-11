@@ -53,6 +53,21 @@ describe("replacePlaceholders", () => {
     expect(replacePlaceholders("Hello {{unknown_var}}", ctx)).toBe("Hello {{unknown_var}}");
   });
 
+  it("resolves common aliases like {{firstname}}, {{company}}, {{phone}}", () => {
+    expect(replacePlaceholders("Hi {{firstname}} from {{company}}", ctx)).toBe(
+      "Hi Tunde from Kreatix",
+    );
+    expect(replacePlaceholders("Call {{phone}} or email {{email}}", ctx)).toBe(
+      "Call +234 803 123 4567 or email tunde@kreatix.com",
+    );
+    expect(replacePlaceholders("Mr {{lastname}}", ctx)).toBe("Mr Adeyemi");
+  });
+
+  it("matches placeholders case-insensitively", () => {
+    expect(replacePlaceholders("Hi {{First_Name}}", ctx)).toBe("Hi Tunde");
+    expect(replacePlaceholders("From {{ORG_NAME}}", ctx)).toBe("From Xsta360");
+  });
+
   it("handles null repName with fallback", () => {
     const ctxNoRep = { ...ctx, repName: null };
     expect(replacePlaceholders("This is {{rep_name}}", ctxNoRep)).toBe("This is our team");

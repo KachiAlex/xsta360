@@ -13,10 +13,9 @@ const mockDb = {
       from: vi.fn(() => ({
         where: vi.fn(() => ({
           // First call: sequence lookup → return sequence
-          // Second call (awaited, no limit): step-count query → 1 step exists
           // Later calls: unsubscribed check, existing enrollment → empty
           then: (resolve: any, reject?: any) =>
-            Promise.resolve(callNum === 2 ? [{ value: 1 }] : []).then(resolve, reject),
+            Promise.resolve([]).then(resolve, reject),
           limit: vi.fn(() =>
             Promise.resolve(callNum === 1 ? [{ id: "seq-1", orgId: "org-1", active: true }] : []),
           ),

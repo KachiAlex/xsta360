@@ -7,11 +7,14 @@ import { useRef, useState, useEffect } from "react";
  * Stores HTML in a hidden textarea for form submission.
  *
  * Toolbar buttons:
- * - Bold, Italic, Underline
+ * - Bold, Italic, Underline, Strikethrough
+ * - Heading 1, Heading 2, normal text
  * - Align left, center, right (justify)
  * - Bullet list, numbered list
- * - Insert link, insert image
- * - Clear formatting
+ * - Quote, horizontal rule
+ * - Text color, highlight color
+ * - Insert link, insert image, remove link
+ * - Clear formatting, undo, redo
  */
 export function RichTextEditor({
   name,
@@ -130,6 +133,21 @@ export function RichTextEditor({
         <button type="button" onClick={() => exec("underline")} className={btnClass} title="Underline" aria-label="Underline">
           <u>U</u>
         </button>
+        <button type="button" onClick={() => exec("strikeThrough")} className={btnClass} title="Strikethrough" aria-label="Strikethrough">
+          <s>S</s>
+        </button>
+
+        <span className="w-px h-5 bg-rule mx-1" />
+
+        <button type="button" onClick={() => exec("formatBlock", "h1")} className={`${btnClass} text-[11px]`} title="Heading 1" aria-label="Heading 1">
+          H1
+        </button>
+        <button type="button" onClick={() => exec("formatBlock", "h2")} className={`${btnClass} text-[11px]`} title="Heading 2" aria-label="Heading 2">
+          H2
+        </button>
+        <button type="button" onClick={() => exec("formatBlock", "p")} className={btnClass} title="Normal text" aria-label="Normal text">
+          ¶
+        </button>
 
         <span className="w-px h-5 bg-rule mx-1" />
 
@@ -151,6 +169,32 @@ export function RichTextEditor({
         <button type="button" onClick={() => exec("insertOrderedList")} className={btnClass} title="Numbered list" aria-label="Numbered list">
           1.
         </button>
+        <button type="button" onClick={() => exec("formatBlock", "blockquote")} className={btnClass} title="Quote" aria-label="Quote">
+          ❝
+        </button>
+        <button type="button" onClick={() => exec("insertHorizontalRule")} className={btnClass} title="Horizontal rule" aria-label="Horizontal rule">
+          ―
+        </button>
+
+        <span className="w-px h-5 bg-rule mx-1" />
+
+        {/* Text color + highlight — color inputs styled as toolbar buttons */}
+        <label className={`${btnClass} relative cursor-pointer`} title="Text color" aria-label="Text color">
+          <span className="border-b-2 border-ink">A</span>
+          <input
+            type="color"
+            className="absolute inset-0 opacity-0 cursor-pointer"
+            onChange={(e) => exec("foreColor", e.currentTarget.value)}
+          />
+        </label>
+        <label className={`${btnClass} relative cursor-pointer`} title="Highlight color" aria-label="Highlight color">
+          <span className="bg-amber-200 px-0.5 rounded-sm">A</span>
+          <input
+            type="color"
+            className="absolute inset-0 opacity-0 cursor-pointer"
+            onChange={(e) => exec("hiliteColor", e.currentTarget.value)}
+          />
+        </label>
 
         <span className="w-px h-5 bg-rule mx-1" />
 
@@ -160,11 +204,20 @@ export function RichTextEditor({
         <button type="button" onClick={handleImage} className={btnClass} title="Insert image" aria-label="Insert image">
           🖼
         </button>
+        <button type="button" onClick={() => exec("unlink")} className={btnClass} title="Remove link" aria-label="Remove link">
+          ⛓‍💥
+        </button>
 
         <span className="w-px h-5 bg-rule mx-1" />
 
         <button type="button" onClick={() => exec("removeFormat")} className={btnClass} title="Clear formatting" aria-label="Clear formatting">
           ⨯
+        </button>
+        <button type="button" onClick={() => exec("undo")} className={btnClass} title="Undo" aria-label="Undo">
+          ↶
+        </button>
+        <button type="button" onClick={() => exec("redo")} className={btnClass} title="Redo" aria-label="Redo">
+          ↷
         </button>
       </div>
 

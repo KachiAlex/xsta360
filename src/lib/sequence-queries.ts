@@ -201,11 +201,12 @@ export interface LeadOption {
   company: string | null;
   phone: string | null;
   email: string | null;
+  categoryIds: string[];
 }
 
 /** Lightweight org leads list for the sequence enrollment picker. */
 export async function getOrgLeadOptions(orgId: string): Promise<LeadOption[]> {
-  return db
+  const leads = await db
     .select({
       id: schema.leads.id,
       name: schema.leads.name,
@@ -217,4 +218,45 @@ export async function getOrgLeadOptions(orgId: string): Promise<LeadOption[]> {
     .where(eq(schema.leads.orgId, orgId))
     .orderBy(asc(schema.leads.name))
     .limit(500);
+
+  if (leads.length === 0) return [];
+
+  // Category assignments per lead — powers "select by tag" in the picker.
+  const assignments = await db
+    .select({
+      leadId: schema.leadCategoryAssignments.leadId,
+      categoryId: schema.leadCategoryAssignments.categoryId,
+    })
+    .from(schema.leadCategoryAssignments)
+    .where(eq(schema.leadCategoryAssignments.orgId, orgId));
+
+  const catsByLead = new Map<string, string[]>();
+  for (const a of assignments) {
+    const arr = catsByLead.get(a.leadId) ?? [];
+    arr.push(a.categoryId);
+    catsByLead.set(a.leadId, arr);
+  }
+
+  return leads.map((l) => ({ ...l, categoryIds: catsByLead.get(l.id) ?? [] }));
+}
+
+export interface SequenceCategoryOption {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+}
+
+/** Org lead categories for the sequence enrollment picker ("select by tag"). */
+export async function getOrgCategoryOptions(orgId: string): Promise<SequenceCategoryOption[]> {
+  return db
+    .select({
+      id: schema.leadCategories.id,
+      name: schema.leadCategories.name,
+      icon: schema.leadCategories.icon,
+      color: schema.leadCategories.color,
+    })
+    .from(schema.leadCategories)
+    .where(and(eq(schema.leadCategories.orgId, orgId), eq(schema.leadCategories.active, true)))
+    .orderBy(asc(schema.leadCategories.name));
 }

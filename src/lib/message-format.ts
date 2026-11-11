@@ -21,20 +21,34 @@ export interface MessageContext {
 
 /**
  * Replace {{placeholder}} variables in a text string with actual values.
+ * Matching is case-insensitive and accepts common aliases — e.g.
+ * {{firstname}}, {{name}}, {{company}}, {{phone}}, {{email}} — so
+ * reasonable spellings don't leak through as literal tokens.
  */
 export function replacePlaceholders(text: string, ctx: MessageContext): string {
+  const firstName = ctx.leadName?.trim().split(/\s+/)[0] || "there";
+  const lastName = ctx.leadName?.trim().split(/\s+/).slice(1).join(" ") ?? "";
   const replacements: Record<string, string> = {
     lead_name: ctx.leadName || "there",
+    name: ctx.leadName || "there",
+    first_name: firstName,
+    firstname: firstName,
+    last_name: lastName,
+    lastname: lastName,
     lead_company: ctx.leadCompany || "",
+    company: ctx.leadCompany || "",
     lead_phone: ctx.leadPhone || "",
+    phone: ctx.leadPhone || "",
     lead_email: ctx.leadEmail || "",
+    email: ctx.leadEmail || "",
     rep_name: ctx.repName || "our team",
+    rep: ctx.repName || "our team",
     org_name: ctx.orgName,
-    first_name: ctx.leadName?.split(" ")[0] || "there",
+    org: ctx.orgName,
   };
 
   return text.replace(/\{\{(\w+)\}\}/g, (match, key: string) => {
-    return replacements[key] ?? match;
+    return replacements[key.toLowerCase()] ?? match;
   });
 }
 

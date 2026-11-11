@@ -39,19 +39,6 @@ export async function enrollLeadInSequence(
   if (!seq) return { ok: false, message: "Sequence not found" };
   if (!seq.active) return { ok: false, message: "Sequence is not active" };
 
-  // A sequence with no steps would enroll, then instantly "complete" on the
-  // next run without sending anything — a silent failure for the user.
-  const [{ value: stepCount }] = await db
-    .select({ value: count() })
-    .from(schema.sequenceSteps)
-    .where(eq(schema.sequenceSteps.sequenceId, sequenceId));
-  if (stepCount === 0) {
-    return {
-      ok: false,
-      message: "This sequence has no steps — add a step before enrolling leads",
-    };
-  }
-
   // Check lead isn't unsubscribed
   const [lead] = await db
     .select({ unsubscribedAt: schema.leads.unsubscribedAt })
@@ -225,6 +212,10 @@ export async function processSequenceSteps(opts?: {
     if (blockedOrgIds.has(enrollment.orgId)) continue;
     // Use prefetched steps (already ordered by position).
     const steps = stepsBySeq.get(enrollment.sequenceId) ?? [];
+
+    // Leads can be enrolled before any steps exist — keep the enrollment
+    // active and waiting rather than instantly marking it "completed".
+    if (steps.length === 0) continue;
 
     const nextStepIndex = enrollment.currentStep;
     if (nextStepIndex >= steps.length) {
