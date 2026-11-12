@@ -127,6 +127,7 @@ export async function GET(request: Request) {
     }
 
     let didSend = false;
+    let whatsappWamid: string | undefined;
 
     // Try WhatsApp first if configured and lead has a phone.
     if (r.whatsappConfig && (r.whatsappConfig as any)?.enabled && r.leadPhone) {
@@ -143,6 +144,7 @@ export async function GET(request: Request) {
       if (result.success) {
         whatsappSent++;
         didSend = true;
+        whatsappWamid = result.wamid;
       }
     }
 
@@ -175,7 +177,14 @@ export async function GET(request: Request) {
     if (didSend) {
       await db
         .update(schema.reminders)
-        .set({ status: "sent", sentAt: now, lastError: null, updatedAt: now })
+        .set({
+          status: "sent",
+          sentAt: now,
+          lastError: null,
+          wamid: whatsappWamid ?? null,
+          deliveryStatus: whatsappWamid ? "sent" : null,
+          updatedAt: now,
+        })
         .where(eq(schema.reminders.id, r.reminderId));
       sent++;
     } else if (!r.assigneeEmail) {

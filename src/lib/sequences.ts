@@ -497,17 +497,25 @@ export async function processSequenceSteps(opts?: {
           | undefined;
         let whatsappSuccess = false;
         let whatsappError: string | undefined;
+        let whatsappWamid: string | undefined;
         stepOutcome = "skipped"; // default: permanent skip if no config/phone
         if (whatsappConfig?.enabled && whatsappConfig.phoneNumberId && whatsappConfig.apiKey && lead.phone) {
           stepOutcome = "failed"; // has config+phone; failed unless send succeeds
-          if (!whatsappConfig.wabaId) {
-            // No WABA — can only free-form send (delivers inside the 24h window).
+          // Inside Meta's 24h customer-service window (lead messaged us
+          // recently) send free-form — session messages aren't subject to
+          // the marketing-template frequency cap (error 131049). Without a
+          // WABA there is no template path, so free-form is the only option.
+          const withinServiceWindow =
+            lead.lastWhatsappInboundAt != null &&
+            now.getTime() - lead.lastWhatsappInboundAt.getTime() < 24 * 3600_000;
+          if (withinServiceWindow || !whatsappConfig.wabaId) {
             const personalizedBody = replacePlaceholders(stepBody, msgCtx);
             const msg = formatWhatsAppMessage(personalizedBody, orgName);
             const result = await sendWhatsAppMessage(whatsappConfig, lead.phone, msg);
             if (result.success) {
               whatsappSent++;
               whatsappSuccess = true;
+              whatsappWamid = result.wamid;
               stepOutcome = "delivered";
             } else {
               whatsappError = result.error || "WhatsApp send failed";
@@ -560,6 +568,7 @@ export async function processSequenceSteps(opts?: {
               if (result.success) {
                 whatsappSent++;
                 whatsappSuccess = true;
+                whatsappWamid = result.wamid;
                 stepOutcome = "delivered";
               } else {
                 whatsappError = result.error || "WhatsApp send failed";
@@ -594,6 +603,8 @@ export async function processSequenceSteps(opts?: {
             sequenceStepId: nextStep.id,
             channel: "whatsapp",
             lastError: whatsappError,
+            wamid: whatsappWamid,
+            deliveryStatus: whatsappSuccess ? "sent" : undefined,
           });
         }
         // After repeated API failures, pause rather than retry every cron run.

@@ -389,6 +389,9 @@ export const leads = pgTable(
     }),
     // When the lead unsubscribed from sequence emails (null = not unsubscribed).
     unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
+    // When the lead last messaged us on WhatsApp — opens Meta's 24h
+    // customer-service window where free-form sends are allowed.
+    lastWhatsappInboundAt: timestamp("last_whatsapp_inbound_at", { withTimezone: true }),
     // When the lead was moved to a Won stage (null = never won). Used for win-rate stats.
     wonAt: timestamp("won_at", { withTimezone: true }),
     // When the lead was moved to a Lost stage (null = never lost).
@@ -542,6 +545,12 @@ export const reminders = pgTable(
     channel: text("channel"),
     // When the reminder was successfully sent.
     sentAt: timestamp("sent_at", { withTimezone: true }),
+    // Meta message id (wamid.…) captured at send time — lets webhook
+    // status receipts update delivery state on this row.
+    wamid: text("wamid"),
+    // Meta delivery receipt: "sent" | "delivered" | "read" | "failed".
+    deliveryStatus: text("delivery_status"),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -549,6 +558,7 @@ export const reminders = pgTable(
     assigneeDueIdx: index("reminders_assignee_due_idx").on(t.assigneeId, t.dueAt),
     statusDueIdx: index("reminders_status_due_idx").on(t.status, t.dueAt),
     orgIdx: index("reminders_org_idx").on(t.orgId),
+    wamidIdx: index("reminders_wamid_idx").on(t.wamid),
     // Standalone indexes for cron scans and per-assignee filters.
     assigneeIdx: index("reminders_assignee_idx").on(t.assigneeId),
     statusIdx: index("reminders_status_idx").on(t.status),

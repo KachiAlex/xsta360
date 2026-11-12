@@ -41,7 +41,7 @@ export async function sendWhatsAppMessage(
   config: WhatsAppConfig | null,
   toPhone: string,
   message: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; wamid?: string }> {
   if (!config?.enabled || !config.phoneNumberId || !config.apiKey) {
     return { success: false, error: "WhatsApp not configured" };
   }
@@ -71,7 +71,11 @@ export async function sendWhatsAppMessage(
       return { success: false, error: err };
     }
 
-    return { success: true };
+    // Capture the message id (wamid.…) so webhook status receipts can be
+    // correlated back to this send for delivery tracking.
+    const data = await res.json().catch(() => null);
+    const wamid = data?.messages?.[0]?.id as string | undefined;
+    return { success: true, wamid };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Unknown error" };
   }
@@ -87,7 +91,7 @@ export async function sendWhatsAppTemplateMessage(
   toPhone: string,
   templateName: string,
   params: string[],
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; wamid?: string }> {
   if (!config?.enabled || !config.phoneNumberId || !config.apiKey) {
     return { success: false, error: "WhatsApp not configured" };
   }
@@ -130,7 +134,9 @@ export async function sendWhatsAppTemplateMessage(
       return { success: false, error: err };
     }
 
-    return { success: true };
+    const data = await res.json().catch(() => null);
+    const wamid = data?.messages?.[0]?.id as string | undefined;
+    return { success: true, wamid };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Unknown error" };
   }

@@ -59,7 +59,8 @@ interface WaChangeValue {
  * POST /api/webhooks/whatsapp — Meta event delivery.
  *
  * Handles two event shapes inside change.field === "messages":
- * - statuses[]  → delivery/read/failed receipts (logged; no wamid stored yet)
+ * - statuses[]  → delivery/read/failed receipts: matched to reminder rows
+ *   by wamid; a failure pauses the enrollment behind that send.
  * - messages[]  → inbound replies: pauses the sender's active sequence
  *   enrollments so a lead who replies stops getting automated follow-ups.
  *
@@ -109,13 +110,16 @@ export async function POST(request: Request) {
         const phoneNumberId = value.metadata?.phone_number_id;
         if (!phoneNumberId) continue;
 
-        // Delivery receipts — logged for now (we don't store wamids yet).
+        // Delivery receipts — update the reminder row that carries this wamid.
         for (const status of value.statuses ?? []) {
           const errs = (status.errors ?? [])
             .map((e: { code?: number; title?: string }) => `${e.code} ${e.title ?? ""}`.trim())
             .join("; ");
           console.log(
             `WhatsApp status: ${status.status} for ${status.id} → ${status.recipient_id}${errs ? ` [${errs}]` : ""}`,
+          );
+          await handleDeliveryReceipt(status, errs).catch((e) =>
+            console.error("Delivery receipt handling failed:", e),
           );
         }
 
@@ -131,6 +135,90 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ received: true });
+}
+
+// Receipt progress ordering — a later status never overwrites a further one.
+const DELIVERY_RANK: Record<string, number> = { sent: 1, delivered: 2, read: 3 };
+
+/**
+ * Correlate a Meta status receipt to the reminder row that carries its wamid.
+ * Progresses deliveryStatus sent → delivered → read; a "failed" receipt marks
+ * the row failed and pauses the enrollment that produced the send — a number
+ * that can't receive messages shouldn't keep burning template steps.
+ */
+async function handleDeliveryReceipt(status: WaStatus, errs: string) {
+  const [reminder] = await db
+    .select({
+      id: schema.reminders.id,
+      leadId: schema.reminders.leadId,
+      orgId: schema.reminders.orgId,
+      sequenceStepId: schema.reminders.sequenceStepId,
+      deliveryStatus: schema.reminders.deliveryStatus,
+    })
+    .from(schema.reminders)
+    .where(eq(schema.reminders.wamid, status.id))
+    .limit(1);
+  if (!reminder) return; // Message not sent from a tracked flow — nothing to update.
+
+  const now = new Date();
+  const receiptAt = status.timestamp ? new Date(Number(status.timestamp) * 1000) : now;
+
+  if (status.status === "failed") {
+    await db
+      .update(schema.reminders)
+      .set({ deliveryStatus: "failed", lastError: errs || "Delivery failed", updatedAt: now })
+      .where(eq(schema.reminders.id, reminder.id));
+
+    if (!reminder.sequenceStepId) return;
+    const [step] = await db
+      .select({ sequenceId: schema.sequenceSteps.sequenceId })
+      .from(schema.sequenceSteps)
+      .where(eq(schema.sequenceSteps.id, reminder.sequenceStepId))
+      .limit(1);
+    if (!step) return;
+
+    const paused = await db
+      .update(schema.sequenceEnrollments)
+      .set({
+        status: "paused",
+        pausedReason: "delivery_failed",
+        pausedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(schema.sequenceEnrollments.orgId, reminder.orgId),
+          eq(schema.sequenceEnrollments.leadId, reminder.leadId),
+          eq(schema.sequenceEnrollments.sequenceId, step.sequenceId),
+          eq(schema.sequenceEnrollments.status, "active"),
+        ),
+      )
+      .returning({ id: schema.sequenceEnrollments.id });
+
+    if (paused.length > 0) {
+      const [lead] = await db
+        .select({ name: schema.leads.name })
+        .from(schema.leads)
+        .where(eq(schema.leads.id, reminder.leadId))
+        .limit(1);
+      await broadcastToOrg({
+        orgId: reminder.orgId,
+        type: "sequence_step",
+        title: `WhatsApp delivery failed for ${lead?.name ?? "a lead"}`,
+        body: `${errs || "Message not delivered"} — sequence paused.`,
+        link: `/leads/${reminder.leadId}`,
+      }).catch((e) => console.error("Delivery-failure notification failed:", e));
+    }
+    return;
+  }
+
+  const rank = DELIVERY_RANK[status.status] ?? 0;
+  if (rank > (DELIVERY_RANK[reminder.deliveryStatus ?? ""] ?? 0)) {
+    await db
+      .update(schema.reminders)
+      .set({ deliveryStatus: status.status, deliveredAt: receiptAt, updatedAt: now })
+      .where(eq(schema.reminders.id, reminder.id));
+  }
 }
 
 /**
@@ -159,6 +247,13 @@ async function handleInboundMessage(phoneNumberId: string, msg: WaInboundMessage
     )
     .limit(1);
   if (!lead) return;
+
+  // Stamp the 24h service window — sequence steps prefer free-form sends
+  // while it's open, which also avoids Meta's marketing-template cap.
+  await db
+    .update(schema.leads)
+    .set({ lastWhatsappInboundAt: new Date(), updatedAt: new Date() })
+    .where(eq(schema.leads.id, lead.id));
 
   const paused = await db
     .update(schema.sequenceEnrollments)
