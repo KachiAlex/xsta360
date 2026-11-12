@@ -167,12 +167,8 @@ function SequenceItem({
 }) {
   const [, startTransition] = useTransition();
   const [showStepForm, setShowStepForm] = useState(false);
-  const [stepState, stepAction, stepPending] = useActionState<SequenceFormState, FormData>(addSequenceStep, {});
-  const [stepActionType, setStepActionType] = useState<string>("reminder");
-  const [emailBody, setEmailBody] = useState<string>("");
-  const [emailSubject, setEmailSubject] = useState<string>("");
-  const [emailSender, setEmailSender] = useState<string>("");
-  const [attachmentIds, setAttachmentIds] = useState<string[]>([]);
+  const [editingStep, setEditingStep] = useState<Step | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   const [running, setRunning] = useState(false);
   const [runMsg, setRunMsg] = useState<string | null>(null);
   const [showLeads, setShowLeads] = useState(false);
@@ -180,22 +176,14 @@ function SequenceItem({
   const [pickerQuery, setPickerQuery] = useState("");
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
   const [enrollMsg, setEnrollMsg] = useState<string | null>(null);
-  // Close on success: reset showStepForm so the form can be reopened.
-  const stepVisible = showStepForm;
-  useEffect(() => {
-    if (stepState.ok) {
-      setShowStepForm(false);
-      setEmailBody("");
-      setEmailSubject("");
-      setEmailSender("");
-      setAttachmentIds([]);
-    }
-  }, [stepState.ok]);
 
-  // Leads already committed to this sequence (active or paused) can't be picked again.
+  // Leads already committed to this sequence (active, in-flight send, or
+  // paused) can't be picked again.
   const visibleEnrollments = enrollments.filter((e) => e.status !== "cancelled");
   const committedLeadIds = new Set(
-    enrollments.filter((e) => e.status === "active" || e.status === "paused").map((e) => e.leadId),
+    enrollments
+      .filter((e) => e.status === "active" || e.status === "paused" || e.status === "processing")
+      .map((e) => e.leadId),
   );
   const q = pickerQuery.trim().toLowerCase();
   // Leads that can still be enrolled — "All contacts" and category
@@ -290,6 +278,13 @@ function SequenceItem({
           </a>
           <button
             type="button"
+            className="text-xs text-ink-soft hover:text-ink min-h-[40px] px-2 active:bg-paper-2 rounded"
+            onClick={() => setShowSettings((v) => !v)}
+          >
+            ⚙ Settings
+          </button>
+          <button
+            type="button"
             disabled={running}
             className="text-xs text-[var(--accent)] hover:text-ink min-h-[40px] px-2 active:bg-paper-2 rounded disabled:opacity-50"
             onClick={() => {
@@ -340,6 +335,11 @@ function SequenceItem({
         <div className="text-xs font-mono text-ink-soft mb-3 ml-1">{runMsg}</div>
       )}
 
+      {/* Send-window settings */}
+      {showSettings && (
+        <SequenceSettingsForm sequence={sequence} onDone={() => setShowSettings(false)} />
+      )}
+
       {/* Steps */}
       {sequence.steps.length > 0 && (
         <ol className="space-y-1.5 mb-3 ml-4">
@@ -364,7 +364,19 @@ function SequenceItem({
               </div>
               <button
                 type="button"
+                className="text-xs text-ink-soft hover:text-ink min-w-[36px] min-h-[36px] flex items-center justify-center rounded hover:bg-paper-2"
+                title="Edit step"
+                onClick={() => {
+                  setEditingStep(step);
+                  setShowStepForm(false);
+                }}
+              >
+                ✎
+              </button>
+              <button
+                type="button"
                 className="text-xs text-ink-soft hover:text-stamp min-w-[36px] min-h-[36px] flex items-center justify-center rounded hover:bg-paper-2"
+                title="Delete step"
                 onClick={() => {
                   const fd = new FormData();
                   fd.set("id", step.id);
@@ -400,7 +412,7 @@ function SequenceItem({
                 <a href={`/leads/${e.leadId}`} className="font-medium hover:underline truncate">
                   {e.leadName}
                 </a>
-                <Badge tone={e.status === "active" ? "won" : e.status === "completed" ? "neutral" : "lost"}>
+                <Badge tone={e.status === "active" || e.status === "processing" ? "won" : e.status === "completed" ? "neutral" : "lost"}>
                   {e.status}
                 </Badge>
                 <span className="text-[11px] font-mono text-ink-soft">
@@ -549,113 +561,19 @@ function SequenceItem({
         {enrollMsg && !showPicker && <p className="text-xs font-mono text-ink-soft mt-1">{enrollMsg}</p>}
       </div>
 
-      {/* Add step form */}
-      {stepVisible ? (
-        <form action={stepAction} className="bg-paper-2 rounded p-3 space-y-3 ml-4">
-          <input type="hidden" name="sequenceId" value={sequence.id} />
-          <input type="hidden" name="attachments" value={JSON.stringify(attachmentIds)} />
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <div>
-              <Label>Delay (days)</Label>
-              <Input name="delayDays" type="number" defaultValue="0" />
-              <p className="text-[11px] text-ink-soft mt-1">
-                Days to wait after enrollment for the first step, or after the previous step for the rest.
-              </p>
-            </div>
-            <div>
-              <Label>Action</Label>
-              <Select
-                name="action"
-                defaultValue="reminder"
-                onChange={(e) => {
-                  const v = e.currentTarget.value;
-                  setStepActionType(v);
-                }}
-              >
-                <option value="reminder">Create reminder</option>
-                <option value="email">Send email</option>
-                <option value="whatsapp">WhatsApp message</option>
-              </Select>
-            </div>
-            <div>
-              <Label>Subject {stepActionType === "email" ? "" : "(optional)"}</Label>
-              <Input
-                name="subject"
-                placeholder={stepActionType === "email" ? "Welcome to Xsta360" : "Follow-up call"}
-                onChange={(e) => setEmailSubject(e.currentTarget.value)}
-              />
-            </div>
-          </div>
-
-          {/* Sender name — only for email steps */}
-          {stepActionType === "email" && (
-            <div>
-              <Label>Sender name (displayed to recipient)</Label>
-              <Input
-                name="senderName"
-                placeholder="e.g. Tunde from Kreatix"
-                onChange={(e) => setEmailSender(e.currentTarget.value)}
-              />
-              <p className="text-[11px] text-ink-soft mt-1">This appears as the sender's display name in the recipient's inbox. Defaults to your org name if left blank.</p>
-            </div>
-          )}
-
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <Label>Content {stepActionType === "email" ? "(rich text)" : ""}</Label>
-              {stepActionType === "email" && (
-                <EmailPreview
-                  subject={emailSubject}
-                  senderName={emailSender}
-                  body={emailBody}
-                  orgName={orgName}
-                  recipientName="Adaeze Okonkwo"
-                  attachments={documents
-                    .filter((d) => attachmentIds.includes(d.id))
-                    .map((d) => ({ fileName: d.fileName, sizeBytes: d.sizeBytes }))}
-                />
-              )}
-            </div>
-            {stepActionType === "email" ? (
-              <RichTextEditor
-                name="body"
-                placeholder="Hi {{first_name}}, this is {{rep_name}} from {{org_name}}. Following up on our conversation..."
-                rows={6}
-                defaultValue={emailBody}
-                onChange={setEmailBody}
-              />
-            ) : (
-              <FormatTextarea
-                name="body"
-                rows={3}
-                placeholder="Hi {{first_name}}, this is {{rep_name}} from {{org_name}}. Following up on our conversation..."
-                value={emailBody}
-                onChange={setEmailBody}
-              />
-            )}
-            {stepState.errors?.body && <p className="text-xs text-stamp mt-1">{stepState.errors.body[0]}</p>}
-            <div className="mt-1.5">
-              <PlaceholderHelp />
-            </div>
-          </div>
-
-          {/* Attachments — only for email steps */}
-          {stepActionType === "email" && (
-            <div>
-              <Label>Attachments</Label>
-              <AttachmentPicker
-                documents={documents}
-                selectedIds={attachmentIds}
-                onChange={setAttachmentIds}
-              />
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" size="sm" onClick={() => setShowStepForm(false)}>Cancel</Button>
-            <Button type="submit" size="sm" disabled={stepPending}>{stepPending ? "Adding…" : "Add step"}</Button>
-          </div>
-        </form>
+      {/* Step form — shared for adding a new step and editing an existing one */}
+      {showStepForm || editingStep ? (
+        <StepForm
+          key={editingStep?.id ?? "new"}
+          sequenceId={sequence.id}
+          step={editingStep}
+          documents={documents}
+          orgName={orgName}
+          onDone={() => {
+            setShowStepForm(false);
+            setEditingStep(null);
+          }}
+        />
       ) : (
         <button
           type="button"
@@ -666,6 +584,199 @@ function SequenceItem({
         </button>
       )}
     </div>
+  );
+}
+
+/** Step add/edit form — same fields, prefilled when editing. */
+function StepForm({
+  sequenceId,
+  step,
+  documents,
+  orgName,
+  onDone,
+}: {
+  sequenceId: string;
+  step: Step | null;
+  documents: AttachmentDoc[];
+  orgName: string;
+  onDone: () => void;
+}) {
+  const [state, action, pending] = useActionState<SequenceFormState, FormData>(
+    step ? updateSequenceStep : addSequenceStep,
+    {},
+  );
+  const [stepActionType, setStepActionType] = useState<string>(step?.action ?? "reminder");
+  const [emailBody, setEmailBody] = useState<string>(step?.body ?? "");
+  const [emailSubject, setEmailSubject] = useState<string>(step?.subject ?? "");
+  const [emailSender, setEmailSender] = useState<string>(step?.senderName ?? "");
+  const [attachmentIds, setAttachmentIds] = useState<string[]>(step?.attachments ?? []);
+
+  // Close on success — parent clears the form state.
+  useEffect(() => {
+    if (state.ok) onDone();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.ok]);
+
+  return (
+    <form action={action} className="bg-paper-2 rounded p-3 space-y-3 ml-4">
+      <input type="hidden" name="sequenceId" value={sequenceId} />
+      {step && <input type="hidden" name="stepId" value={step.id} />}
+      <input type="hidden" name="attachments" value={JSON.stringify(attachmentIds)} />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div>
+          <Label>Delay (days)</Label>
+          <Input name="delayDays" type="number" defaultValue={step?.delayDays ?? 0} />
+          <p className="text-[11px] text-ink-soft mt-1">
+            Days to wait after enrollment for the first step, or after the previous step for the rest.
+          </p>
+        </div>
+        <div>
+          <Label>Action</Label>
+          <Select
+            name="action"
+            defaultValue={step?.action ?? "reminder"}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setStepActionType(v);
+            }}
+          >
+            <option value="reminder">Create reminder</option>
+            <option value="email">Send email</option>
+            <option value="whatsapp">WhatsApp message</option>
+          </Select>
+        </div>
+        <div>
+          <Label>Subject {stepActionType === "email" ? "" : "(optional)"}</Label>
+          <Input
+            name="subject"
+            defaultValue={step?.subject ?? ""}
+            placeholder={stepActionType === "email" ? "Welcome to Xsta360" : "Follow-up call"}
+            onChange={(e) => setEmailSubject(e.currentTarget.value)}
+          />
+        </div>
+      </div>
+
+      {/* Sender name — only for email steps */}
+      {stepActionType === "email" && (
+        <div>
+          <Label>Sender name (displayed to recipient)</Label>
+          <Input
+            name="senderName"
+            defaultValue={step?.senderName ?? ""}
+            placeholder="e.g. Tunde from Kreatix"
+            onChange={(e) => setEmailSender(e.currentTarget.value)}
+          />
+          <p className="text-[11px] text-ink-soft mt-1">This appears as the sender's display name in the recipient's inbox. Defaults to your org name if left blank.</p>
+        </div>
+      )}
+
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <Label>Content {stepActionType === "email" ? "(rich text)" : ""}</Label>
+          {stepActionType === "email" && (
+            <EmailPreview
+              subject={emailSubject}
+              senderName={emailSender}
+              body={emailBody}
+              orgName={orgName}
+              recipientName="Adaeze Okonkwo"
+              attachments={documents
+                .filter((d) => attachmentIds.includes(d.id))
+                .map((d) => ({ fileName: d.fileName, sizeBytes: d.sizeBytes }))}
+            />
+          )}
+        </div>
+        {stepActionType === "email" ? (
+          <RichTextEditor
+            name="body"
+            placeholder="Hi {{first_name}}, this is {{rep_name}} from {{org_name}}. Following up on our conversation..."
+            rows={6}
+            defaultValue={emailBody}
+            onChange={setEmailBody}
+          />
+        ) : (
+          <FormatTextarea
+            name="body"
+            rows={3}
+            placeholder="Hi {{first_name}}, this is {{rep_name}} from {{org_name}}. Following up on our conversation..."
+            value={emailBody}
+            onChange={setEmailBody}
+          />
+        )}
+        {state.errors?.body && <p className="text-xs text-stamp mt-1">{state.errors.body[0]}</p>}
+        <div className="mt-1.5">
+          <PlaceholderHelp />
+        </div>
+      </div>
+
+      {/* Attachments — only for email steps */}
+      {stepActionType === "email" && (
+        <div>
+          <Label>Attachments</Label>
+          <AttachmentPicker
+            documents={documents}
+            selectedIds={attachmentIds}
+            onChange={setAttachmentIds}
+          />
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="ghost" size="sm" onClick={onDone}>Cancel</Button>
+        <Button type="submit" size="sm" disabled={pending}>
+          {pending ? "Saving…" : step ? "Save changes" : "Add step"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/** Per-sequence sending window settings (business hours, weekends, timezone). */
+function SequenceSettingsForm({ sequence, onDone }: { sequence: Sequence; onDone: () => void }) {
+  const [state, action, pending] = useActionState<SequenceFormState, FormData>(updateSequenceSettings, {});
+
+  useEffect(() => {
+    if (state.ok) onDone();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.ok]);
+
+  return (
+    <form action={action} className="bg-paper-2 rounded p-3 space-y-3 mb-3 ml-4">
+      <input type="hidden" name="sequenceId" value={sequence.id} />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div>
+          <Label>Send window start</Label>
+          <Input name="sendWindowStart" type="time" defaultValue={sequence.sendWindowStart ?? ""} />
+        </div>
+        <div>
+          <Label>Send window end</Label>
+          <Input name="sendWindowEnd" type="time" defaultValue={sequence.sendWindowEnd ?? ""} />
+        </div>
+        <div>
+          <Label>Timezone</Label>
+          <Input name="timezone" defaultValue={sequence.timezone || "Africa/Lagos"} placeholder="Africa/Lagos" />
+        </div>
+      </div>
+      <p className="text-[11px] text-ink-soft">
+        Email and WhatsApp steps only send inside this window; reminder steps fire anytime.
+        Leave the times empty to send around the clock.
+      </p>
+      <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <input
+          type="checkbox"
+          name="skipWeekends"
+          value="true"
+          defaultChecked={sequence.skipWeekends}
+          className="accent-[var(--accent)]"
+        />
+        Skip weekends (Sat / Sun)
+      </label>
+      {state.message && <p className="text-xs text-stamp">{state.message}</p>}
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="ghost" size="sm" onClick={onDone}>Cancel</Button>
+        <Button type="submit" size="sm" disabled={pending}>{pending ? "Saving…" : "Save settings"}</Button>
+      </div>
+    </form>
   );
 }
 

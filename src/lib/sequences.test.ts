@@ -13,11 +13,18 @@ const mockDb = {
       from: vi.fn(() => ({
         where: vi.fn(() => ({
           // First call: sequence lookup → return sequence
-          // Later calls: unsubscribed check, existing enrollment → empty
+          // Second call: lead lookup → return a lead
+          // Later calls: existing enrollment → empty
           then: (resolve: any, reject?: any) =>
             Promise.resolve([]).then(resolve, reject),
           limit: vi.fn(() =>
-            Promise.resolve(callNum === 1 ? [{ id: "seq-1", orgId: "org-1", active: true }] : []),
+            Promise.resolve(
+              callNum === 1
+                ? [{ id: "seq-1", orgId: "org-1", active: true }]
+                : callNum === 2
+                  ? [{ unsubscribedAt: null }]
+                  : [],
+            ),
           ),
         })),
       })),
@@ -46,6 +53,9 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn((a, b) => ({ eq: [a, b] })),
   and: vi.fn((...args) => ({ and: args })),
   asc: vi.fn((a) => ({ asc: a })),
+  or: vi.fn((...args) => ({ or: args })),
+  lt: vi.fn((a, b) => ({ lt: [a, b] })),
+  gte: vi.fn((a, b) => ({ gte: [a, b] })),
   inArray: vi.fn((a, b) => ({ inArray: [a, b] })),
   isNull: vi.fn((a) => ({ isNull: a })),
   count: vi.fn(() => "count()"),
@@ -182,7 +192,10 @@ describe("processSequenceSteps — email flow", () => {
       })),
       update: vi.fn(() => ({
         set: vi.fn(() => ({
-          where: vi.fn(() => Promise.resolve()),
+          where: vi.fn(() => ({
+            then: (resolve: any, reject?: any) => Promise.resolve().then(resolve, reject),
+            returning: vi.fn(() => Promise.resolve([{ id: "claimed-1" }])),
+          })),
         })),
       })),
     };
@@ -256,6 +269,9 @@ describe("processSequenceSteps — email flow", () => {
       eq: vi.fn((a, b) => ({ eq: [a, b] })),
       and: vi.fn((...args) => ({ and: args })),
       asc: vi.fn((a) => ({ asc: a })),
+      or: vi.fn((...args) => ({ or: args })),
+      lt: vi.fn((a, b) => ({ lt: [a, b] })),
+      gte: vi.fn((a, b) => ({ gte: [a, b] })),
       inArray: vi.fn((a, b) => ({ inArray: [a, b] })),
       isNull: vi.fn((a) => ({ isNull: a })),
       count: vi.fn(() => "count()"),
@@ -348,6 +364,9 @@ describe("processSequenceSteps — email flow", () => {
       eq: vi.fn((a, b) => ({ eq: [a, b] })),
       and: vi.fn((...args) => ({ and: args })),
       asc: vi.fn((a) => ({ asc: a })),
+      or: vi.fn((...args) => ({ or: args })),
+      lt: vi.fn((a, b) => ({ lt: [a, b] })),
+      gte: vi.fn((a, b) => ({ gte: [a, b] })),
       inArray: vi.fn((a, b) => ({ inArray: [a, b] })),
       isNull: vi.fn((a) => ({ isNull: a })),
       count: vi.fn(() => "count()"),
@@ -427,6 +446,9 @@ describe("processSequenceSteps — email flow", () => {
       eq: vi.fn((a, b) => ({ eq: [a, b] })),
       and: vi.fn((...args) => ({ and: args })),
       asc: vi.fn((a) => ({ asc: a })),
+      or: vi.fn((...args) => ({ or: args })),
+      lt: vi.fn((a, b) => ({ lt: [a, b] })),
+      gte: vi.fn((a, b) => ({ gte: [a, b] })),
       inArray: vi.fn((a, b) => ({ inArray: [a, b] })),
       isNull: vi.fn((a) => ({ isNull: a })),
       count: vi.fn(() => "count()"),
@@ -513,6 +535,9 @@ describe("processSequenceSteps — email flow", () => {
       eq: vi.fn((a, b) => ({ eq: [a, b] })),
       and: vi.fn((...args) => ({ and: args })),
       asc: vi.fn((a) => ({ asc: a })),
+      or: vi.fn((...args) => ({ or: args })),
+      lt: vi.fn((a, b) => ({ lt: [a, b] })),
+      gte: vi.fn((a, b) => ({ gte: [a, b] })),
       inArray: vi.fn((a, b) => ({ inArray: [a, b] })),
       isNull: vi.fn((a) => ({ isNull: a })),
       count: vi.fn(() => "count()"),
@@ -584,7 +609,10 @@ function buildWhatsAppMockDb(opts: {
     })),
     update: vi.fn(() => ({
       set: vi.fn(() => ({
-        where: vi.fn(() => Promise.resolve()),
+        where: vi.fn(() => ({
+          then: (resolve: any, reject?: any) => Promise.resolve().then(resolve, reject),
+          returning: vi.fn(() => Promise.resolve([{ id: "claimed-1" }])),
+        })),
       })),
     })),
   };
@@ -609,6 +637,9 @@ async function loadSequencesWithWhatsApp(dbMock: any) {
     eq: vi.fn((a, b) => ({ eq: [a, b] })),
     and: vi.fn((...args) => ({ and: args })),
     asc: vi.fn((a) => ({ asc: a })),
+    or: vi.fn((...args) => ({ or: args })),
+    lt: vi.fn((a, b) => ({ lt: [a, b] })),
+    gte: vi.fn((a, b) => ({ gte: [a, b] })),
     inArray: vi.fn((a, b) => ({ inArray: [a, b] })),
     isNull: vi.fn((a) => ({ isNull: a })),
     count: vi.fn(() => "count()"),
@@ -738,11 +769,13 @@ describe("processSequenceSteps — whatsapp flow", () => {
   it("does NOT advance when WhatsApp API call fails (transient)", async () => {
     sendWhatsAppMock.mockResolvedValue({ success: false, error: "401 Unauthorized" });
 
-    const updateSpy = vi.fn(() => ({
-      set: vi.fn(() => ({
-        where: vi.fn(() => Promise.resolve()),
+    const setSpy = vi.fn(() => ({
+      where: vi.fn(() => ({
+        then: (resolve: any, reject?: any) => Promise.resolve().then(resolve, reject),
+        returning: vi.fn(() => Promise.resolve([{ id: "claimed-1" }])),
       })),
     }));
+    const updateSpy = vi.fn(() => ({ set: setSpy }));
 
     const dbMock = buildWhatsAppMockDb({
       enrollments: [baseEnrollment],
@@ -769,9 +802,12 @@ describe("processSequenceSteps — whatsapp flow", () => {
 
     expect(sendWhatsAppMock).toHaveBeenCalledTimes(1);
     expect(result.whatsappSent).toBe(0);
-    // On transient failure, currentStep must NOT advance (no enrollment update).
+    // On transient failure, currentStep must NOT advance. The enrollment IS
+    // updated twice (processing claim + release) but never with currentStep.
     expect(result.processed).toBe(0);
-    expect(updateSpy).not.toHaveBeenCalled();
+    for (const call of setSpy.mock.calls as any[][]) {
+      expect(call[0]).not.toHaveProperty("currentStep");
+    }
   });
 });
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, schema } from "@/db";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { logEvent } from "@/lib/audit";
 import { broadcastToOrg } from "@/lib/notifications";
 
@@ -164,6 +164,9 @@ async function handleDeliveryReceipt(status: WaStatus, errs: string) {
   const receiptAt = status.timestamp ? new Date(Number(status.timestamp) * 1000) : now;
 
   if (status.status === "failed") {
+    // A late terminal "failed" shouldn't overwrite "read" — Meta can emit
+    // statuses out of order; read is a stronger signal than failed.
+    if (reminder.deliveryStatus === "read") return;
     await db
       .update(schema.reminders)
       .set({ deliveryStatus: "failed", lastError: errs || "Delivery failed", updatedAt: now })
@@ -190,7 +193,7 @@ async function handleDeliveryReceipt(status: WaStatus, errs: string) {
           eq(schema.sequenceEnrollments.orgId, reminder.orgId),
           eq(schema.sequenceEnrollments.leadId, reminder.leadId),
           eq(schema.sequenceEnrollments.sequenceId, step.sequenceId),
-          eq(schema.sequenceEnrollments.status, "active"),
+          inArray(schema.sequenceEnrollments.status, ["active", "processing"]),
         ),
       )
       .returning({ id: schema.sequenceEnrollments.id });
@@ -268,7 +271,7 @@ async function handleInboundMessage(phoneNumberId: string, msg: WaInboundMessage
       and(
         eq(schema.sequenceEnrollments.orgId, org.id),
         eq(schema.sequenceEnrollments.leadId, lead.id),
-        eq(schema.sequenceEnrollments.status, "active"),
+        inArray(schema.sequenceEnrollments.status, ["active", "processing"]),
       ),
     )
     .returning({ id: schema.sequenceEnrollments.id });

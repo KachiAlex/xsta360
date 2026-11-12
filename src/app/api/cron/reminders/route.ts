@@ -3,7 +3,6 @@ import { timingSafeEqual } from "crypto";
 import { db, schema } from "@/db";
 import { isSubscriptionBlocked } from "@/lib/dal";
 import { sendReminderEmail } from "@/lib/email";
-import { sendWhatsAppMessage, formatReminderMessage } from "@/lib/whatsapp";
 import { processSequenceSteps } from "@/lib/sequences";
 import { recomputeOrgLeadScores } from "@/lib/scoring";
 
@@ -34,8 +33,20 @@ export async function GET(request: Request) {
 
   try {
     // Process sequence steps FIRST, so newly-created reminders (e.g. delayDays: 0)
-    // are picked up in the same cron run, not the next one.
-    const seqResult = await processSequenceSteps();
+    // are picked up in the same cron run, not the next one. Isolated in its own
+    // try/catch — a sequence bug must not take down reminder delivery too.
+    let seqResult = {
+      processed: 0,
+      emailsSent: 0,
+      whatsappSent: 0,
+      remindersCreated: 0,
+      skippedWindow: 0,
+    };
+    try {
+      seqResult = await processSequenceSteps();
+    } catch (err) {
+      console.error("Sequence step processing failed:", err);
+    }
 
   // Find pending reminders due now or earlier that haven't been sent.
   const due = await db
@@ -48,10 +59,8 @@ export async function GET(request: Request) {
       note: schema.reminders.note,
       leadName: schema.leads.name,
       leadCompany: schema.leads.company,
-      leadPhone: schema.leads.phone,
       assigneeEmail: schema.users.email,
       orgName: schema.organizations.name,
-      whatsappConfig: schema.organizations.whatsappConfig,
       memberActive: schema.memberships.id,
     })
     .from(schema.reminders)
@@ -103,7 +112,6 @@ export async function GET(request: Request) {
 
   let sent = 0;
   let failed = 0;
-  let whatsappSent = 0;
 
   for (const r of claimed) {
     // Skip if the reminder has no assignee.
@@ -127,28 +135,10 @@ export async function GET(request: Request) {
     }
 
     let didSend = false;
-    let whatsappWamid: string | undefined;
 
-    // Try WhatsApp first if configured and lead has a phone.
-    if (r.whatsappConfig && (r.whatsappConfig as any)?.enabled && r.leadPhone) {
-      const msg = formatReminderMessage(
-        r.leadName,
-        r.note || "Follow-up due",
-        r.orgName || "Xsta360",
-      );
-      const result = await sendWhatsAppMessage(
-        r.whatsappConfig as any,
-        r.leadPhone,
-        msg,
-      );
-      if (result.success) {
-        whatsappSent++;
-        didSend = true;
-        whatsappWamid = result.wamid;
-      }
-    }
-
-    // Also send email to the assignee.
+    // Reminders go to the assignee by email. They intentionally do NOT go to
+    // the lead's WhatsApp — the note is internal rep-facing content and would
+    // leak to the customer.
     if (r.assigneeEmail) {
       try {
         await sendReminderEmail({
@@ -181,8 +171,6 @@ export async function GET(request: Request) {
           status: "sent",
           sentAt: now,
           lastError: null,
-          wamid: whatsappWamid ?? null,
-          deliveryStatus: whatsappWamid ? "sent" : null,
           updatedAt: now,
         })
         .where(eq(schema.reminders.id, r.reminderId));
@@ -206,7 +194,6 @@ export async function GET(request: Request) {
   return Response.json({
     sent,
     failed,
-    whatsappSent,
     checked: claimed.length,
     sequenceSteps: seqResult.processed,
     sequenceEmails: seqResult.emailsSent,

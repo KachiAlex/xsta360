@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
 import { randomUUID, createHash } from "crypto";
 import { db, schema } from "@/db";
 import { isSubscriptionBlocked } from "@/lib/dal";
@@ -46,7 +46,8 @@ export async function enrollLeadInSequence(
     .where(and(eq(schema.leads.id, leadId), eq(schema.leads.orgId, orgId)))
     .limit(1);
 
-  if (lead?.unsubscribedAt) {
+  if (!lead) return { ok: false, message: "Lead not found" };
+  if (lead.unsubscribedAt) {
     return { ok: false, message: "Lead has unsubscribed from sequence emails" };
   }
 
@@ -59,7 +60,7 @@ export async function enrollLeadInSequence(
         eq(schema.sequenceEnrollments.orgId, orgId),
         eq(schema.sequenceEnrollments.sequenceId, sequenceId),
         eq(schema.sequenceEnrollments.leadId, leadId),
-        eq(schema.sequenceEnrollments.status, "active"),
+        inArray(schema.sequenceEnrollments.status, ["active", "processing"]),
       ),
     )
     .limit(1);
@@ -164,8 +165,20 @@ export async function processSequenceSteps(opts?: {
   let remindersCreated = 0;
   let skippedWindow = 0;
 
-  // Get all active enrollments (optionally scoped to one org/sequence).
-  const enrollmentConditions = [eq(schema.sequenceEnrollments.status, "active")];
+  // Get all claimable enrollments (optionally scoped to one org/sequence).
+  // "active" rows plus "processing" rows abandoned >10 min (crashed run) —
+  // the claim below flips status to "processing" atomically so a concurrent
+  // cron or manual "Run now" can't process the same enrollment twice.
+  const staleClaimBefore = new Date(now.getTime() - 10 * 60 * 1000);
+  const enrollmentConditions = [
+    or(
+      eq(schema.sequenceEnrollments.status, "active"),
+      and(
+        eq(schema.sequenceEnrollments.status, "processing"),
+        lt(schema.sequenceEnrollments.updatedAt, staleClaimBefore),
+      ),
+    )!,
+  ];
   if (opts?.orgId) enrollmentConditions.push(eq(schema.sequenceEnrollments.orgId, opts.orgId));
   if (opts?.sequenceId) enrollmentConditions.push(eq(schema.sequenceEnrollments.sequenceId, opts.sequenceId));
   const enrollments = await db
@@ -279,6 +292,27 @@ export async function processSequenceSteps(opts?: {
         continue;
       }
     }
+
+    // Claim the enrollment before sending. The UPDATE only matches if the
+    // row is still claimable ("active", or a stale "processing"), so a
+    // second worker that already fetched this row loses the race and skips.
+    const claimed = await db
+      .update(schema.sequenceEnrollments)
+      .set({ status: "processing", updatedAt: now })
+      .where(
+        and(
+          eq(schema.sequenceEnrollments.id, enrollment.id),
+          or(
+            eq(schema.sequenceEnrollments.status, "active"),
+            and(
+              eq(schema.sequenceEnrollments.status, "processing"),
+              lt(schema.sequenceEnrollments.updatedAt, staleClaimBefore),
+            ),
+          ),
+        ),
+      )
+      .returning({ id: schema.sequenceEnrollments.id });
+    if (claimed.length === 0) continue;
 
     // Load the org for WhatsApp config, org name, reply-to, and custom email domain.
     const [org] = await db
@@ -589,9 +623,10 @@ export async function processSequenceSteps(opts?: {
               ? "No phone number"
               : "Missing WhatsApp config";
         }
-        // Create a reminder record for tracking — except while a template is
-        // still awaiting approval, to avoid piling up failed rows each cron run.
-        if (stepOutcome !== "pending") {
+        // Create a reminder record for tracking — only on an actual send
+        // attempt (delivered/failed). Permanent skips (no phone/config) and
+        // pending template approvals shouldn't pile up tracking rows.
+        if (stepOutcome === "delivered" || stepOutcome === "failed") {
           await db.insert(schema.reminders).values({
             leadId: enrollment.leadId,
             orgId: enrollment.orgId,
@@ -608,7 +643,8 @@ export async function processSequenceSteps(opts?: {
           });
         }
         // After repeated API failures, pause rather than retry every cron run.
-        // (Skipped steps — no phone/config — advance permanently and don't count.)
+        // Scoped to this enrollment (createdAt >= enrolledAt) so a re-enrolled
+        // lead starts with a clean failure count.
         if (stepOutcome === "failed") {
           const waFailRows = await db
             .select({ value: count() })
@@ -619,6 +655,7 @@ export async function processSequenceSteps(opts?: {
                 eq(schema.reminders.sequenceStepId, nextStep.id),
                 eq(schema.reminders.channel, "whatsapp"),
                 eq(schema.reminders.status, "failed"),
+                gte(schema.reminders.createdAt, enrollment.enrolledAt),
               ),
             );
           if ((waFailRows[0]?.value ?? 0) >= MAX_STEP_FAILURES) {
@@ -655,8 +692,22 @@ export async function processSequenceSteps(opts?: {
 
     // Only log and advance when the step was delivered or permanently skipped.
     // On transient failure or pending template approval we leave currentStep
-    // unchanged so the cron retries.
-    if (stepOutcome === "failed" || stepOutcome === "pending") continue;
+    // unchanged so the cron retries — but first release the claim so the next
+    // run can pick the enrollment up again immediately.
+    if (stepOutcome === "failed" || stepOutcome === "pending") {
+      // Release the claim — only if it's still ours. If the enrollment was
+      // paused/cancelled mid-send, leave that status alone.
+      await db
+        .update(schema.sequenceEnrollments)
+        .set({ status: "active", updatedAt: now })
+        .where(
+          and(
+            eq(schema.sequenceEnrollments.id, enrollment.id),
+            eq(schema.sequenceEnrollments.status, "processing"),
+          ),
+        );
+      continue;
+    }
 
     await logEvent(enrollment.orgId, "sequence_step_sent", {
       leadId: enrollment.leadId,
@@ -680,6 +731,18 @@ export async function processSequenceSteps(opts?: {
         updatedAt: now,
       })
       .where(eq(schema.sequenceEnrollments.id, enrollment.id));
+
+    // Release the "processing" claim — unless the enrollment was paused or
+    // cancelled mid-send (a reply webhook or manual pause), which wins.
+    await db
+      .update(schema.sequenceEnrollments)
+      .set({ status: "active", updatedAt: now })
+      .where(
+        and(
+          eq(schema.sequenceEnrollments.id, enrollment.id),
+          eq(schema.sequenceEnrollments.status, "processing"),
+        ),
+      );
 
     processed++;
   }

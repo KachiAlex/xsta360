@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, gt, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { verifyActiveSession, getOrgPlan, planHasFeature } from "@/lib/dal";
 
@@ -170,7 +170,9 @@ export async function addSequenceStep(
     .where(eq(schema.sequenceSteps.sequenceId, parsed.data.sequenceId))
     .orderBy(schema.sequenceSteps.position);
 
-  const nextPos = steps.length;
+  // Position is "max + 1", not steps.length — deleting a middle step leaves
+  // a gap, and reusing a position would make ORDER BY position ambiguous.
+  const nextPos = steps.length ? Math.max(...steps.map((s) => s.position)) + 1 : 0;
 
   // Parse attachments (JSON array of document IDs).
   let attachmentIds: string[] = [];
@@ -210,14 +212,56 @@ export async function deleteSequenceStep(
   const id = String(formData.get("id"));
   if (!z.string().uuid().safeParse(id).success) return { message: "Invalid ID" };
   const [step] = await db
-    .select({ sequenceId: schema.sequenceSteps.sequenceId })
+    .select({
+      sequenceId: schema.sequenceSteps.sequenceId,
+      position: schema.sequenceSteps.position,
+    })
     .from(schema.sequenceSteps)
     .where(and(eq(schema.sequenceSteps.id, id), eq(schema.sequenceSteps.orgId, ctx.orgId)))
     .limit(1);
 
+  // The step's ordinal index — currentStep is an index into the ordered
+  // steps, so shift logic must compare against this, not `position` (which
+  // can carry gaps from earlier deletes).
+  const siblings = step
+    ? await db
+        .select({ id: schema.sequenceSteps.id })
+        .from(schema.sequenceSteps)
+        .where(eq(schema.sequenceSteps.sequenceId, step.sequenceId))
+        .orderBy(schema.sequenceSteps.position)
+    : [];
+  const deletedIndex = siblings.findIndex((s) => s.id === id);
+
   await db
     .delete(schema.sequenceSteps)
     .where(and(eq(schema.sequenceSteps.id, id), eq(schema.sequenceSteps.orgId, ctx.orgId)));
+
+  if (step && deletedIndex >= 0) {
+    // Enrollments that already fired the deleted step have one more step
+    // "done" than the array now reflects — shift them back one. Leads
+    // waiting AT the deleted step keep their index: it points at the next
+    // step, which is correct.
+    await db
+      .update(schema.sequenceEnrollments)
+      .set({ currentStep: sql`${schema.sequenceEnrollments.currentStep} - 1` })
+      .where(
+        and(
+          eq(schema.sequenceEnrollments.sequenceId, step.sequenceId),
+          eq(schema.sequenceEnrollments.orgId, ctx.orgId),
+          gt(schema.sequenceEnrollments.currentStep, deletedIndex),
+        ),
+      );
+
+    // Renumber positions contiguously so position always equals index —
+    // keeps ordering unambiguous and the shift logic valid next time.
+    const remaining = siblings.filter((s) => s.id !== id);
+    for (let i = 0; i < remaining.length; i++) {
+      await db
+        .update(schema.sequenceSteps)
+        .set({ position: i })
+        .where(eq(schema.sequenceSteps.id, remaining[i].id));
+    }
+  }
 
   revalidatePath("/sequences");
   if (step) revalidatePath(`/sequences/${step.sequenceId}`);
@@ -431,7 +475,7 @@ const UpdateSequenceSettingsSchema = z.object({
   sequenceId: z.string().uuid(),
   sendWindowStart: z.string().trim().nullish().or(z.literal("")),
   sendWindowEnd: z.string().trim().nullish().or(z.literal("")),
-  skipWeekends: z.string().optional(),
+  skipWeekends: z.string().nullish(),
   timezone: z.string().trim().default("Africa/Lagos"),
 });
 
@@ -579,6 +623,8 @@ export async function resumeEnrollment(
 
   const enrollmentId = String(formData.get("enrollmentId"));
   if (!z.string().uuid().safeParse(enrollmentId).success) return { message: "Invalid ID" };
+  // Only paused or completed enrollments can be resumed — a cancelled one
+  // (explicit unenroll) stays cancelled.
   await db
     .update(schema.sequenceEnrollments)
     .set({
@@ -592,6 +638,7 @@ export async function resumeEnrollment(
       and(
         eq(schema.sequenceEnrollments.id, enrollmentId),
         eq(schema.sequenceEnrollments.orgId, ctx.orgId),
+        inArray(schema.sequenceEnrollments.status, ["paused", "completed"]),
       ),
     );
 
