@@ -136,16 +136,19 @@ export default async function SettingsPage() {
 
         {/* Messaging usage — this month's sends against plan allowances */}
         <Panel>
-          <PanelHead title="Messaging usage" sub={`${plan.planName} plan · resets monthly`} />
+          <PanelHead title="Messaging usage" sub={`${plan.planName} plan · resets on the 1st of each month`} />
           <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <UsageMeter label="Emails this month" used={usage.emailsThisMonth} limit={emailLimit} />
             <UsageMeter label="WhatsApp this month" used={usage.whatsappThisMonth} limit={waMonthlyLimit} />
             <UsageMeter label="WhatsApp today" used={usage.whatsappToday} limit={waDailyLimit} />
           </div>
-          <p className="px-5 pb-4 text-[11px] text-ink-soft">
-            WhatsApp messages are billed by Meta directly to your WABA&apos;s payment method — the
-            monthly/daily limits above cap how many the platform sends on your behalf.
-          </p>
+          <div className="px-5 pb-4 space-y-1.5 text-[11px] text-ink-soft border-t border-dashed border-rule pt-3.5">
+            <p><span className="font-semibold text-ink">What counts:</span> every email or WhatsApp message a sequence or reminder actually sends. Failed sends don&apos;t count — only accepted deliveries.</p>
+            <p><span className="font-semibold text-ink">Who bills you:</span> WhatsApp messages are billed by <span className="font-semibold">Meta directly to your WABA&apos;s payment method</span> (~5¢ per marketing template message) — that charge is between you and Meta, separate from your Xsta360 subscription. Emails send through our platform at no extra cost to you.</p>
+            <p><span className="font-semibold text-ink">When a limit is reached:</span> due sequence steps pause automatically and retry on the next run — nothing is lost or cancelled. Sends resume on the 1st of the month (or tomorrow for the daily cap). You&apos;ll get a notification the first time it happens each period.</p>
+            <p><span className="font-semibold text-ink">Why a daily WhatsApp cap:</span> Meta throttles numbers that send high volumes of marketing messages — the cap protects your WABA quality rating. Replies from a lead open a free 24-hour window where messages don&apos;t use the marketing-template rate.</p>
+            <p><span className="font-semibold text-ink">Need more?</span> Upgrade your plan or contact support to raise a limit.</p>
+          </div>
         </Panel>
 
         {/* Org settings: WhatsApp, custom fields, currency */}
