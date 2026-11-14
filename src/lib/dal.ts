@@ -214,6 +214,29 @@ export function getPlanMaxMembers(plan: OrgPlan): number | null {
 }
 
 /**
+ * Conservative send quotas applied when a plan doesn't declare the key —
+ * protects orgs without a subscription (and legacy plans) from runaway
+ * sends. Admins override per-plan via the features JSON.
+ */
+const DEFAULT_QUOTAS: Record<string, number> = {
+  email_monthly_limit: 500,
+  whatsapp_monthly_limit: 100,
+  whatsapp_daily_limit: 50,
+};
+
+/**
+ * Read a send quota from the plan's features (e.g. "whatsapp_monthly_limit").
+ * Explicit -1 = unlimited (returns null). Missing keys fall back to the
+ * conservative defaults above.
+ */
+export function getPlanQuota(plan: OrgPlan, key: string): number | null {
+  const v = (plan.features as Record<string, unknown>)?.[key];
+  if (v === -1) return null;
+  if (typeof v === "number") return v;
+  return DEFAULT_QUOTAS[key] ?? null;
+}
+
+/**
  * Check a feature flag on the plan (e.g. "reports", "sequences").
  * Locked only when the flag is explicitly `false` — orgs without a
  * subscription (pre-billing) or plans that don't declare the flag

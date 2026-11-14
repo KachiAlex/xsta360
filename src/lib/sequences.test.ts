@@ -69,6 +69,16 @@ vi.mock("@/lib/audit", () => ({
 const isSubscriptionBlockedMock = vi.fn(() => Promise.resolve(false));
 vi.mock("@/lib/dal", () => ({
   isSubscriptionBlocked: isSubscriptionBlockedMock,
+  // Quotas: unlimited in tests unless a test overrides.
+  getOrgPlan: vi.fn(() => Promise.resolve({ features: {} })),
+  getPlanQuota: vi.fn(() => null),
+}));
+
+// Send-usage metering — zeroed in tests so quotas never hold sends.
+vi.mock("@/lib/usage", () => ({
+  getOrgSendUsage: vi.fn(() =>
+    Promise.resolve({ emailsThisMonth: 0, whatsappThisMonth: 0, whatsappToday: 0 }),
+  ),
 }));
 
 vi.mock("@/lib/whatsapp", () => ({

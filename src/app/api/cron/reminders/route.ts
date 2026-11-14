@@ -41,6 +41,7 @@ export async function GET(request: Request) {
       whatsappSent: 0,
       remindersCreated: 0,
       skippedWindow: 0,
+      quotaHeld: 0,
     };
     try {
       seqResult = await processSequenceSteps();
@@ -200,6 +201,7 @@ export async function GET(request: Request) {
     sequenceWhatsapp: seqResult.whatsappSent,
     sequenceReminders: seqResult.remindersCreated,
     sequenceSkippedWindow: seqResult.skippedWindow,
+    sequenceQuotaHeld: seqResult.quotaHeld,
     scoresUpdated,
   });
   } catch (err) {

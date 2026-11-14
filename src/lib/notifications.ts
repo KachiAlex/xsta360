@@ -10,6 +10,7 @@ export type NotificationType =
   | "card_lead"
   | "card_saved"
   | "sequence_step"
+  | "quota_exceeded"
   | "team_invite";
 
 /**

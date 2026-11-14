@@ -1,4 +1,5 @@
-import { requireAuth, can } from "@/lib/dal";
+import { requireAuth, can, getOrgPlan, getPlanQuota } from "@/lib/dal";
+import { getOrgSendUsage } from "@/lib/usage";
 import { getOrgStages, getOrgMembers } from "@/lib/queries";
 import { db, schema } from "@/db";
 import { eq, and, isNull } from "drizzle-orm";
@@ -17,7 +18,7 @@ export default async function SettingsPage() {
   const ctx = await requireAuth();
   const isAdmin = can(ctx, "manage_team");
 
-  const [stages, members, invitations, org] = await Promise.all([
+  const [stages, members, invitations, org, plan, usage] = await Promise.all([
     getOrgStages(ctx.orgId),
     getOrgMembers(ctx.orgId),
     isAdmin
@@ -29,7 +30,13 @@ export default async function SettingsPage() {
         )
       : Promise.resolve([]),
     db.select().from(schema.organizations).where(eq(schema.organizations.id, ctx.orgId)).limit(1),
+    getOrgPlan(ctx.orgId),
+    getOrgSendUsage(ctx.orgId),
   ]);
+
+  const emailLimit = getPlanQuota(plan, "email_monthly_limit");
+  const waMonthlyLimit = getPlanQuota(plan, "whatsapp_monthly_limit");
+  const waDailyLimit = getPlanQuota(plan, "whatsapp_daily_limit");
 
   return (
     <>
@@ -127,6 +134,20 @@ export default async function SettingsPage() {
           </Panel>
         )}
 
+        {/* Messaging usage — this month's sends against plan allowances */}
+        <Panel>
+          <PanelHead title="Messaging usage" sub={`${plan.planName} plan · resets monthly`} />
+          <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <UsageMeter label="Emails this month" used={usage.emailsThisMonth} limit={emailLimit} />
+            <UsageMeter label="WhatsApp this month" used={usage.whatsappThisMonth} limit={waMonthlyLimit} />
+            <UsageMeter label="WhatsApp today" used={usage.whatsappToday} limit={waDailyLimit} />
+          </div>
+          <p className="px-5 pb-4 text-[11px] text-ink-soft">
+            WhatsApp messages are billed by Meta directly to your WABA&apos;s payment method — the
+            monthly/daily limits above cap how many the platform sends on your behalf.
+          </p>
+        </Panel>
+
         {/* Org settings: WhatsApp, custom fields, currency */}
         {can(ctx, "configure") && org[0] && (
           <Panel>
@@ -147,5 +168,24 @@ export default async function SettingsPage() {
         )}
       </div>
     </>
+  );
+}
+
+/** Small "used / limit" meter; null limit renders as unlimited. */
+function UsageMeter({ label, used, limit }: { label: string; used: number; limit: number | null }) {
+  const pct = limit && limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+  const tone = pct >= 100 ? "bg-stamp" : pct >= 80 ? "bg-today" : "bg-[var(--accent)]";
+  return (
+    <div>
+      <div className="flex items-baseline justify-between">
+        <span className="text-xs font-semibold">{label}</span>
+        <span className="font-mono text-xs text-ink-soft">
+          {used.toLocaleString()}{limit == null ? " sent" : ` / ${limit.toLocaleString()}`}
+        </span>
+      </div>
+      <div className="mt-1.5 h-1.5 rounded bg-paper-2 overflow-hidden">
+        {limit != null && <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />}
+      </div>
+    </div>
   );
 }

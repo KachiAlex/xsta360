@@ -67,6 +67,9 @@ async function seedAdmin() {
         sso: false,
         dedicated_support: false,
         max_members: 3,
+        email_monthly_limit: 500,
+        whatsapp_monthly_limit: 50,
+        whatsapp_daily_limit: 25,
       },
       position: 0,
     },
@@ -85,6 +88,9 @@ async function seedAdmin() {
         sso: false,
         dedicated_support: false,
         max_members: 10,
+        email_monthly_limit: 2000,
+        whatsapp_monthly_limit: 200,
+        whatsapp_daily_limit: 100,
       },
       position: 1,
     },
@@ -103,6 +109,9 @@ async function seedAdmin() {
         sso: false,
         dedicated_support: false,
         max_members: 25,
+        email_monthly_limit: 10000,
+        whatsapp_monthly_limit: 500,
+        whatsapp_daily_limit: 200,
       },
       position: 2,
     },
@@ -121,6 +130,9 @@ async function seedAdmin() {
         sso: true,
         dedicated_support: true,
         max_members: null, // unlimited
+        email_monthly_limit: -1, // unlimited
+        whatsapp_monthly_limit: 2000,
+        whatsapp_daily_limit: 200,
       },
       position: 3,
     },
@@ -139,7 +151,11 @@ async function seedAdmin() {
         api_access: true,
         sso: true,
         dedicated_support: true,
-        max_members: null, // unlimited
+        max_members: null, // unlimited seats
+        // Usage still capped — lifetime buys feature access, not unlimited sends.
+        email_monthly_limit: 10000,
+        whatsapp_monthly_limit: 500,
+        whatsapp_daily_limit: 200,
       },
       position: 4,
     },

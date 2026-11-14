@@ -373,15 +373,18 @@ export async function runSequenceNow(
   if (result.processed === 0) {
     return {
       ok: true,
-      message: result.skippedWindow > 0
-        ? `${result.skippedWindow} step(s) held — outside the send window`
-        : "No due steps — enrollments may not exist or next steps aren't due yet",
+      message: result.quotaHeld > 0
+        ? `${result.quotaHeld} step(s) held — plan quota reached (resumes next period or after upgrade)`
+        : result.skippedWindow > 0
+          ? `${result.skippedWindow} step(s) held — outside the send window`
+          : "No due steps — enrollments may not exist or next steps aren't due yet",
     };
   }
   const parts: string[] = [];
   if (result.emailsSent) parts.push(`${result.emailsSent} email${result.emailsSent === 1 ? "" : "s"}`);
   if (result.whatsappSent) parts.push(`${result.whatsappSent} WhatsApp${result.whatsappSent === 1 ? "" : "s"}`);
   if (result.remindersCreated) parts.push(`${result.remindersCreated} reminder${result.remindersCreated === 1 ? "" : "s"}`);
+  if (result.quotaHeld) parts.push(`${result.quotaHeld} held — quota reached`);
   return { ok: true, message: `Sent: ${parts.join(", ") || `${result.processed} step(s) processed`}` };
 }
 

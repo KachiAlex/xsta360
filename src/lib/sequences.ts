@@ -2,7 +2,9 @@ import "server-only";
 import { and, asc, count, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
 import { randomUUID, createHash } from "crypto";
 import { db, schema } from "@/db";
-import { isSubscriptionBlocked } from "@/lib/dal";
+import { isSubscriptionBlocked, getOrgPlan, getPlanQuota } from "@/lib/dal";
+import { getOrgSendUsage, type OrgSendUsage } from "@/lib/usage";
+import { broadcastToOrg } from "@/lib/notifications";
 import { logEvent } from "@/lib/audit";
 import {
   sendWhatsAppMessage,
@@ -157,6 +159,7 @@ export async function processSequenceSteps(opts?: {
   whatsappSent: number;
   remindersCreated: number;
   skippedWindow: number;
+  quotaHeld: number;
 }> {
   const now = new Date();
   let processed = 0;
@@ -164,6 +167,7 @@ export async function processSequenceSteps(opts?: {
   let whatsappSent = 0;
   let remindersCreated = 0;
   let skippedWindow = 0;
+  let quotaHeld = 0;
 
   // Get all claimable enrollments (optionally scoped to one org/sequence).
   // "active" rows plus "processing" rows abandoned >10 min (crashed run) —
@@ -221,6 +225,12 @@ export async function processSequenceSteps(opts?: {
     : [];
   const leadsById = new Map(allLeads.map((l) => [l.id, l]));
 
+  // Per-org plan + send-usage caches — the quota check would otherwise
+  // query the same rows once per enrollment.
+  const planByOrg = new Map<string, Awaited<ReturnType<typeof getOrgPlan>>>();
+  const usageByOrg = new Map<string, OrgSendUsage>();
+  const quotaNotified = new Set<string>();
+
   for (const enrollment of enrollments) {
     if (blockedOrgIds.has(enrollment.orgId)) continue;
     // Use prefetched steps (already ordered by position).
@@ -242,6 +252,8 @@ export async function processSequenceSteps(opts?: {
 
     const nextStep = steps[nextStepIndex];
     if (!nextStep) continue;
+
+    const action = nextStep.action || "reminder";
 
     // Delay anchors to enrollment for step 0, and to when the previous
     // step fired for all later steps.
@@ -289,6 +301,40 @@ export async function processSequenceSteps(opts?: {
     if (nextStep.action !== "reminder" && seq) {
       if (!isWithinSendWindow(seq, now)) {
         skippedWindow++;
+        continue;
+      }
+    }
+
+    // Plan send quotas — the step holds (and retries next run) once the
+    // org's monthly allowance or daily WhatsApp cap is exhausted. Sends
+    // stay queued rather than being dropped, so an upgrade resumes them.
+    let usage: OrgSendUsage | undefined;
+    if (action === "email" || action === "whatsapp") {
+      let plan = planByOrg.get(enrollment.orgId);
+      if (!plan) {
+        plan = await getOrgPlan(enrollment.orgId);
+        planByOrg.set(enrollment.orgId, plan);
+      }
+      usage = usageByOrg.get(enrollment.orgId);
+      if (!usage) {
+        usage = await getOrgSendUsage(enrollment.orgId, now);
+        usageByOrg.set(enrollment.orgId, usage);
+      }
+
+      const monthlyLimit = getPlanQuota(
+        plan,
+        action === "email" ? "email_monthly_limit" : "whatsapp_monthly_limit",
+      );
+      const monthlyUsed =
+        action === "email" ? usage.emailsThisMonth : usage.whatsappThisMonth;
+      const dailyLimit =
+        action === "whatsapp" ? getPlanQuota(plan, "whatsapp_daily_limit") : null;
+      const overMonthly = monthlyLimit != null && monthlyUsed >= monthlyLimit;
+      const overDaily = dailyLimit != null && usage.whatsappToday >= dailyLimit;
+
+      if (overMonthly || overDaily) {
+        quotaHeld++;
+        await maybeNotifyQuota(enrollment.orgId, action, overDaily, now, quotaNotified);
         continue;
       }
     }
@@ -348,7 +394,6 @@ export async function processSequenceSteps(opts?: {
       orgName,
     };
 
-    const action = nextStep.action || "reminder";
     const reminderNote = nextStep.subject
       ? `${nextStep.subject}: ${nextStep.body}`
       : nextStep.body;
@@ -690,6 +735,16 @@ export async function processSequenceSteps(opts?: {
       }
     }
 
+    // Count the send toward the org's usage so this run can't overshoot
+    // the plan's allowance.
+    if (stepOutcome === "delivered" && usage) {
+      if (action === "email") usage.emailsThisMonth++;
+      else if (action === "whatsapp") {
+        usage.whatsappThisMonth++;
+        usage.whatsappToday++;
+      }
+    }
+
     // Only log and advance when the step was delivered or permanently skipped.
     // On transient failure or pending template approval we leave currentStep
     // unchanged so the cron retries — but first release the claim so the next
@@ -747,5 +802,54 @@ export async function processSequenceSteps(opts?: {
     processed++;
   }
 
-  return { processed, emailsSent, whatsappSent, remindersCreated, skippedWindow };
+  return { processed, emailsSent, whatsappSent, remindersCreated, skippedWindow, quotaHeld };
+}
+
+/**
+ * Notify the org once per quota period (month/day) that a send channel is
+ * exhausted — deduplicates via the notifications table so a run holding 50
+ * steps doesn't blast 50 alerts.
+ */
+async function maybeNotifyQuota(
+  orgId: string,
+  channel: "email" | "whatsapp",
+  overDaily: boolean,
+  now: Date,
+  notified: Set<string>,
+) {
+  const key = `${orgId}:${channel}:${overDaily ? "daily" : "monthly"}`;
+  if (notified.has(key)) return;
+  notified.add(key);
+  try {
+    const since = overDaily
+      ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+      : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const title = overDaily
+      ? "Daily WhatsApp limit reached"
+      : `Monthly ${channel === "email" ? "email" : "WhatsApp"} quota reached`;
+    const [seen] = await db
+      .select({ id: schema.notifications.id })
+      .from(schema.notifications)
+      .where(
+        and(
+          eq(schema.notifications.orgId, orgId),
+          eq(schema.notifications.type, "quota_exceeded"),
+          eq(schema.notifications.title, title),
+          gte(schema.notifications.createdAt, since),
+        ),
+      )
+      .limit(1);
+    if (seen) return;
+    await broadcastToOrg({
+      orgId,
+      type: "quota_exceeded",
+      title,
+      body: `Your ${overDaily ? "daily" : "monthly"} ${
+        channel === "email" ? "email" : "WhatsApp"
+      } allowance is used up. Sends resume ${overDaily ? "tomorrow" : "next month"} — or upgrade your plan for a higher limit.`,
+      link: "/settings",
+    });
+  } catch (e) {
+    console.error("Quota notification failed:", e);
+  }
 }
