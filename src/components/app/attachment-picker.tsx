@@ -61,28 +61,17 @@ export function AttachmentPicker({
     setUploading(true);
     try {
       const mime = file.type || "application/octet-stream";
-      const initRes = await fetch("/api/documents/upload", {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/documents/upload-file", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileName: file.name,
-          mimeType: mime,
-          sizeBytes: file.size,
-          leadId: null,
-        }),
+        body: fd,
       });
-      if (!initRes.ok) {
-        const err = await initRes.json().catch(() => ({}));
-        throw new Error(err.error || "Could not initialize upload");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Upload failed (${res.status})`);
       }
-      const { uploadUrl, docId } = await initRes.json();
-
-      const putRes = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": mime },
-        body: file,
-      });
-      if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
+      const { docId } = await res.json();
 
       const doc: AttachmentDoc = {
         id: docId,

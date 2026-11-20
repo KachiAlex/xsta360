@@ -39,6 +39,9 @@ export function RichTextEditor({
   const [linkText, setLinkText] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [imageAlt, setImageAlt] = useState("");
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const imageFileRef = useRef<HTMLInputElement>(null);
 
   // Sync editor content from defaultValue — but never while the user is
   // typing. Re-assigning innerHTML destroys the DOM selection and collapses
@@ -145,7 +148,46 @@ export function RichTextEditor({
     saveSelection();
     setImageUrl("");
     setImageAlt("");
+    setImageError(null);
+    setImageUploading(false);
     setShowImageModal(true);
+  }
+
+  /** Upload a picked image file, then insert it at the saved caret. */
+  async function uploadImage(file: File) {
+    if (!file.type.startsWith("image/")) {
+      setImageError("That's not an image file — pick a PNG, JPG, GIF or WebP.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setImageError("Images should stay under 10 MB for email deliverability.");
+      return;
+    }
+    setImageError(null);
+    setImageUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/documents/upload-file", { method: "POST", body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Upload failed (${res.status})`);
+      }
+      const { publicUrl } = await res.json();
+      if (!publicUrl) {
+        throw new Error("Uploaded, but your file storage has no public URL — paste a public https:// image link instead.");
+      }
+      restoreSelection();
+      const imgHtml = `<img src="${escapeAttr(publicUrl)}" alt="${escapeAttr(imageAlt || file.name)}" style="max-width: 100%; height: auto; border-radius: 4px; margin: 8px 0;" />`;
+      document.execCommand("insertHTML", false, imgHtml);
+      syncHtml();
+      setShowImageModal(false);
+    } catch (err) {
+      setImageError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setImageUploading(false);
+      if (imageFileRef.current) imageFileRef.current.value = "";
+    }
   }
 
   function confirmImage() {
@@ -362,6 +404,29 @@ export function RichTextEditor({
             <h3 className="font-semibold text-sm mb-3">Insert image</h3>
             <div className="space-y-2">
               <input
+                ref={imageFileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadImage(f);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => imageFileRef.current?.click()}
+                disabled={imageUploading}
+                className="w-full text-sm font-semibold px-3 py-2 min-h-[40px] bg-panel border border-rule rounded hover:bg-paper-2 disabled:opacity-50"
+              >
+                {imageUploading ? "Uploading…" : "↑ Upload from device"}
+              </button>
+              <div className="flex items-center gap-2 text-[11px] text-ink-soft">
+                <span className="flex-1 border-t border-dashed border-rule" />
+                or paste an image URL
+                <span className="flex-1 border-t border-dashed border-rule" />
+              </div>
+              <input
                 type="url"
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
@@ -384,11 +449,12 @@ export function RichTextEditor({
                 placeholder="Alt text (optional)"
                 className="w-full text-sm border border-rule rounded px-3 py-2 min-h-[40px]"
               />
+              {imageError && <p className="text-xs text-stamp">{imageError}</p>}
               <div className="flex justify-end gap-2 pt-1">
                 <button type="button" onClick={() => setShowImageModal(false)} className="text-sm px-3 py-1.5 min-h-[36px] border border-rule rounded hover:bg-paper-2">
                   Cancel
                 </button>
-                <button type="button" onClick={confirmImage} className="text-sm font-semibold px-3 py-1.5 min-h-[36px] bg-ink text-paper rounded hover:bg-ink/90">
+                <button type="button" onClick={confirmImage} disabled={imageUploading} className="text-sm font-semibold px-3 py-1.5 min-h-[36px] bg-ink text-paper rounded hover:bg-ink/90 disabled:opacity-50">
                   Insert
                 </button>
               </div>
