@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
+import { PLACEHOLDER_HELP_ITEMS } from "@/components/app/placeholder-help";
 
 /**
  * Lightweight rich text editor with a formatting toolbar.
@@ -59,6 +60,17 @@ export function RichTextEditor({
     document.execCommand(command, false, value);
     syncHtml();
     editorRef.current?.focus();
+  }
+
+  /** Keep the stored caret fresh as the user moves through the editor. */
+  function captureCaret() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const r = sel.getRangeAt(0);
+      if (editorRef.current?.contains(r.commonAncestorContainer)) {
+        savedRange.current = r.cloneRange();
+      }
+    }
   }
 
   /** Capture the caret/selection before a modal steals focus. */
@@ -122,6 +134,13 @@ export function RichTextEditor({
     setShowLinkModal(false);
   }
 
+  /** Insert a {{variable}} token where the caret last was. */
+  function insertToken(token: string) {
+    restoreSelection();
+    document.execCommand("insertText", false, token);
+    syncHtml();
+  }
+
   function handleImage() {
     saveSelection();
     setImageUrl("");
@@ -150,7 +169,10 @@ export function RichTextEditor({
       {/* Toolbar — preventDefault on mousedown keeps the editor selection */}
       <div
         className="flex items-center gap-0.5 flex-wrap border-b border-rule bg-panel px-1.5 py-1"
-        onMouseDown={(e) => e.preventDefault()}
+        onMouseDown={(e) => {
+          // Buttons must not steal the caret — but the select needs its mousedown to open.
+          if ((e.target as HTMLElement).tagName !== "SELECT") e.preventDefault();
+        }}
       >
         <button type="button" onClick={() => exec("bold")} className={btnClass} title="Bold" aria-label="Bold">
           <strong>B</strong>
@@ -247,6 +269,30 @@ export function RichTextEditor({
         <button type="button" onClick={() => exec("redo")} className={btnClass} title="Redo" aria-label="Redo">
           ↷
         </button>
+
+        <span className="w-px h-5 bg-rule mx-1" />
+
+        {/* Variable inserter — tokens are replaced with lead data at send time */}
+        <select
+          className="text-xs bg-panel border border-rule rounded px-1.5 min-h-[36px] font-mono cursor-pointer"
+          value=""
+          onChange={(e) => {
+            const t = e.currentTarget.value;
+            if (t) insertToken(t);
+            e.currentTarget.value = "";
+          }}
+          aria-label="Insert variable"
+          title="Insert variable — replaced with the lead's details when sent"
+        >
+          <option value="" disabled>
+            {"{{…}}"} Field
+          </option>
+          {PLACEHOLDER_HELP_ITEMS.map((p) => (
+            <option key={p.token} value={p.token}>
+              {p.token}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Editable area */}
@@ -255,6 +301,9 @@ export function RichTextEditor({
         contentEditable
         onInput={syncHtml}
         onBlur={syncHtml}
+        onKeyUp={captureCaret}
+        onMouseUp={captureCaret}
+        onFocus={captureCaret}
         className="px-3 py-2.5 text-sm min-h-[120px] focus:outline-none prose prose-sm max-w-none"
         style={{ minHeight: `${rows * 24}px` }}
         data-placeholder={placeholder}

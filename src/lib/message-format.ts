@@ -47,8 +47,10 @@ export function replacePlaceholders(text: string, ctx: MessageContext): string {
     org: ctx.orgName,
   };
 
-  return text.replace(/\{\{(\w+)\}\}/g, (match, key: string) => {
-    return replacements[key.toLowerCase()] ?? match;
+  return text.replace(/\{\{\s*([\w ]+?)\s*\}\}/g, (match, key: string) => {
+    // Normalize {{First Name}}, {{ first_name }} → first_name
+    const normalized = key.trim().toLowerCase().replace(/\s+/g, "_");
+    return replacements[normalized] ?? match;
   });
 }
 
