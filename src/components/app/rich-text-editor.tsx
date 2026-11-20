@@ -30,7 +30,7 @@ export function RichTextEditor({
   onChange?: (html: string) => void;
 }) {
   const editorRef = useRef<HTMLDivElement>(null);
-  const linkModalRef = useRef<HTMLDivElement>(null);
+  const savedRange = useRef<Range | null>(null);
   const [html, setHtml] = useState(defaultValue ?? "");
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -61,6 +61,38 @@ export function RichTextEditor({
     editorRef.current?.focus();
   }
 
+  /** Capture the caret/selection before a modal steals focus. */
+  function saveSelection() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const r = sel.getRangeAt(0);
+      if (editorRef.current?.contains(r.commonAncestorContainer)) {
+        savedRange.current = r.cloneRange();
+        return;
+      }
+    }
+    savedRange.current = null;
+  }
+
+  /** Put the caret back where it was — or at the end of the content. */
+  function restoreSelection() {
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+    const sel = window.getSelection();
+    const r = savedRange.current;
+    savedRange.current = null;
+    sel?.removeAllRanges();
+    if (r && el.contains(r.commonAncestorContainer)) {
+      sel?.addRange(r);
+    } else {
+      const end = document.createRange();
+      end.selectNodeContents(el);
+      end.collapse(false);
+      sel?.addRange(end);
+    }
+  }
+
   function syncHtml() {
     if (editorRef.current) {
       const newHtml = editorRef.current.innerHTML;
@@ -70,49 +102,42 @@ export function RichTextEditor({
   }
 
   function handleLink() {
-    const selection = window.getSelection();
-    const selectedText = selection?.toString() ?? "";
-    setLinkText(selectedText);
+    saveSelection();
+    setLinkText(savedRange.current?.toString() ?? "");
     setLinkUrl("");
     setShowLinkModal(true);
   }
 
   function confirmLink() {
-    if (!linkUrl) {
+    const url = linkUrl.trim();
+    if (!url) {
       setShowLinkModal(false);
       return;
     }
-    editorRef.current?.focus();
-    // Restore selection
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0 && linkText) {
-      // If there was selected text, use it; otherwise insert the URL as text
-    }
-    const displayText = linkText || linkUrl;
-    const linkHtml = `<a href="${escapeAttr(linkUrl)}" style="color: #B23A2E; text-decoration: underline;">${escapeHtml(displayText)}</a>`;
-
-    if (linkText) {
-      document.execCommand("insertHTML", false, linkHtml);
-    } else {
-      document.execCommand("insertHTML", false, linkHtml);
-    }
+    restoreSelection();
+    const displayText = linkText.trim() || url;
+    const linkHtml = `<a href="${escapeAttr(url)}" style="color: #B23A2E; text-decoration: underline;">${escapeHtml(displayText)}</a>`;
+    document.execCommand("insertHTML", false, linkHtml);
     syncHtml();
     setShowLinkModal(false);
   }
 
   function handleImage() {
+    saveSelection();
     setImageUrl("");
     setImageAlt("");
     setShowImageModal(true);
   }
 
   function confirmImage() {
-    if (!imageUrl) {
+    const url = imageUrl.trim();
+    if (!url) {
       setShowImageModal(false);
       return;
     }
+    restoreSelection();
     const altText = imageAlt || "Image";
-    const imgHtml = `<img src="${escapeAttr(imageUrl)}" alt="${escapeAttr(altText)}" style="max-width: 100%; height: auto; border-radius: 4px; margin: 8px 0;" />`;
+    const imgHtml = `<img src="${escapeAttr(url)}" alt="${escapeAttr(altText)}" style="max-width: 100%; height: auto; border-radius: 4px; margin: 8px 0;" />`;
     document.execCommand("insertHTML", false, imgHtml);
     syncHtml();
     setShowImageModal(false);
@@ -122,8 +147,11 @@ export function RichTextEditor({
 
   return (
     <div className="border border-rule rounded bg-paper overflow-hidden">
-      {/* Toolbar */}
-      <div className="flex items-center gap-0.5 flex-wrap border-b border-rule bg-panel px-1.5 py-1">
+      {/* Toolbar — preventDefault on mousedown keeps the editor selection */}
+      <div
+        className="flex items-center gap-0.5 flex-wrap border-b border-rule bg-panel px-1.5 py-1"
+        onMouseDown={(e) => e.preventDefault()}
+      >
         <button type="button" onClick={() => exec("bold")} className={btnClass} title="Bold" aria-label="Bold">
           <strong>B</strong>
         </button>
@@ -246,6 +274,10 @@ export function RichTextEditor({
                 type="url"
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); confirmLink(); }
+                  else if (e.key === "Escape") setShowLinkModal(false);
+                }}
                 placeholder="https://example.com"
                 className="w-full text-sm border border-rule rounded px-3 py-2 min-h-[40px]"
                 autoFocus
@@ -254,6 +286,10 @@ export function RichTextEditor({
                 type="text"
                 value={linkText}
                 onChange={(e) => setLinkText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); confirmLink(); }
+                  else if (e.key === "Escape") setShowLinkModal(false);
+                }}
                 placeholder="Link text (optional)"
                 className="w-full text-sm border border-rule rounded px-3 py-2 min-h-[40px]"
               />
@@ -280,6 +316,10 @@ export function RichTextEditor({
                 type="url"
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); confirmImage(); }
+                  else if (e.key === "Escape") setShowImageModal(false);
+                }}
                 placeholder="https://example.com/image.png"
                 className="w-full text-sm border border-rule rounded px-3 py-2 min-h-[40px]"
                 autoFocus
@@ -288,6 +328,10 @@ export function RichTextEditor({
                 type="text"
                 value={imageAlt}
                 onChange={(e) => setImageAlt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); confirmImage(); }
+                  else if (e.key === "Escape") setShowImageModal(false);
+                }}
                 placeholder="Alt text (optional)"
                 className="w-full text-sm border border-rule rounded px-3 py-2 min-h-[40px]"
               />
