@@ -2,7 +2,8 @@ import { requireAuth, can, getOrgPlan, getPlanQuota } from "@/lib/dal";
 import { getOrgSendUsage } from "@/lib/usage";
 import { getOrgStages, getOrgMembers } from "@/lib/queries";
 import { db, schema } from "@/db";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, desc } from "drizzle-orm";
+import { ApiSettings } from "@/components/app/api-settings";
 import { Topbar } from "@/components/app/topbar";
 import { Panel, PanelHead } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +38,29 @@ export default async function SettingsPage() {
   const emailLimit = getPlanQuota(plan, "email_monthly_limit");
   const waMonthlyLimit = getPlanQuota(plan, "whatsapp_monthly_limit");
   const waDailyLimit = getPlanQuota(plan, "whatsapp_daily_limit");
+
+  const apiAccessEnabled = (plan.features as Record<string, unknown>)?.api_access === true;
+  const [apiKeys, webhooks] = isAdmin
+    ? await Promise.all([
+        db
+          .select({
+            id: schema.apiKeys.id,
+            name: schema.apiKeys.name,
+            prefix: schema.apiKeys.prefix,
+            scopes: schema.apiKeys.scopes,
+            lastUsedAt: schema.apiKeys.lastUsedAt,
+            createdAt: schema.apiKeys.createdAt,
+          })
+          .from(schema.apiKeys)
+          .where(and(eq(schema.apiKeys.orgId, ctx.orgId), isNull(schema.apiKeys.revokedAt)))
+          .orderBy(desc(schema.apiKeys.createdAt)),
+        db
+          .select()
+          .from(schema.orgWebhooks)
+          .where(eq(schema.orgWebhooks.orgId, ctx.orgId))
+          .orderBy(desc(schema.orgWebhooks.createdAt)),
+      ])
+    : [[], []];
 
   return (
     <>
@@ -150,6 +174,19 @@ export default async function SettingsPage() {
             <p><span className="font-semibold text-ink">Need more?</span> Upgrade your plan or contact support to raise a limit.</p>
           </div>
         </Panel>
+
+        {/* Public API — keys + outbound webhooks (admin only) */}
+        {isAdmin && (
+          <Panel>
+            <PanelHead title="API & integrations" sub="Let client apps send messages through your workspace" />
+            <ApiSettings
+              apiAccessEnabled={apiAccessEnabled}
+              keys={apiKeys as unknown as import("@/components/app/api-settings").ApiKeyRow[]}
+              webhooks={webhooks as unknown as import("@/components/app/api-settings").WebhookRow[]}
+              baseUrl={appUrl || "https://your-domain.com"}
+            />
+          </Panel>
+        )}
 
         {/* Org settings: WhatsApp, custom fields, currency */}
         {can(ctx, "configure") && org[0] && (

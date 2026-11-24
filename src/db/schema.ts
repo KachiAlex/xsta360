@@ -1072,3 +1072,79 @@ export const promoRedemptions = pgTable(
     uniqOrgCode: uniqueIndex("promo_redemptions_org_code_idx").on(t.orgId, t.promoCodeId),
   }),
 );
+
+// ---------------------------------------------------------------------------
+// Public REST API — keys, outbound webhooks, idempotency
+// ---------------------------------------------------------------------------
+
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    name: text("name").notNull(),
+    // Display prefix — "xsta_live_ab12cd34" (first chars only, not the secret).
+    prefix: text("prefix").notNull(),
+    // sha256 hash of the full key — plaintext keys are never stored.
+    keyHash: text("key_hash").notNull().unique(),
+    // e.g. ["messages:send", "contacts:write", "sequences:enroll", "read"]
+    scopes: jsonb("scopes").notNull().default([]),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("api_keys_org_idx").on(t.orgId),
+  }),
+);
+
+// Outbound webhook subscriptions — we POST delivery/reply events to these.
+export const orgWebhooks = pgTable(
+  "org_webhooks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    url: text("url").notNull(),
+    // HMAC-SHA256 signing secret — sent back as x-xsta-signature.
+    secret: text("secret").notNull(),
+    // e.g. ["message.sent", "message.delivered", "message.failed", "contact.replied", "contact.opted_out"]
+    events: jsonb("events").notNull().default([]),
+    active: boolean("active").notNull().default(true),
+    lastDeliveredAt: timestamp("last_delivered_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    orgIdx: index("org_webhooks_org_idx").on(t.orgId),
+  }),
+);
+
+// Idempotency for API writes — dedupes retried sends (WooCommerce/Shopify
+// webhooks retry aggressively; replays return the stored response).
+export const apiIdempotencyKeys = pgTable(
+  "api_idempotency_keys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    responseStatus: integer("response_status").notNull(),
+    responseBody: jsonb("response_body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    uniqOrgKey: uniqueIndex("api_idem_org_key_idx").on(t.orgId, t.key),
+    orgIdx: index("api_idem_org_idx").on(t.orgId),
+  }),
+);

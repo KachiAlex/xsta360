@@ -49,6 +49,14 @@ export async function GET(request: Request) {
       console.error("Sequence step processing failed:", err);
     }
 
+    // Housekeeping: expired API idempotency records.
+    try {
+      const { pruneIdempotencyKeys } = await import("@/lib/api");
+      await pruneIdempotencyKeys();
+    } catch (err) {
+      console.error("Idempotency prune failed:", err);
+    }
+
   // Find pending reminders due now or earlier that haven't been sent.
   const due = await db
     .select({

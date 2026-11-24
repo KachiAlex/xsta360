@@ -27,7 +27,7 @@ export async function enrollLeadInSequence(
   orgId: string,
   leadId: string,
   sequenceId: string,
-  enrolledBy: string,
+  enrolledBy: string | null,
 ): Promise<{ ok: boolean; message?: string }> {
   // Check sequence exists and is active.
   const [seq] = await db
@@ -84,7 +84,7 @@ export async function enrollLeadInSequence(
 
   await logEvent(orgId, "sequence_enrolled", {
     leadId,
-    actorId: enrolledBy,
+    actorId: enrolledBy ?? undefined,
     meta: { sequenceId, enrollmentId: enrollment.id },
   });
 

@@ -11,7 +11,7 @@
 // NOTE: click-to-chat helpers are client-safe (no server-only import).
 // The sendWhatsAppMessage function is only called from server code.
 
-interface WhatsAppConfig {
+export interface WhatsAppConfig {
   enabled?: boolean;
   phoneNumberId?: string;
   apiKey?: string;

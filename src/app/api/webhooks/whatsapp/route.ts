@@ -4,6 +4,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { logEvent } from "@/lib/audit";
 import { broadcastToOrg } from "@/lib/notifications";
 import { getConsentAction } from "@/lib/consent";
+import { dispatchOrgWebhook } from "@/lib/outbound-webhooks";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,33 @@ interface WaChangeValue {
   statuses?: WaStatus[];
   messages?: WaInboundMessage[];
   contacts?: { wa_id: string; profile?: { name?: string } }[];
+  // message_template_status_update payloads
+  event?: string;
+  message_template_name?: string;
+  message_template_language?: string;
+  reason?: string;
+}
+
+/**
+ * Meta template status/quality events — notify the org when a template is
+ * paused or a send limit hit, so they can act before the WABA rating drops.
+ * entry.id is the WABA id.
+ */
+async function handleTemplateStatusUpdate(wabaId: string, value?: WaChangeValue) {
+  if (!wabaId || !value) return;
+  const [org] = await db
+    .select({ id: schema.organizations.id })
+    .from(schema.organizations)
+    .where(sql`${schema.organizations.whatsappConfig}->>'wabaId' = ${wabaId}`)
+    .limit(1);
+  if (!org) return;
+  await broadcastToOrg({
+    orgId: org.id,
+    type: "sequence_step",
+    title: `WhatsApp template ${value.message_template_name ?? ""} — ${value.event ?? "status update"}`,
+    body: value.reason ? `Reason: ${value.reason}` : "Check your WhatsApp template status in Meta Business Suite.",
+    link: "/settings",
+  }).catch((e) => console.error("Template-status notification failed:", e));
 }
 
 /**
@@ -84,7 +112,10 @@ export async function POST(request: Request) {
     }
   }
 
-  let payload: { object?: string; entry?: { changes?: { field?: string; value?: WaChangeValue }[] }[] };
+  let payload: {
+    object?: string;
+    entry?: { id?: string; changes?: { field?: string; value?: WaChangeValue }[] }[];
+  };
   try {
     payload = JSON.parse(rawBody);
   } catch {
@@ -104,6 +135,14 @@ export async function POST(request: Request) {
         // client WABA list live, so we only log these — they're informational.
         if (change.field === "account_update") {
           console.log("WhatsApp account_update:", JSON.stringify(change.value));
+          continue;
+        }
+        // Template quality/status changes — Meta sends these under the WABA
+        // id (entry.id), which maps to org.whatsappConfig.wabaId.
+        if (change.field === "message_template_status_update") {
+          await handleTemplateStatusUpdate(entry.id ?? "", change.value).catch((e) =>
+            console.error("Template status update failed:", e),
+          );
           continue;
         }
         if (change.field !== "messages" || !change.value) continue;
@@ -213,6 +252,13 @@ async function handleDeliveryReceipt(status: WaStatus, errs: string) {
         link: `/leads/${reminder.leadId}`,
       }).catch((e) => console.error("Delivery-failure notification failed:", e));
     }
+    void dispatchOrgWebhook(reminder.orgId, "message.failed", {
+      channel: "whatsapp",
+      messageId: reminder.id,
+      wamid: status.id,
+      contactId: reminder.leadId,
+      error: errs || "Delivery failed",
+    }).catch(() => {});
     return;
   }
 
@@ -222,6 +268,13 @@ async function handleDeliveryReceipt(status: WaStatus, errs: string) {
       .update(schema.reminders)
       .set({ deliveryStatus: status.status, deliveredAt: receiptAt, updatedAt: now })
       .where(eq(schema.reminders.id, reminder.id));
+    const evt = status.status === "read" ? "message.read" : "message.delivered";
+    void dispatchOrgWebhook(reminder.orgId, evt, {
+      channel: "whatsapp",
+      messageId: reminder.id,
+      wamid: status.id,
+      contactId: reminder.leadId,
+    }).catch(() => {});
   }
 }
 
@@ -312,7 +365,20 @@ async function handleInboundMessage(phoneNumberId: string, msg: WaInboundMessage
       body: `"${preview || "STOP"}" — WhatsApp sends to this contact are now blocked.`,
       link: `/leads/${lead.id}`,
     }).catch((e) => console.error("Opt-out notification failed:", e));
+    void dispatchOrgWebhook(org.id, "contact.opted_out", {
+      contactId: lead.id,
+      channel: "whatsapp",
+      keyword: preview,
+    }).catch(() => {});
     return;
+  }
+
+  if (consentAction === null) {
+    void dispatchOrgWebhook(org.id, "contact.replied", {
+      contactId: lead.id,
+      channel: "whatsapp",
+      preview,
+    }).catch(() => {});
   }
 
   if (paused.length > 0) {
