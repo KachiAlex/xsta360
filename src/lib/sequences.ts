@@ -276,8 +276,12 @@ export async function processSequenceSteps(opts?: {
       continue;
     }
 
-    // Skip unsubscribed leads for email steps.
-    if (lead.unsubscribedAt && nextStep.action === "email") {
+    // Channel-scoped opt-outs: an email unsubscribe only gates email steps,
+    // a WhatsApp opt-out only gates WhatsApp steps.
+    if (
+      (lead.unsubscribedAt && nextStep.action === "email") ||
+      (lead.whatsappOptOutAt && nextStep.action === "whatsapp")
+    ) {
       await db
         .update(schema.sequenceEnrollments)
         .set({

@@ -389,6 +389,12 @@ export const leads = pgTable(
     }),
     // When the lead unsubscribed from sequence emails (null = not unsubscribed).
     unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
+    // WhatsApp consent — separate channel opt-out from email. Meta policy
+    // requires honoring opt-outs; optIn fields store consent evidence
+    // (source = "inbound_start", "api", "manual", "woocommerce_checkout", …).
+    whatsappOptInAt: timestamp("whatsapp_opt_in_at", { withTimezone: true }),
+    whatsappOptInSource: text("whatsapp_opt_in_source"),
+    whatsappOptOutAt: timestamp("whatsapp_opt_out_at", { withTimezone: true }),
     // When the lead last messaged us on WhatsApp — opens Meta's 24h
     // customer-service window where free-form sends are allowed.
     lastWhatsappInboundAt: timestamp("last_whatsapp_inbound_at", { withTimezone: true }),

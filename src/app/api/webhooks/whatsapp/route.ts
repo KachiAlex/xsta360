@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { logEvent } from "@/lib/audit";
 import { broadcastToOrg } from "@/lib/notifications";
+import { getConsentAction } from "@/lib/consent";
 
 export const dynamic = "force-dynamic";
 
@@ -251,21 +252,34 @@ async function handleInboundMessage(phoneNumberId: string, msg: WaInboundMessage
     .limit(1);
   if (!lead) return;
 
+  const now = new Date();
+  const text = msg.type === "text" ? (msg.text?.body ?? "") : "";
+  const consentAction = getConsentAction(text);
+
   // Stamp the 24h service window — sequence steps prefer free-form sends
   // while it's open, which also avoids Meta's marketing-template cap.
-  await db
-    .update(schema.leads)
-    .set({ lastWhatsappInboundAt: new Date(), updatedAt: new Date() })
-    .where(eq(schema.leads.id, lead.id));
+  // Consent keywords update the channel opt-in/out record alongside.
+  const leadUpdate: Record<string, unknown> = {
+    lastWhatsappInboundAt: now,
+    updatedAt: now,
+  };
+  if (consentAction === "out") {
+    leadUpdate.whatsappOptOutAt = now;
+  } else if (consentAction === "in") {
+    leadUpdate.whatsappOptOutAt = null;
+    leadUpdate.whatsappOptInAt = now;
+    leadUpdate.whatsappOptInSource = "inbound_start";
+  }
+  await db.update(schema.leads).set(leadUpdate).where(eq(schema.leads.id, lead.id));
 
   const paused = await db
     .update(schema.sequenceEnrollments)
     .set({
       status: "paused",
-      pausedReason: "reply",
-      pausedAt: new Date(),
-      repliedAt: new Date(),
-      updatedAt: new Date(),
+      pausedReason: consentAction === "out" ? "unsubscribed" : "reply",
+      pausedAt: now,
+      repliedAt: now,
+      updatedAt: now,
     })
     .where(
       and(
@@ -280,8 +294,26 @@ async function handleInboundMessage(phoneNumberId: string, msg: WaInboundMessage
 
   await logEvent(org.id, "activity_logged", {
     leadId: lead.id,
-    meta: { channel: "whatsapp_inbound", preview, pausedEnrollments: paused.length },
+    meta: {
+      channel: "whatsapp_inbound",
+      preview,
+      pausedEnrollments: paused.length,
+      ...(consentAction ? { consentAction } : {}),
+    },
   });
+
+  // An opt-out is binding whether or not any enrollment was active —
+  // always surface it so the org knows the channel is closed.
+  if (consentAction === "out") {
+    await broadcastToOrg({
+      orgId: org.id,
+      type: "sequence_step",
+      title: `${lead.name} opted out of WhatsApp`,
+      body: `"${preview || "STOP"}" — WhatsApp sends to this contact are now blocked.`,
+      link: `/leads/${lead.id}`,
+    }).catch((e) => console.error("Opt-out notification failed:", e));
+    return;
+  }
 
   if (paused.length > 0) {
     await broadcastToOrg({

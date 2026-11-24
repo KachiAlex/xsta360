@@ -724,6 +724,46 @@ describe("processSequenceSteps — whatsapp flow", () => {
     expect(msg).toContain("— Kreatix");
   });
 
+  it("pauses (does not send or advance) when lead opted out of WhatsApp", async () => {
+    const setSpy = vi.fn(() => ({
+      where: vi.fn(() => ({
+        then: (resolve: any, reject?: any) => Promise.resolve().then(resolve, reject),
+        returning: vi.fn(() => Promise.resolve([{ id: "claimed-1" }])),
+      })),
+    }));
+    const updateSpy = vi.fn(() => ({ set: setSpy }));
+
+    const dbMock = buildWhatsAppMockDb({
+      enrollments: [baseEnrollment],
+      steps: [whatsappStep],
+      lead: {
+        id: "lead-w1",
+        name: "Opted Out",
+        email: null,
+        phone: "+234 803 123 4567",
+        company: null,
+        assigneeId: null,
+        unsubscribedAt: null,
+        whatsappOptOutAt: new Date("2026-11-20T10:00:00Z"),
+      },
+      org: {
+        name: "Kreatix",
+        whatsappConfig: { enabled: true, phoneNumberId: "12345", apiKey: "EAAGtest" },
+        replyToEmail: null,
+      },
+    });
+    dbMock.update = updateSpy;
+
+    const { processSequenceSteps } = await loadSequencesWithWhatsApp(dbMock);
+    const result = await processSequenceSteps();
+
+    expect(sendWhatsAppMock).not.toHaveBeenCalled();
+    expect(result.whatsappSent).toBe(0);
+    expect(result.processed).toBe(0);
+    // Paused with the unsubscribe reason.
+    expect(setSpy.mock.calls.some((c: any[]) => c[0]?.pausedReason === "unsubscribed")).toBe(true);
+  });
+
   it("advances (skips) when lead has no phone", async () => {
     const dbMock = buildWhatsAppMockDb({
       enrollments: [baseEnrollment],
