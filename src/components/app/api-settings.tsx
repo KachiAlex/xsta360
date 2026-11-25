@@ -108,6 +108,7 @@ export function ApiSettings({
       <p className="text-xs text-ink-soft">
         Base URL: <code className="font-mono bg-paper-2 px-1.5 py-0.5 rounded">{baseUrl}/api/v1</code>
         {" · "}Auth: <code className="font-mono bg-paper-2 px-1.5 py-0.5 rounded">Authorization: Bearer xsta_live_…</code>
+        {" · "}<a href="/api-docs" target="_blank" rel="noreferrer" className="text-stamp underline underline-offset-2">API docs &amp; integration guide ↗</a>
       </p>
 
       {error && <p className="text-xs text-stamp">{error}</p>}

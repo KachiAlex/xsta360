@@ -36,6 +36,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "yearly" as const,
       priority: 0.2,
     },
+    {
+      url: `${siteUrl}/api-docs`,
+      lastModified: now,
+      changeFrequency: "monthly" as const,
+      priority: 0.4,
+    },
   ];
 
   return staticRoutes;
