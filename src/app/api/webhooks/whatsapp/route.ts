@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { logEvent } from "@/lib/audit";
 import { broadcastToOrg } from "@/lib/notifications";
+import { sendMail } from "@/lib/email";
 import { getConsentAction } from "@/lib/consent";
 import { dispatchOrgWebhook } from "@/lib/outbound-webhooks";
 
@@ -294,7 +295,11 @@ async function handleInboundMessage(phoneNumberId: string, msg: WaInboundMessage
 
   // Match lead by phone digits — stored formats vary (+234…, 0803…, etc).
   const [lead] = await db
-    .select({ id: schema.leads.id, name: schema.leads.name })
+    .select({
+      id: schema.leads.id,
+      name: schema.leads.name,
+      assigneeId: schema.leads.assigneeId,
+    })
     .from(schema.leads)
     .where(
       and(
@@ -355,6 +360,17 @@ async function handleInboundMessage(phoneNumberId: string, msg: WaInboundMessage
     },
   });
 
+  // Email the assignee (or org admins if unassigned) — an inbound reply is
+  // high-signal and easy to miss in the notification bell.
+  void emailReplyAlert({
+    orgId: org.id,
+    leadId: lead.id,
+    leadName: lead.name,
+    assigneeId: lead.assigneeId,
+    preview,
+    optedOut: consentAction === "out",
+  }).catch((e) => console.error("Reply alert email failed:", e));
+
   // An opt-out is binding whether or not any enrollment was active —
   // always surface it so the org knows the channel is closed.
   if (consentAction === "out") {
@@ -389,5 +405,65 @@ async function handleInboundMessage(phoneNumberId: string, msg: WaInboundMessage
       body: `Paused ${paused.length} active sequence${paused.length === 1 ? "" : "s"}. "${preview}"`,
       link: `/leads/${lead.id}`,
     }).catch((e) => console.error("Reply notification failed:", e));
+  }
+}
+
+/**
+ * Email alert for an inbound WhatsApp message — goes to the lead's
+ * assignee, or all admin/manager members when the lead is unassigned.
+ */
+async function emailReplyAlert(params: {
+  orgId: string;
+  leadId: string;
+  leadName: string;
+  assigneeId: string | null;
+  preview: string;
+  optedOut: boolean;
+}) {
+  const { orgId, leadId, leadName, assigneeId, preview, optedOut } = params;
+
+  let recipients: { email: string }[] = [];
+  if (assigneeId) {
+    recipients = await db
+      .select({ email: schema.users.email })
+      .from(schema.users)
+      .where(eq(schema.users.id, assigneeId))
+      .limit(1);
+  }
+  if (recipients.length === 0) {
+    recipients = await db
+      .select({ email: schema.users.email })
+      .from(schema.memberships)
+      .innerJoin(schema.users, eq(schema.memberships.userId, schema.users.id))
+      .where(
+        and(
+          eq(schema.memberships.orgId, orgId),
+          inArray(schema.memberships.role, ["admin", "manager"]),
+        ),
+      );
+  }
+  if (recipients.length === 0) return;
+
+  const appUrl = process.env.APP_URL ?? "https://xsta360.com.ng";
+  const subject = optedOut
+    ? `${leadName} opted out of WhatsApp`
+    : `${leadName} replied on WhatsApp`;
+  const html = `
+    <div style="font-family:system-ui,sans-serif;max-width:560px">
+      <p style="margin:0 0 12px"><strong>${leadName}</strong> ${
+        optedOut ? "opted out of WhatsApp with:" : "sent you a WhatsApp message:"
+      }</p>
+      <blockquote style="margin:0 0 16px;padding:10px 14px;border-left:3px solid #d4cfc7;background:#f7f5f2;color:#3d3a34">
+        ${preview || "(non-text message)"}
+      </blockquote>
+      <p style="margin:0">
+        <a href="${appUrl}/leads/${leadId}" style="color:#b3541e">View lead →</a>
+        &nbsp;·&nbsp;
+        <a href="${appUrl}/replies" style="color:#b3541e">All replies →</a>
+      </p>
+    </div>`;
+
+  for (const r of recipients) {
+    await sendMail(r.email, subject, html, { senderName: "Xsta360" });
   }
 }

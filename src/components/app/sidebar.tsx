@@ -21,6 +21,7 @@ const NAV = [
   { href: "/leads", label: "Leads", icon: "▥", key: "leads" },
   { href: "/categories", label: "Categories", icon: "🏷", key: "categories" },
   { href: "/sequences", label: "Sequences", icon: "↻", key: "sequences" },
+  { href: "/replies", label: "Replies", icon: "◉", key: "replies" },
   { href: "/documents", label: "Documents", icon: "📎", key: "documents" },
   { href: "/reports", label: "Reports", icon: "▧", key: "reports" },
   { href: "/billing", label: "Billing", icon: "₦", key: "billing" },

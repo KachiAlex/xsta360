@@ -23,7 +23,7 @@ async function isValidSession(token: string | undefined): Promise<boolean> {
 
 // Routes that require a session. Anything else is public (homepage, login,
 // signup, the embedded form endpoint, the cron route).
-const PROTECTED = ["/dashboard", "/leads", "/pipeline", "/reports", "/settings", "/team", "/tasks", "/sequences", "/follow-ups", "/billing", "/contact-card", "/admin", "/categories", "/documents"];
+const PROTECTED = ["/dashboard", "/leads", "/pipeline", "/reports", "/settings", "/team", "/tasks", "/sequences", "/follow-ups", "/billing", "/contact-card", "/admin", "/categories", "/documents", "/replies"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
